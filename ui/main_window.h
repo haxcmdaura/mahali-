@@ -189,6 +189,7 @@ private:
     // One zakat reminder check per run of the app. Kept because the check is a
     // pure read now, so nothing but this stops it being asked twice.
     bool m_zakatCheckedThisSession = false;
+    bool m_greetingCheckedThisSession = false;
     // The column the nav groups are added to. Held so a role change can empty
     // it and build the groups again without rebuilding the window.
     QVBoxLayout* m_sidebarGroupLayout = nullptr;

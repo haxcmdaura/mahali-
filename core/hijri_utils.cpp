@@ -46,6 +46,28 @@ QString getCurrentHijriOccasion(const QDate& gregorianDate)
     return {};
 }
 
+QString formatHijriDate(const QDate& gregorianDate)
+{
+    if (!gregorianDate.isValid()) {
+        return {};
+    }
+
+    const QCalendar calendar = hijriCalendar();
+    if (!calendar.isValid()) {
+        return {};
+    }
+
+    const QCalendar::YearMonthDay parts = calendar.partsFromDate(gregorianDate);
+    if (!parts.isValid() || parts.year == QCalendar::Unspecified) {
+        return {};
+    }
+
+    return QStringLiteral("%1-%2-%3")
+        .arg(parts.year)
+        .arg(parts.month, 2, 10, QLatin1Char('0'))
+        .arg(parts.day, 2, 10, QLatin1Char('0'));
+}
+
 std::optional<QDate> hijriOccasionStart(int hijriYear, const QString& occasionKey)
 {
     const QCalendar calendar = hijriCalendar();

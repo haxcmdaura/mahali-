@@ -1,5 +1,6 @@
  #include <QtTest/QtTest>
 
+#include <QCalendar>
 #include <QDate>
 #include <QDateEdit>
 #include <QDir>
@@ -201,6 +202,8 @@ private slots:
     void occasions_page_lists_occasions();
     void occasions_page_create_dialog_populates_table();
     void occasions_page_mode_controls();
+    void occasions_page_row_actions_deactivate_and_edit();
+    void occasions_page_shows_hijri_agenda_and_auto_reason();
 
 private:
     void seedSyncDatabase(const QString& path, int* productId, int* sessionId);
@@ -3418,30 +3421,33 @@ void UiTest::occasion_greeting_shown_once_on_startup()
     ui::MainWindow window(db, controller);
     window.show();
 
+    const auto greetingDialog = []() -> QMessageBox* {
+        for (QWidget* widget : QApplication::topLevelWidgets()) {
+            if (auto* box = qobject_cast<QMessageBox*>(widget);
+                box && box->objectName() == QStringLiteral("occasionGreetingDialog")) {
+                return box;
+            }
+        }
+        return nullptr;
+    };
+
     bool dialogSeen = false;
     QString shownText;
-    QTimer::singleShot(0, [&dialogSeen, &shownText]() {
-        if (auto* modal = qobject_cast<QMessageBox*>(QApplication::activeModalWidget())) {
+    QTimer::singleShot(10, [&dialogSeen, &shownText, greetingDialog]() {
+        if (auto* box = greetingDialog()) {
             dialogSeen = true;
-            shownText = modal->text();
-            modal->accept();
+            shownText = box->text();
+            box->accept();
         }
     });
-    window.maybeShowOccasionGreeting();
 
-    QVERIFY(dialogSeen);
+    QTest::qWait(100);
+    QVERIFY2(dialogSeen, "the startup timer must show the greeting without a manual call");
     QCOMPARE(shownText, QStringLiteral("عيد أضحى مبارك"));
     QVERIFY(settings.value(key).has_value());
 
-    dialogSeen = false;
-    QTimer::singleShot(0, [&dialogSeen]() {
-        if (auto* modal = qobject_cast<QMessageBox*>(QApplication::activeModalWidget())) {
-            dialogSeen = true;
-            modal->accept();
-        }
-    });
     window.maybeShowOccasionGreeting();
-    QVERIFY(!dialogSeen);
+    QVERIFY(greetingDialog() == nullptr);
 }
 
 void UiTest::pos_shows_active_occasion_offer()
@@ -3524,7 +3530,8 @@ void UiTest::occasions_page_lists_occasions()
 
     QTableWidget* table = page->findChild<QTableWidget*>(QStringLiteral("occasionTable"));
     QVERIFY2(table != nullptr, "the occasions page must show a table, not a stub label");
-    QCOMPARE(table->columnCount(), 6);
+    QCOMPARE(table->columnCount(), 7);
+    QCOMPARE(table->horizontalHeaderItem(6)->text(), QStringLiteral("Actions"));
     QCOMPARE(table->rowCount(), 1);
     QVERIFY2(table->item(0, 1) != nullptr, "the row must carry the occasion name");
     QVERIFY(table->item(0, 1)->text().contains(occasion.name));
@@ -3657,6 +3664,128 @@ void UiTest::occasions_page_mode_controls()
              QStringLiteral("disabled"));
     QCOMPARE(page.modeLabel()->property("mode").toString(), QStringLiteral("disabled"));
     QVERIFY(!page.modeLabel()->text().isEmpty());
+}
+
+void UiTest::occasions_page_row_actions_deactivate_and_edit()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasion-row-actions.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+
+    data::OccasionRepository occasions(db);
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("رمضان");
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
+    occasion.createdAt = data::nowIso();
+    occasion.active = true;
+    const int occasionId = occasions.insert(occasion);
+    QVERIFY2(occasionId > 0, qPrintable(db.lastError()));
+
+    ui::OccasionsPage page(db);
+    QTableWidget* table = page.table();
+    QVERIFY2(table != nullptr, "the occasions page must show a table");
+    QCOMPARE(table->columnCount(), 7);
+    QVERIFY2(table->horizontalHeaderItem(6) != nullptr, "the table needs an Actions column");
+    QCOMPARE(table->horizontalHeaderItem(6)->text(), QStringLiteral("Actions"));
+
+    QWidget* actionCell = table->cellWidget(0, 6);
+    QVERIFY2(actionCell != nullptr, "each row needs its own action buttons");
+    QPushButton* deactivate =
+        actionCell->findChild<QPushButton*>(QStringLiteral("occasionDeactivateButton"));
+    QPushButton* edit = actionCell->findChild<QPushButton*>(QStringLiteral("occasionEditButton"));
+    QVERIFY2(deactivate != nullptr, "the row needs a deactivate button");
+    QVERIFY2(edit != nullptr, "the row needs an edit button");
+    QCOMPARE(deactivate->text(), QStringLiteral("تعطيل"));
+    QCOMPARE(edit->text(), QStringLiteral("تعديل"));
+
+    deactivate->click();
+    const auto afterDeactivate = occasions.findById(occasionId);
+    QVERIFY(afterDeactivate.has_value());
+    QVERIFY2(!afterDeactivate->active, "the row action must clear the occasion's active flag");
+    QVERIFY(!page.activeAt(0));
+
+    bool editHandled = false;
+    bool watchdogFired = false;
+    QTimer::singleShot(0, [&editHandled]() {
+        auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        if (!modal) {
+            return;
+        }
+        editHandled = true;
+        if (auto* field = modal->findChild<QLineEdit*>(QStringLiteral("occasionNameField"))) {
+            field->setText(QStringLiteral("رمضان معدل"));
+        }
+        if (auto* buttons = modal->findChild<QDialogButtonBox*>()) {
+            if (QPushButton* save = buttons->button(QDialogButtonBox::Save)) {
+                save->click();
+            }
+        }
+    });
+    QTimer watchdog;
+    watchdog.setSingleShot(true);
+    QObject::connect(&watchdog, &QTimer::timeout, [&watchdogFired]() {
+        watchdogFired = true;
+        if (auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget())) {
+            modal->reject();
+        }
+    });
+    watchdog.start(3000);
+
+    edit->click();
+
+    QVERIFY2(!watchdogFired, "the edit dialog stayed open until the watchdog fired");
+    QVERIFY2(editHandled, "the edit button must open the dialog for this row");
+    QCOMPARE(occasions.findById(occasionId)->name, QStringLiteral("رمضان معدل"));
+}
+
+void UiTest::occasions_page_shows_hijri_agenda_and_auto_reason()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasion-hijri-agenda.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+
+    data::OccasionRepository occasions(db);
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("رمضان");
+    occasion.startsAt = QStringLiteral("2020-01-01T00:00:00.000");
+    occasion.endsAt = QStringLiteral("2020-01-31T23:59:59.999");
+    occasion.createdAt = data::nowIso();
+    occasion.active = true;
+    occasion.themeKey = QStringLiteral("ramadan");
+    QVERIFY(occasions.insert(occasion) > 0);
+
+    data::SettingRepository settings(db);
+    settings.set(QStringLiteral("occasion_mode"), QStringLiteral("auto"));
+
+    ui::OccasionsPage page(db);
+    QLabel* hijriLabel = page.findChild<QLabel*>(QStringLiteral("occasionHijriLabel"));
+    QVERIFY2(hijriLabel != nullptr, "auto mode needs a Hijri agenda label");
+
+    const QDate today(2024, 3, 11);
+    const QCalendar calendar(QCalendar::System::IslamicCivil);
+    const QCalendar::YearMonthDay parts = calendar.partsFromDate(today);
+    const QString hijriText = QStringLiteral("%1-%2-%3")
+                                  .arg(parts.year)
+                                  .arg(parts.month, 2, 10, QLatin1Char('0'))
+                                  .arg(parts.day, 2, 10, QLatin1Char('0'));
+
+    page.refresh(today);
+    QVERIFY2(!hijriLabel->isHidden(), "the Hijri agenda must show in auto mode");
+    QVERIFY2(hijriLabel->text().contains(hijriText), qPrintable(hijriLabel->text()));
+
+    QLabel* banner = page.findChild<QLabel*>(QStringLiteral("occasionAutoReasonBanner"));
+    QVERIFY2(banner != nullptr, "an auto-selected occasion needs a reason banner");
+    QVERIFY2(!banner->isHidden(), "the reason banner must show for an auto occasion");
+    QVERIFY2(banner->text().contains(QStringLiteral("رمضان")), qPrintable(banner->text()));
+    QVERIFY2(banner->text().contains(hijriText), qPrintable(banner->text()));
+    QVERIFY2(!banner->styleSheet().isEmpty(), "the reason banner must be coloured");
+    QCOMPARE(banner->property("occasionKey").toString(), QStringLiteral("ramadan"));
+
+    settings.set(QStringLiteral("occasion_mode"), QStringLiteral("disabled"));
+    page.refresh(today);
+    QVERIFY(hijriLabel->isHidden());
+    QVERIFY(banner->isHidden());
 }
 
 void UiTest::language_dialog_returns_the_chosen_code()

@@ -308,6 +308,8 @@ MainWindow::MainWindow(app::data::Database& db, ServerController& controller, QW
         }
     });
 
+    QTimer::singleShot(0, this, [this]() { maybeShowOccasionGreeting(); });
+
     // Built up front but idle: the download only starts when the user asks for
     // it, and a bar is only ever shown when a newer release exists.
     m_updateDownloader = new app::core::UpdateDownloader(this);
@@ -1190,6 +1192,11 @@ QString MainWindow::occasionLabelText() const
 
 void MainWindow::maybeShowOccasionGreeting()
 {
+    if (m_greetingCheckedThisSession) {
+        return;
+    }
+    m_greetingCheckedThisSession = true;
+
     data::OccasionRepository occasions(m_db);
     data::SettingRepository settings(m_db);
     data::OccasionService service(m_db, occasions, settings);
@@ -1209,8 +1216,18 @@ void MainWindow::maybeShowOccasionGreeting()
         return;
     }
 
-    QMessageBox::information(this, tr("تهنئة المناسبة"), greeting);
-    settings.set(key, data::nowIso());
+    auto* dialog = new QMessageBox(QMessageBox::Information, tr("تهنئة المناسبة"),
+                                   greeting, QMessageBox::Ok, this);
+    dialog->setObjectName(QStringLiteral("occasionGreetingDialog"));
+    connect(dialog, &QDialog::finished, this,
+            [this, key, dialog](int) {
+                data::SettingRepository dialogSettings(m_db);
+                dialogSettings.set(key, data::nowIso());
+                dialog->deleteLater();
+            });
+    dialog->open();
+    dialog->raise();
+    dialog->activateWindow();
 }
 
 bool MainWindow::activateOccasion(int occasionId)

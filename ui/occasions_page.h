@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include <QDate>
 #include <QWidget>
 
 #include "core/occasion.h"
@@ -23,6 +24,7 @@ public:
     explicit OccasionsPage(app::data::Database& db, QWidget* parent = nullptr);
 
     void refresh();
+    void refresh(const QDate& today);
 
     int rowCount() const;
     int occasionIdAt(int row) const;
@@ -36,6 +38,8 @@ public:
     QPushButton* autoButton() const { return m_autoButton; }
     QPushButton* disableButton() const { return m_disableButton; }
     QLabel* modeLabel() const { return m_modeLabel; }
+    QLabel* hijriLabel() const { return m_hijriLabel; }
+    QLabel* autoReasonBanner() const { return m_autoReasonBanner; }
 
 private slots:
     void onAddClicked();
@@ -43,6 +47,8 @@ private slots:
     void onManualClicked();
     void onAutoClicked();
     void onDisableClicked();
+    void deactivateOccasionId(int occasionId);
+    void editOccasionId(int occasionId);
 
 private:
     app::data::Database& m_db;
@@ -52,6 +58,8 @@ private:
     QPushButton* m_autoButton;
     QPushButton* m_disableButton;
     QLabel* m_modeLabel;
+    QLabel* m_hijriLabel;
+    QLabel* m_autoReasonBanner;
 };
 
 } // namespace app::ui

@@ -18,9 +18,11 @@
 #include <QStringList>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QVariant>
 #include <QVector>
 #include <QVBoxLayout>
 
+#include "core/hijri_utils.h"
 #include "data/date_utils.h"
 #include "data/occasion_repository.h"
 #include "data/occasion_service.h"
@@ -65,6 +67,36 @@ QDate dateOf(const QString& iso, const QDate& fallback)
         return fallback;
     }
     return parsed->date();
+}
+
+QString occasionKeyLabel(const QString& key)
+{
+    const QString normalized = key.trimmed().toLower();
+    if (normalized == QStringLiteral("ramadan")) {
+        return tr("رمضان");
+    }
+    if (normalized == QStringLiteral("fitr")) {
+        return tr("عيد الفطر");
+    }
+    if (normalized == QStringLiteral("adha")) {
+        return tr("عيد الأضحى");
+    }
+    return key.isEmpty() ? tr("المناسبة") : key;
+}
+
+QString bannerStyle(const QString& key)
+{
+    const QString normalized = key.trimmed().toLower();
+    const QString color = normalized == QStringLiteral("ramadan")
+                              ? QStringLiteral("#6a1b9a")
+                              : normalized == QStringLiteral("fitr")
+                                    ? QStringLiteral("#1565c0")
+                                    : normalized == QStringLiteral("adha")
+                                          ? QStringLiteral("#b22222")
+                                          : QStringLiteral("#2e7d32");
+    return QStringLiteral("background-color: %1; color: #ffffff; border-radius: 8px; "
+                          "padding: 10px; font-weight: 600;")
+        .arg(color);
 }
 
 } // namespace
@@ -173,6 +205,15 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
     m_modeLabel = new QLabel;
     m_modeLabel->setObjectName(QStringLiteral("occasionModeLabel"));
 
+    m_hijriLabel = new QLabel;
+    m_hijriLabel->setObjectName(QStringLiteral("occasionHijriLabel"));
+    m_hijriLabel->setVisible(false);
+
+    m_autoReasonBanner = new QLabel;
+    m_autoReasonBanner->setObjectName(QStringLiteral("occasionAutoReasonBanner"));
+    m_autoReasonBanner->setWordWrap(true);
+    m_autoReasonBanner->setVisible(false);
+
     auto* toolbar = new QHBoxLayout;
     toolbar->addWidget(m_modeLabel);
     toolbar->addWidget(m_manualButton);
@@ -188,9 +229,10 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
 
     m_table = new QTableWidget;
     m_table->setObjectName(QStringLiteral("occasionTable"));
-    m_table->setColumnCount(6);
+    m_table->setColumnCount(7);
     m_table->setHorizontalHeaderLabels({tr("ID"), tr("Nom"), tr("Date de début"),
-                                        tr("Date de fin"), tr("Thème"), tr("Actif")});
+                                        tr("Date de fin"), tr("Thème"), tr("Actif"),
+                                        tr("Actions")});
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -200,6 +242,7 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
     m_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     m_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_table->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
+    m_table->horizontalHeader()->setSectionResizeMode(6, QHeaderView::ResizeToContents);
     m_table->verticalHeader()->hide();
     m_table->verticalHeader()->setDefaultSectionSize(42);
 
@@ -210,6 +253,8 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
     gridLayout->addWidget(m_table, 1);
 
     root->addWidget(toolbarCard);
+    root->addWidget(m_hijriLabel);
+    root->addWidget(m_autoReasonBanner);
     root->addWidget(gridCard, 1);
 
     connect(m_newButton, &QPushButton::clicked, this, &OccasionsPage::onAddClicked);
@@ -221,6 +266,11 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
 }
 
 void OccasionsPage::refresh()
+{
+    refresh(QDate::currentDate());
+}
+
+void OccasionsPage::refresh(const QDate& today)
 {
     data::OccasionRepository repo(m_db);
     data::SettingRepository settings(m_db);
@@ -244,6 +294,27 @@ void OccasionsPage::refresh()
         for (int column = 0; column < cells.size(); ++column) {
             m_table->setItem(row, column, new QTableWidgetItem(cells.at(column)));
         }
+
+        auto* actionCell = new QWidget;
+        auto* actionLayout = new QHBoxLayout(actionCell);
+        actionLayout->setContentsMargins(4, 0, 4, 0);
+        actionLayout->setSpacing(4);
+        auto* deactivate = new QPushButton(tr("تعطيل"));
+        deactivate->setObjectName(QStringLiteral("occasionDeactivateButton"));
+        deactivate->setCursor(Qt::PointingHandCursor);
+        deactivate->setEnabled(occasion.active);
+        auto* edit = new QPushButton(tr("تعديل"));
+        edit->setObjectName(QStringLiteral("occasionEditButton"));
+        edit->setCursor(Qt::PointingHandCursor);
+        actionLayout->addWidget(deactivate);
+        actionLayout->addWidget(edit);
+        m_table->setCellWidget(row, 6, actionCell);
+
+        const int occasionId = occasion.id;
+        connect(deactivate, &QPushButton::clicked, this,
+                [this, occasionId]() { deactivateOccasionId(occasionId); });
+        connect(edit, &QPushButton::clicked, this,
+                [this, occasionId]() { editOccasionId(occasionId); });
     }
 
     const QString modeText = mode == QStringLiteral("manual")
@@ -252,6 +323,38 @@ void OccasionsPage::refresh()
                                                                       : tr("automatique");
     m_modeLabel->setText(tr("Mode: %1").arg(modeText));
     m_modeLabel->setProperty("mode", mode);
+
+    const QString hijriDate = core::formatHijriDate(today);
+    if (mode == QStringLiteral("auto") && !hijriDate.isEmpty()) {
+        m_hijriLabel->setText(tr("الوضع التلقائي: اليوم هو %1").arg(hijriDate));
+        m_hijriLabel->setProperty("mode", mode);
+        m_hijriLabel->setVisible(true);
+    } else {
+        m_hijriLabel->clear();
+        m_hijriLabel->setProperty("mode", QVariant());
+        m_hijriLabel->setVisible(false);
+    }
+
+    const QString hijriKey = mode == QStringLiteral("auto")
+                                 ? core::getCurrentHijriOccasion(today)
+                                 : QString();
+    const std::optional<core::Occasion> current =
+        mode == QStringLiteral("auto") ? service.current(today) : std::nullopt;
+    const bool autoChosen = current.has_value() && !hijriKey.isEmpty()
+        && current->themeKey.trimmed().toLower() == hijriKey.trimmed().toLower();
+    if (autoChosen) {
+        m_autoReasonBanner->setText(
+            tr("تم تفعيل وضع %1 تلقائياً لأن اليوم هو %2")
+                .arg(occasionKeyLabel(current->themeKey), hijriDate));
+        m_autoReasonBanner->setProperty("occasionKey", current->themeKey);
+        m_autoReasonBanner->setStyleSheet(bannerStyle(current->themeKey));
+        m_autoReasonBanner->setVisible(true);
+    } else {
+        m_autoReasonBanner->clear();
+        m_autoReasonBanner->setProperty("occasionKey", QVariant());
+        m_autoReasonBanner->setStyleSheet(QString());
+        m_autoReasonBanner->setVisible(false);
+    }
 }
 
 int OccasionsPage::rowCount() const
@@ -297,8 +400,23 @@ void OccasionsPage::onAddClicked()
 void OccasionsPage::onRowActivated(int row, int column)
 {
     Q_UNUSED(column);
+    editOccasionId(occasionIdAt(row));
+}
+
+void OccasionsPage::deactivateOccasionId(int occasionId)
+{
     data::OccasionRepository repo(m_db);
-    const auto current = repo.findById(occasionIdAt(row));
+    if (!repo.setActive(occasionId, false)) {
+        QMessageBox::warning(this, tr("Erreur"),
+                             tr("Impossible de désactiver l'occasion"));
+    }
+    refresh();
+}
+
+void OccasionsPage::editOccasionId(int occasionId)
+{
+    data::OccasionRepository repo(m_db);
+    const auto current = repo.findById(occasionId);
     if (!current) {
         return;
     }
