@@ -706,7 +706,7 @@ Stock : %4</translation>
         <location line="+100"/>
         <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+11"/>
         <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+59"/>
-        <location filename="../ui/occasions_page.cpp" line="+142"/>
+        <location filename="../ui/occasions_page.cpp" line="+136"/>
         <source>Enregistrer</source>
         <translation>Enregistrer</translation>
     </message>
@@ -1212,27 +1212,7 @@ Stock : %4</translation>
         <translation type="unfinished">Stock</translation>
     </message>
     <message>
-        <location filename="../ui/occasions_page.cpp" line="-58"/>
-        <source>رمضان</source>
-        <translation>رمضان</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>عيد الفطر</source>
-        <translation>عيد الفطر</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>عيد الأضحى</source>
-        <translation>عيد الأضحى</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>المناسبة</source>
-        <translation>المناسبة</translation>
-    </message>
-    <message>
-        <location line="+26"/>
+        <location filename="../ui/occasions_page.cpp" line="-24"/>
         <source>Nouvelle occasion</source>
         <translation>مناسبة جديدة</translation>
     </message>
@@ -2016,7 +1996,7 @@ Stock : %4</translation>
         <translation>تهنئة المناسبة</translation>
     </message>
     <message>
-        <location line="+78"/>
+        <location line="+88"/>
         <source>تحديث متاح: %1</source>
         <translation>تحديث متاح: %1</translation>
     </message>
@@ -2081,7 +2061,7 @@ Stock : %4</translation>
         <translation>تعذّر بدء التحديث.</translation>
     </message>
     <message>
-        <location line="-496"/>
+        <location line="-506"/>
         <source>جلسة الصندوق</source>
         <translation>جلسة الصندوق</translation>
     </message>
@@ -2142,7 +2122,7 @@ Stock : %4</translation>
 <context>
     <name>app::ui::OccasionsPage</name>
     <message>
-        <location filename="../ui/occasions_page.cpp" line="+22"/>
+        <location filename="../ui/occasions_page.cpp" line="+23"/>
         <source>المناسبات</source>
         <translation>المناسبات</translation>
     </message>
@@ -2172,7 +2152,12 @@ Stock : %4</translation>
         <translation>خروج من وضع المناسبة</translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+16"/>
+        <source>تعديل التواريخ</source>
+        <translation>تعديل التواريخ</translation>
+    </message>
+    <message>
+        <location line="+29"/>
         <source>ID</source>
         <translation>المعرّف</translation>
     </message>
@@ -2212,13 +2197,13 @@ Stock : %4</translation>
         <translation>قائمة المناسبات</translation>
     </message>
     <message>
-        <location line="+40"/>
-        <location line="+94"/>
+        <location line="+42"/>
+        <location line="+102"/>
         <source>نعم</source>
         <translation>نعم</translation>
     </message>
     <message>
-        <location line="-94"/>
+        <location line="-102"/>
         <source>لا</source>
         <translation>لا</translation>
     </message>
@@ -2228,12 +2213,12 @@ Stock : %4</translation>
         <translation>تعطيل</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+5"/>
         <source>تعديل</source>
         <translation>تعديل</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+16"/>
         <source>manuel</source>
         <translation>يدوي</translation>
     </message>
@@ -2258,13 +2243,19 @@ Stock : %4</translation>
         <translation>الوضع التلقائي: اليوم هو %1</translation>
     </message>
     <message>
-        <location line="+18"/>
-        <source>تم تفعيل وضع %1 تلقائياً لأن اليوم هو %2</source>
-        <translation>تم تفعيل وضع %1 تلقائياً لأن اليوم هو %2</translation>
+        <location line="+14"/>
+        <source>تم تفعيل %1 تلقائياً (التاريخ الهجري: %2)</source>
+        <translation>تم تفعيل %1 تلقائياً (التاريخ الهجري: %2)</translation>
     </message>
     <message>
-        <location line="+63"/>
-        <location line="+25"/>
+        <location line="+6"/>
+        <source>لا توجد مناسبة نشطة حالياً. التاريخ الهجري اليوم: %1</source>
+        <translation>لا توجد مناسبة نشطة حالياً. التاريخ الهجري اليوم: %1</translation>
+    </message>
+    <message>
+        <location line="+71"/>
+        <location line="+46"/>
+        <location line="+7"/>
         <location line="+8"/>
         <location line="+12"/>
         <location line="+12"/>
@@ -2272,12 +2263,17 @@ Stock : %4</translation>
         <translation type="unfinished">Erreur</translation>
     </message>
     <message>
-        <location line="-56"/>
+        <location line="-84"/>
         <source>Impossible de désactiver l&apos;occasion</source>
         <translation>تعذّر تعطيل المناسبة</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+45"/>
+        <source>لا توجد مناسبة لتعديل تواريخها</source>
+        <translation>لا توجد مناسبة لتعديل تواريخها</translation>
+    </message>
+    <message>
+        <location line="+7"/>
         <source>Sélectionnez une occasion</source>
         <translation>اختر مناسبة</translation>
     </message>

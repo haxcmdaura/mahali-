@@ -12,6 +12,7 @@
 #include <QTemporaryDir>
 #include <QTime>
 #include <QComboBox>
+#include <QHeaderView>
 #include <QTableView>
 #include <QTableWidget>
 #include <QFont>
@@ -204,6 +205,7 @@ private slots:
     void occasions_page_mode_controls();
     void occasions_page_row_actions_deactivate_and_edit();
     void occasions_page_shows_hijri_agenda_and_auto_reason();
+    void occasions_page_edit_dates_button_opens_prefilled_dialog();
 
 private:
     void seedSyncDatabase(const QString& path, int* productId, int* sessionId);
@@ -3683,6 +3685,7 @@ void UiTest::occasions_page_row_actions_deactivate_and_edit()
     QVERIFY2(occasionId > 0, qPrintable(db.lastError()));
 
     ui::OccasionsPage page(db);
+    page.refresh(QDate(2024, 3, 11));
     QTableWidget* table = page.table();
     QVERIFY2(table != nullptr, "the occasions page must show a table");
     QCOMPARE(table->columnCount(), 7);
@@ -3698,6 +3701,21 @@ void UiTest::occasions_page_row_actions_deactivate_and_edit()
     QVERIFY2(edit != nullptr, "the row needs an edit button");
     QCOMPARE(deactivate->text(), QStringLiteral("تعطيل"));
     QCOMPARE(edit->text(), QStringLiteral("تعديل"));
+
+    const int rowHeight = table->verticalHeader()->sectionSize(0);
+    const QString previousStyle = qApp->styleSheet();
+    qApp->setStyleSheet(QStringLiteral("QPushButton { min-height: 40px; padding: 8px 12px; }"));
+    const int deactivateHint = deactivate->sizeHint().height();
+    const int editHint = edit->sizeHint().height();
+    qApp->setStyleSheet(previousStyle);
+    QVERIFY2(deactivateHint <= rowHeight,
+             qPrintable(QStringLiteral("deactivate button is %1px in a %2px row")
+                            .arg(deactivateHint)
+                            .arg(rowHeight)));
+    QVERIFY2(editHint <= rowHeight,
+             qPrintable(QStringLiteral("edit button is %1px in a %2px row")
+                            .arg(editHint)
+                            .arg(rowHeight)));
 
     deactivate->click();
     const auto afterDeactivate = occasions.findById(occasionId);
@@ -3753,7 +3771,8 @@ void UiTest::occasions_page_shows_hijri_agenda_and_auto_reason()
     occasion.createdAt = data::nowIso();
     occasion.active = true;
     occasion.themeKey = QStringLiteral("ramadan");
-    QVERIFY(occasions.insert(occasion) > 0);
+    const int occasionId = occasions.insert(occasion);
+    QVERIFY(occasionId > 0);
 
     data::SettingRepository settings(db);
     settings.set(QStringLiteral("occasion_mode"), QStringLiteral("auto"));
@@ -3777,15 +3796,86 @@ void UiTest::occasions_page_shows_hijri_agenda_and_auto_reason()
     QLabel* banner = page.findChild<QLabel*>(QStringLiteral("occasionAutoReasonBanner"));
     QVERIFY2(banner != nullptr, "an auto-selected occasion needs a reason banner");
     QVERIFY2(!banner->isHidden(), "the reason banner must show for an auto occasion");
-    QVERIFY2(banner->text().contains(QStringLiteral("رمضان")), qPrintable(banner->text()));
-    QVERIFY2(banner->text().contains(hijriText), qPrintable(banner->text()));
+    QCOMPARE(banner->text(),
+             QStringLiteral("تم تفعيل رمضان تلقائياً (التاريخ الهجري: %1)").arg(hijriText));
     QVERIFY2(!banner->styleSheet().isEmpty(), "the reason banner must be coloured");
     QCOMPARE(banner->property("occasionKey").toString(), QStringLiteral("ramadan"));
+
+    auto stored = occasions.findById(occasionId);
+    QVERIFY(stored.has_value());
+    stored->active = false;
+    QVERIFY(occasions.update(*stored));
+    page.refresh(today);
+    QVERIFY2(!banner->isHidden(), "the banner must explain why no occasion is active");
+    QCOMPARE(banner->text(),
+             QStringLiteral("لا توجد مناسبة نشطة حالياً. التاريخ الهجري اليوم: %1")
+                 .arg(hijriText));
 
     settings.set(QStringLiteral("occasion_mode"), QStringLiteral("disabled"));
     page.refresh(today);
     QVERIFY(hijriLabel->isHidden());
     QVERIFY(banner->isHidden());
+}
+
+void UiTest::occasions_page_edit_dates_button_opens_prefilled_dialog()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasion-edit-dates.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+
+    data::OccasionRepository occasions(db);
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("رمضان");
+    occasion.startsAt = QStringLiteral("2024-03-01T00:00:00.000");
+    occasion.endsAt = QStringLiteral("2024-04-10T23:59:59.999");
+    occasion.createdAt = data::nowIso();
+    occasion.active = true;
+    occasion.themeKey = QStringLiteral("ramadan");
+    const int occasionId = occasions.insert(occasion);
+    QVERIFY(occasionId > 0);
+
+    data::SettingRepository settings(db);
+    settings.set(QStringLiteral("occasion_mode"), QStringLiteral("auto"));
+
+    ui::OccasionsPage page(db);
+    page.refresh(QDate(2024, 3, 11));
+
+    QPushButton* editDates =
+        page.findChild<QPushButton*>(QStringLiteral("occasionEditDatesButton"));
+    QVERIFY2(editDates != nullptr, "the auto banner needs an Edit Dates button");
+    QVERIFY2(!editDates->isHidden(), "the Edit Dates button must be visible in auto mode");
+    QCOMPARE(editDates->text(), QStringLiteral("تعديل التواريخ"));
+
+    bool dialogSeen = false;
+    bool datesOk = false;
+    bool watchdogFired = false;
+    QTimer::singleShot(0, [&]() {
+        auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        if (!modal) {
+            return;
+        }
+        dialogSeen = true;
+        auto* start = modal->findChild<QDateEdit*>(QStringLiteral("occasionStartField"));
+        auto* end = modal->findChild<QDateEdit*>(QStringLiteral("occasionEndField"));
+        datesOk = start && end && start->date() == QDate(2024, 3, 1)
+            && end->date() == QDate(2024, 4, 10);
+        modal->reject();
+    });
+    QTimer watchdog;
+    watchdog.setSingleShot(true);
+    QObject::connect(&watchdog, &QTimer::timeout, [&watchdogFired]() {
+        watchdogFired = true;
+        if (auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget())) {
+            modal->reject();
+        }
+    });
+    watchdog.start(3000);
+
+    editDates->click();
+
+    QVERIFY2(!watchdogFired, "the Edit Dates dialog stayed open until the watchdog fired");
+    QVERIFY2(dialogSeen, "the Edit Dates button must open the occasion dialog");
+    QVERIFY2(datesOk, "the dialog must be prefilled with the auto occasion's dates");
 }
 
 void UiTest::language_dialog_returns_the_chosen_code()

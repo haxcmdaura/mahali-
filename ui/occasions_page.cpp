@@ -69,21 +69,6 @@ QDate dateOf(const QString& iso, const QDate& fallback)
     return parsed->date();
 }
 
-QString occasionKeyLabel(const QString& key)
-{
-    const QString normalized = key.trimmed().toLower();
-    if (normalized == QStringLiteral("ramadan")) {
-        return tr("رمضان");
-    }
-    if (normalized == QStringLiteral("fitr")) {
-        return tr("عيد الفطر");
-    }
-    if (normalized == QStringLiteral("adha")) {
-        return tr("عيد الأضحى");
-    }
-    return key.isEmpty() ? tr("المناسبة") : key;
-}
-
 QString bannerStyle(const QString& key)
 {
     const QString normalized = key.trimmed().toLower();
@@ -97,6 +82,15 @@ QString bannerStyle(const QString& key)
     return QStringLiteral("background-color: %1; color: #ffffff; border-radius: 8px; "
                           "padding: 10px; font-weight: 600;")
         .arg(color);
+}
+
+void compactActionButton(QPushButton* button)
+{
+    button->setMinimumHeight(21);
+    button->setMaximumHeight(30);
+    button->setStyleSheet(QStringLiteral(
+        "QPushButton { min-height: 21px; max-height: 30px; padding: 3px 8px; "
+        "font-size: 9pt; }"));
 }
 
 } // namespace
@@ -182,6 +176,7 @@ std::optional<core::Occasion> showOccasionDialog(QWidget* parent, const core::Oc
 OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
     : QWidget(parent)
     , m_db(db)
+    , m_today(QDate::currentDate())
 {
     auto* root = new QVBoxLayout(this);
     padPageLayout(root);
@@ -213,6 +208,19 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
     m_autoReasonBanner->setObjectName(QStringLiteral("occasionAutoReasonBanner"));
     m_autoReasonBanner->setWordWrap(true);
     m_autoReasonBanner->setVisible(false);
+
+    m_editDatesButton = new QPushButton(tr("تعديل التواريخ"));
+    m_editDatesButton->setObjectName(QStringLiteral("occasionEditDatesButton"));
+    m_editDatesButton->setCursor(Qt::PointingHandCursor);
+    compactActionButton(m_editDatesButton);
+
+    m_autoBannerRow = new QWidget;
+    auto* bannerLayout = new QHBoxLayout(m_autoBannerRow);
+    bannerLayout->setContentsMargins(0, 0, 0, 0);
+    bannerLayout->setSpacing(8);
+    bannerLayout->addWidget(m_autoReasonBanner, 1);
+    bannerLayout->addWidget(m_editDatesButton);
+    m_autoBannerRow->setVisible(false);
 
     auto* toolbar = new QHBoxLayout;
     toolbar->addWidget(m_modeLabel);
@@ -254,13 +262,14 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
 
     root->addWidget(toolbarCard);
     root->addWidget(m_hijriLabel);
-    root->addWidget(m_autoReasonBanner);
+    root->addWidget(m_autoBannerRow);
     root->addWidget(gridCard, 1);
 
     connect(m_newButton, &QPushButton::clicked, this, &OccasionsPage::onAddClicked);
     connect(m_manualButton, &QPushButton::clicked, this, &OccasionsPage::onManualClicked);
     connect(m_autoButton, &QPushButton::clicked, this, &OccasionsPage::onAutoClicked);
     connect(m_disableButton, &QPushButton::clicked, this, &OccasionsPage::onDisableClicked);
+    connect(m_editDatesButton, &QPushButton::clicked, this, &OccasionsPage::onEditDatesClicked);
     connect(m_table, &QTableWidget::cellDoubleClicked, this, &OccasionsPage::onRowActivated);
     refresh();
 }
@@ -272,6 +281,7 @@ void OccasionsPage::refresh()
 
 void OccasionsPage::refresh(const QDate& today)
 {
+    m_today = today;
     data::OccasionRepository repo(m_db);
     data::SettingRepository settings(m_db);
     data::OccasionService service(m_db, repo, settings);
@@ -303,9 +313,11 @@ void OccasionsPage::refresh(const QDate& today)
         deactivate->setObjectName(QStringLiteral("occasionDeactivateButton"));
         deactivate->setCursor(Qt::PointingHandCursor);
         deactivate->setEnabled(occasion.active);
+        compactActionButton(deactivate);
         auto* edit = new QPushButton(tr("تعديل"));
         edit->setObjectName(QStringLiteral("occasionEditButton"));
         edit->setCursor(Qt::PointingHandCursor);
+        compactActionButton(edit);
         actionLayout->addWidget(deactivate);
         actionLayout->addWidget(edit);
         m_table->setCellWidget(row, 6, actionCell);
@@ -335,25 +347,31 @@ void OccasionsPage::refresh(const QDate& today)
         m_hijriLabel->setVisible(false);
     }
 
-    const QString hijriKey = mode == QStringLiteral("auto")
-                                 ? core::getCurrentHijriOccasion(today)
-                                 : QString();
     const std::optional<core::Occasion> current =
         mode == QStringLiteral("auto") ? service.current(today) : std::nullopt;
-    const bool autoChosen = current.has_value() && !hijriKey.isEmpty()
-        && current->themeKey.trimmed().toLower() == hijriKey.trimmed().toLower();
-    if (autoChosen) {
-        m_autoReasonBanner->setText(
-            tr("تم تفعيل وضع %1 تلقائياً لأن اليوم هو %2")
-                .arg(occasionKeyLabel(current->themeKey), hijriDate));
-        m_autoReasonBanner->setProperty("occasionKey", current->themeKey);
-        m_autoReasonBanner->setStyleSheet(bannerStyle(current->themeKey));
+    if (mode == QStringLiteral("auto") && !hijriDate.isEmpty()) {
+        if (current.has_value()) {
+            m_autoReasonBanner->setText(
+                tr("تم تفعيل %1 تلقائياً (التاريخ الهجري: %2)")
+                    .arg(current->name, hijriDate));
+            m_autoReasonBanner->setProperty("occasionKey", current->themeKey);
+            m_autoReasonBanner->setStyleSheet(bannerStyle(current->themeKey));
+        } else {
+            m_autoReasonBanner->setText(
+                tr("لا توجد مناسبة نشطة حالياً. التاريخ الهجري اليوم: %1").arg(hijriDate));
+            m_autoReasonBanner->setProperty("occasionKey", QVariant());
+            m_autoReasonBanner->setStyleSheet(bannerStyle(QString()));
+        }
         m_autoReasonBanner->setVisible(true);
+        m_editDatesButton->setVisible(true);
+        m_autoBannerRow->setVisible(true);
     } else {
         m_autoReasonBanner->clear();
         m_autoReasonBanner->setProperty("occasionKey", QVariant());
         m_autoReasonBanner->setStyleSheet(QString());
         m_autoReasonBanner->setVisible(false);
+        m_editDatesButton->setVisible(false);
+        m_autoBannerRow->setVisible(false);
     }
 }
 
@@ -406,9 +424,17 @@ void OccasionsPage::onRowActivated(int row, int column)
 void OccasionsPage::deactivateOccasionId(int occasionId)
 {
     data::OccasionRepository repo(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, repo, settings);
+    const auto current = service.current(m_today);
+
     if (!repo.setActive(occasionId, false)) {
         QMessageBox::warning(this, tr("Erreur"),
                              tr("Impossible de désactiver l'occasion"));
+        return;
+    }
+    if (current && current->id == occasionId && service.mode() == QStringLiteral("manual")) {
+        service.disable();
     }
     refresh();
 }
@@ -426,6 +452,30 @@ void OccasionsPage::editOccasionId(int occasionId)
     }
     repo.update(*edited);
     refresh();
+}
+
+void OccasionsPage::onEditDatesClicked()
+{
+    data::OccasionRepository repo(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, repo, settings);
+
+    const auto current = service.current(m_today);
+    if (current) {
+        editOccasionId(current->id);
+        return;
+    }
+
+    const QString hijriKey = core::getCurrentHijriOccasion(m_today);
+    if (!hijriKey.isEmpty()) {
+        for (const core::Occasion& occasion : repo.findAll()) {
+            if (occasion.themeKey.trimmed().toLower() == hijriKey.trimmed().toLower()) {
+                editOccasionId(occasion.id);
+                return;
+            }
+        }
+    }
+    QMessageBox::warning(this, tr("Erreur"), tr("لا توجد مناسبة لتعديل تواريخها"));
 }
 
 void OccasionsPage::onManualClicked()

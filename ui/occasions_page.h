@@ -40,6 +40,7 @@ public:
     QLabel* modeLabel() const { return m_modeLabel; }
     QLabel* hijriLabel() const { return m_hijriLabel; }
     QLabel* autoReasonBanner() const { return m_autoReasonBanner; }
+    QPushButton* editDatesButton() const { return m_editDatesButton; }
 
 private slots:
     void onAddClicked();
@@ -49,9 +50,11 @@ private slots:
     void onDisableClicked();
     void deactivateOccasionId(int occasionId);
     void editOccasionId(int occasionId);
+    void onEditDatesClicked();
 
 private:
     app::data::Database& m_db;
+    QDate m_today;
     QTableWidget* m_table;
     QPushButton* m_newButton;
     QPushButton* m_manualButton;
@@ -59,7 +62,9 @@ private:
     QPushButton* m_disableButton;
     QLabel* m_modeLabel;
     QLabel* m_hijriLabel;
+    QWidget* m_autoBannerRow;
     QLabel* m_autoReasonBanner;
+    QPushButton* m_editDatesButton;
 };
 
 } // namespace app::ui
