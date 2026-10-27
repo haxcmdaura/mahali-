@@ -20,6 +20,7 @@ public:
     // Opening a database below this build's schema first writes a
     // backups/pre-migration-v<from>-<time>.sqlite copy beside it. A failed copy
     // stops the upgrade; the version is only advanced by migrations that commit.
+    // A database stamped by a newer build is refused before anything is written.
     explicit Database(const QString& filePath, DatabaseMode mode = DatabaseMode::Device);
     ~Database();
 

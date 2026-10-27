@@ -18,6 +18,7 @@ constexpr int kSchemaVersion = 16;
 // in its own transaction and stamps its own version before that transaction
 // commits. Called once from Database's constructor, after createSchema().
 //
+// A database stamped by a newer build is refused before any migration runs.
 // A failed migration rolls back and throws without advancing the version, so the
 // next start retries it instead of treating a partial database as current.
 // The one exception is the duplicate-reversal index, which warns and is skipped:
@@ -30,5 +31,9 @@ void runSchemaMigrations(const QSqlDatabase& db);
 // The version the database was last migrated to, or 0 when it predates
 // versioning. Read with PRAGMA user_version.
 int readSchemaVersion(const QSqlDatabase& db);
+
+// Reads the version and refuses a database stamped by a newer build. The check
+// is read-only, so callers can run it before changing pragmas or the schema.
+int readSupportedSchemaVersion(const QSqlDatabase& db);
 
 } // namespace app::data

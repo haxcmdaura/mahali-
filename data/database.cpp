@@ -370,6 +370,11 @@ Database::Database(const QString& filePath, DatabaseMode mode)
                     .arg(m_db.lastError().text())
                     .toStdString());
         }
+
+        // Read-only, and before any pragma that could write the file: a database
+        // from a newer build must be refused without leaving a trace.
+        const int versionOnOpen = readSupportedSchemaVersion(m_db);
+
         applyPragmas();
         runQuickCheck(m_db);
 
@@ -378,7 +383,7 @@ Database::Database(const QString& filePath, DatabaseMode mode)
         // one. A fresh file is version 0 and has nothing worth preserving. If the
         // copy fails, the migration must not start: the point of the copy is to
         // be the way back from a failed upgrade.
-        const int versionBeforeUpgrade = readSchemaVersion(m_db);
+        const int versionBeforeUpgrade = versionOnOpen;
         if (versionBeforeUpgrade > 0 && versionBeforeUpgrade < kSchemaVersion) {
             const QDir backupDirectory(
                 QFileInfo(filePath).absoluteDir().filePath(QStringLiteral("backups")));

@@ -913,9 +913,24 @@ int readSchemaVersion(const QSqlDatabase& db)
     return query.value(0).toInt();
 }
 
+int readSupportedSchemaVersion(const QSqlDatabase& db)
+{
+    const int version = readSchemaVersion(db);
+    if (version > kSchemaVersion) {
+        throw std::runtime_error(
+            QStringLiteral("This database was created by a newer version of Mahali "
+                           "(schema %1; this build supports %2). "
+                           "قاعدة البيانات أنشأتها نسخة أحدث من البرنامج.")
+                .arg(version)
+                .arg(kSchemaVersion)
+                .toStdString());
+    }
+    return version;
+}
+
 void runSchemaMigrations(const QSqlDatabase& db)
 {
-    const int from = readSchemaVersion(db);
+    const int from = readSupportedSchemaVersion(db);
     if (from >= kSchemaVersion) {
         return;
     }

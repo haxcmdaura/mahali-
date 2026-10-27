@@ -1,6 +1,7 @@
 #include <QtTest/QtTest>
 
 #include <QApplication>
+#include <QCryptographicHash>
 #include <QDir>
 #include <limits>
 #include <optional>
@@ -122,6 +123,7 @@ private slots:
     void migration_failure_does_not_stamp_the_schema_version();
     void migration_is_atomic_and_backs_up_before_upgrading();
     void migration_does_not_start_when_pre_migration_backup_fails();
+    void newer_schema_is_refused_without_touching_the_file();
     void cash_movements_carry_correct_reference();
     void close_validation_detects_violations();
     void cash_reference_migration_keeps_legacy_null_and_adds_index();
@@ -2452,6 +2454,42 @@ void DataLayerTest::migration_does_not_start_when_pre_migration_backup_fails()
         check.close();
     }
     QSqlDatabase::removeDatabase(connection);
+}
+
+void DataLayerTest::newer_schema_is_refused_without_touching_the_file()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    const QString path = work.filePath(QStringLiteral("newer_schema.sqlite"));
+    {
+        data::Database db(path);
+        QSqlQuery stamp(db.handle());
+        QVERIFY(stamp.exec(
+            QStringLiteral("PRAGMA user_version = %1").arg(data::kSchemaVersion + 1)));
+    }
+
+    const auto digest = [](const QString& filePath) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly)) {
+            return QByteArray();
+        }
+        return QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha256).toHex();
+    };
+    const QByteArray before = digest(path);
+    QVERIFY(!before.isEmpty());
+
+    bool threw = false;
+    try {
+        data::Database db(path);
+    } catch (const std::runtime_error& error) {
+        threw = true;
+        const QString message = QString::fromUtf8(error.what());
+        QVERIFY2(message.contains(QStringLiteral("newer"), Qt::CaseInsensitive),
+                 qPrintable(message));
+        QVERIFY2(message.contains(QStringLiteral("أحدث")), qPrintable(message));
+    }
+    QVERIFY2(threw, "a database from a newer schema must not open");
+    QCOMPARE(digest(path), before);
 }
 
 void DataLayerTest::audit_row_is_written_by_the_service_not_the_caller()
