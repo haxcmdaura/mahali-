@@ -52,7 +52,7 @@ CashEntryResult CashEntryService::recordExpense(const QString& label, long long 
         return result;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
@@ -114,7 +114,7 @@ CashEntryResult CashEntryService::recordDrawing(const QString& note, long long a
         return result;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
@@ -172,7 +172,7 @@ CashEntryResult CashEntryService::reverseExpense(int expenseId, int cashSessionI
 {
     CashEntryResult result;
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
@@ -237,7 +237,7 @@ CashEntryResult CashEntryService::reverseDrawing(int drawingId, int cashSessionI
 {
     CashEntryResult result;
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
