@@ -88,7 +88,7 @@ SupplierReturnResult SupplierReturnService::recordLinkedReturn(int supplierId,
     }
 
     // B.
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = stepError(m_db, QStringLiteral("opening the transaction"));
         return result;
     }
@@ -189,7 +189,7 @@ SupplierReturnResult SupplierReturnService::recordGeneralReturn(int supplierId,
     }
 
     // B.
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = stepError(m_db, QStringLiteral("opening the transaction"));
         return result;
     }
