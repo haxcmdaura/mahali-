@@ -76,6 +76,7 @@ private slots:
     void schemaContainsAllTables();
     void backupTo_copies_rows_and_schema_version();
     void backupTo_refuses_existing_destination();
+    void opening_corrupt_database_throws_quick_check_error();
     void productSaveAndFind();
     void product_visibility_filter();
     void product_repository_round_trips_package_fields();
@@ -308,6 +309,63 @@ void DataLayerTest::backupTo_refuses_existing_destination()
 
     QVERIFY(destination.open(QIODevice::ReadOnly));
     QCOMPARE(destination.readAll(), original);
+}
+
+void DataLayerTest::opening_corrupt_database_throws_quick_check_error()
+{
+    const QString path = m_dir.filePath(QStringLiteral("corrupt-open.sqlite"));
+    QFile::remove(path);
+
+    qint64 pageSize = 0;
+    qint64 pageCount = 0;
+    {
+        data::Database valid(path);
+        QSqlQuery insert(valid.handle());
+        QVERIFY(insert.prepare(QStringLiteral("INSERT INTO products (name) VALUES (?)")));
+        for (int i = 0; i < 200; ++i) {
+            insert.bindValue(0, QString(1000, QLatin1Char('x')) + QString::number(i));
+            QVERIFY(insert.exec());
+        }
+
+        QSqlQuery pageSizeQuery(valid.handle());
+        QVERIFY(pageSizeQuery.exec(QStringLiteral("PRAGMA page_size")));
+        QVERIFY(pageSizeQuery.next());
+        pageSize = pageSizeQuery.value(0).toLongLong();
+
+        QSqlQuery pageCountQuery(valid.handle());
+        QVERIFY(pageCountQuery.exec(QStringLiteral("PRAGMA page_count")));
+        QVERIFY(pageCountQuery.next());
+        pageCount = pageCountQuery.value(0).toLongLong();
+    }
+    QVERIFY(pageSize > 0);
+    QVERIFY(pageCount > 1);
+
+    bool healthyOpened = true;
+    try {
+        data::Database healthy(path);
+    } catch (const std::exception&) {
+        healthyOpened = false;
+    }
+    QVERIFY2(healthyOpened, "a healthy database failed to open");
+
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadWrite));
+    QVERIFY(file.seek((pageCount - 1) * pageSize));
+    const QByteArray garbage(512, '\xA5');
+    QCOMPARE(file.write(garbage), garbage.size());
+    file.close();
+
+    bool threw = false;
+    QString message;
+    try {
+        data::Database corrupt(path);
+    } catch (const std::exception& e) {
+        threw = true;
+        message = QString::fromUtf8(e.what());
+    }
+    QVERIFY2(threw, "a corrupt database opened without an integrity error");
+    QVERIFY2(message.contains(QStringLiteral("quick_check"), Qt::CaseInsensitive),
+             qPrintable(message));
 }
 
 void DataLayerTest::productSaveAndFind()

@@ -4,6 +4,8 @@
 
 #include <QPair>
 
+#include <stdexcept>
+
 #include <QCryptographicHash>
 #include <QFileInfo>
 #include <QDebug>
@@ -24,6 +26,25 @@ const char* kSingleOpenSessionIndex = "idx_cash_sessions_one_open";
 QString uniqueConnectionName()
 {
     return QStringLiteral("mahali_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+}
+
+void runQuickCheck(const QSqlDatabase& db)
+{
+    QSqlQuery query(db);
+    if (!query.exec(QStringLiteral("PRAGMA quick_check"))) {
+        throw std::runtime_error(
+            QStringLiteral("Database quick_check could not run: %1")
+                .arg(query.lastError().text())
+                .toStdString());
+    }
+    if (!query.next()) {
+        throw std::runtime_error("Database quick_check returned no result");
+    }
+    const QString result = query.value(0).toString();
+    if (result != QLatin1String("ok")) {
+        throw std::runtime_error(
+            QStringLiteral("Database quick_check failed: %1").arg(result).toStdString());
+    }
 }
 
 QStringList tableColumns(const QSqlDatabase& db, const QString& table)
@@ -325,6 +346,7 @@ Database::Database(const QString& filePath, DatabaseMode mode)
             QStringLiteral("Failed to open database: %1").arg(m_db.lastError().text()).toStdString());
     }
     applyPragmas();
+    runQuickCheck(m_db);
     createSchema();
     // A fresh install gets the whole current shape from createSchema() above and
     // has nothing to replay. A database carried over from an older build gets the
