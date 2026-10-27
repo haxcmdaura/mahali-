@@ -14,6 +14,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#include "core/zakat_calculator.h"
 #include "core/zakat_notifier.h"
 #include "data/report_service.h"
 #include "data/setting_repository.h"
