@@ -35,6 +35,11 @@ public:
     QString filePath() const;
 
     bool beginTransaction();
+    // BEGIN IMMEDIATE takes the write lock before the first read. A deferred
+    // transaction that reads and then writes can fail with SQLITE_BUSY_SNAPSHOT
+    // in WAL when another connection commits in between, and busy_timeout does
+    // not help there. Writers use this so the wait happens up front instead.
+    bool beginWriteTransaction();
     bool commit();
     bool rollback();
 

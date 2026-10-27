@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QCryptographicHash>
 #include <QDir>
+#include <QElapsedTimer>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -81,6 +82,8 @@ private slots:
     void backupTo_copies_rows_and_schema_version();
     void backupTo_refuses_existing_destination();
     void opening_corrupt_database_throws_quick_check_error();
+    void begin_write_transaction_commits_and_rolls_back();
+    void begin_write_transaction_blocks_another_writer();
     void productSaveAndFind();
     void product_visibility_filter();
     void product_repository_round_trips_package_fields();
@@ -384,6 +387,75 @@ void DataLayerTest::opening_corrupt_database_throws_quick_check_error()
     QVERIFY2(threw, "a corrupt database opened without an integrity error");
     QVERIFY2(message.contains(QStringLiteral("quick_check"), Qt::CaseInsensitive),
              qPrintable(message));
+}
+
+void DataLayerTest::begin_write_transaction_commits_and_rolls_back()
+{
+    const QString path = m_dir.filePath(QStringLiteral("begin-write-commit.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+    QVERIFY2(db.lastError().isEmpty(), qPrintable(db.lastError()));
+
+    QVERIFY2(db.beginWriteTransaction(), qPrintable(db.lastError()));
+    QSqlQuery insert(db.handle());
+    QVERIFY(insert.exec(
+        QStringLiteral("INSERT INTO settings (key, value) VALUES ('t13_commit', 'kept')")));
+    QVERIFY2(db.commit(), qPrintable(db.lastError()));
+
+    QSqlQuery afterCommit(db.handle());
+    QVERIFY(afterCommit.exec(
+        QStringLiteral("SELECT COUNT(*) FROM settings WHERE key = 't13_commit'")));
+    QVERIFY(afterCommit.next());
+    QCOMPARE(afterCommit.value(0).toInt(), 1);
+
+    QVERIFY2(db.beginWriteTransaction(), qPrintable(db.lastError()));
+    QSqlQuery insertThenRollback(db.handle());
+    QVERIFY(insertThenRollback.exec(
+        QStringLiteral("INSERT INTO settings (key, value) VALUES ('t13_rollback', 'gone')")));
+    QVERIFY2(db.rollback(), qPrintable(db.lastError()));
+
+    QSqlQuery afterRollback(db.handle());
+    QVERIFY(afterRollback.exec(
+        QStringLiteral("SELECT COUNT(*) FROM settings WHERE key = 't13_rollback'")));
+    QVERIFY(afterRollback.next());
+    QCOMPARE(afterRollback.value(0).toInt(), 0);
+}
+
+void DataLayerTest::begin_write_transaction_blocks_another_writer()
+{
+    const QString path = m_dir.filePath(QStringLiteral("begin-write-lock.sqlite"));
+    QFile::remove(path);
+    data::Database first(path, data::DatabaseMode::Server);
+    QVERIFY2(first.lastError().isEmpty(), qPrintable(first.lastError()));
+    data::Database second(path, data::DatabaseMode::Server);
+    QVERIFY2(second.lastError().isEmpty(), qPrintable(second.lastError()));
+
+    QVERIFY2(first.beginWriteTransaction(), qPrintable(first.lastError()));
+    QSqlQuery held(first.handle());
+    QVERIFY(held.exec(
+        QStringLiteral("INSERT INTO settings (key, value) VALUES ('t13_lock', 'first')")));
+
+    QElapsedTimer timer;
+    timer.start();
+    QVERIFY(!second.beginWriteTransaction());
+    const qint64 waited = timer.elapsed();
+    QVERIFY2(waited >= 4000, qPrintable(QStringLiteral("gave up after %1 ms").arg(waited)));
+    QVERIFY2(second.lastError().contains(QStringLiteral("locked"), Qt::CaseInsensitive),
+             qPrintable(second.lastError()));
+    QVERIFY2(!second.lastError().contains(QStringLiteral("snapshot"), Qt::CaseInsensitive),
+             qPrintable(second.lastError()));
+
+    QVERIFY2(first.commit(), qPrintable(first.lastError()));
+    QVERIFY2(second.beginWriteTransaction(), qPrintable(second.lastError()));
+    QSqlQuery secondWrite(second.handle());
+    QVERIFY(secondWrite.exec(
+        QStringLiteral("UPDATE settings SET value = 'second' WHERE key = 't13_lock'")));
+    QVERIFY2(second.commit(), qPrintable(second.lastError()));
+
+    QSqlQuery stored(second.handle());
+    QVERIFY(stored.exec(QStringLiteral("SELECT value FROM settings WHERE key = 't13_lock'")));
+    QVERIFY(stored.next());
+    QCOMPARE(stored.value(0).toString(), QStringLiteral("second"));
 }
 
 void DataLayerTest::productSaveAndFind()

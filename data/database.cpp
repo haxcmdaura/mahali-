@@ -471,6 +471,16 @@ bool Database::beginTransaction()
     return true;
 }
 
+bool Database::beginWriteTransaction()
+{
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral("BEGIN IMMEDIATE"))) {
+        recordError(query.lastError(), QStringLiteral("Database::beginWriteTransaction"));
+        return false;
+    }
+    return true;
+}
+
 bool Database::commit()
 {
     if (!m_db.commit()) {
