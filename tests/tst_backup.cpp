@@ -3,10 +3,14 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QTemporaryDir>
+#include <QUuid>
 
 #include "data/backup_service.h"
 #include "data/database.h"
+#include "data/schema_migrations.h"
 
 using namespace app;
 
@@ -19,10 +23,16 @@ private slots:
     void dailyBackupRunsAtMostOncePer24Hours();
     void dailyBackupKeepsLatestFourteen();
     void backupFailureIsReportedWithoutThrowing();
+    void restoreReplacesDatabaseWithValidatedBackup();
+    void restoreRejectsCorruptBackupAndLeavesCurrentIntact();
+    void restoreRejectsNewerSchemaAndLeavesCurrentIntact();
 
 private:
     static QStringList backupsIn(const QString& directory);
     static QString clockStamp(const QDateTime& time);
+    static QByteArray readFile(const QString& path);
+    static QString productName(const QString& path);
+    static bool setUserVersion(const QString& path, int version);
 
     QTemporaryDir m_dir;
     QString m_dbPath;
@@ -128,6 +138,142 @@ void BackupServiceTest::backupFailureIsReportedWithoutThrowing()
     QVERIFY(!result.ok);
     QVERIFY(!result.created);
     QVERIFY(!result.error.isEmpty());
+}
+
+QByteArray BackupServiceTest::readFile(const QString& path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    return file.readAll();
+}
+
+QString BackupServiceTest::productName(const QString& path)
+{
+    data::Database db(path);
+    QSqlQuery query(db.handle());
+    if (!query.exec(QStringLiteral("SELECT name FROM products ORDER BY id LIMIT 1"))
+        || !query.next()) {
+        return {};
+    }
+    return query.value(0).toString();
+}
+
+bool BackupServiceTest::setUserVersion(const QString& path, int version)
+{
+    const QString connection =
+        QStringLiteral("tst_backup_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    bool ok = false;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        db.setDatabaseName(path);
+        if (db.open()) {
+            QSqlQuery query(db);
+            ok = query.exec(QStringLiteral("PRAGMA user_version = %1").arg(version));
+            db.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(connection);
+    return ok;
+}
+
+void BackupServiceTest::restoreReplacesDatabaseWithValidatedBackup()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    const QString currentPath = work.filePath(QStringLiteral("current.sqlite"));
+    const QString backupPath = work.filePath(QStringLiteral("backup.sqlite"));
+
+    {
+        data::Database db(currentPath);
+        QSqlQuery insert(db.handle());
+        QVERIFY(insert.prepare(QStringLiteral("INSERT INTO products (name) VALUES (?)")));
+        insert.addBindValue(QStringLiteral("original"));
+        QVERIFY(insert.exec());
+        QVERIFY2(db.backupTo(backupPath), qPrintable(db.lastError()));
+    }
+
+    {
+        data::Database db(currentPath);
+        QSqlQuery update(db.handle());
+        QVERIFY(update.exec(QStringLiteral("UPDATE products SET name = 'changed'")));
+    }
+
+    const QDateTime now(QDate(2026, 2, 2), QTime(12, 30), Qt::UTC);
+    const data::BackupService::RestoreResult result =
+        data::BackupService::restore(backupPath, currentPath, [&now]() { return now; });
+
+    QVERIFY2(result.ok, qPrintable(result.error));
+    QCOMPARE(result.safetyCopyPath,
+             currentPath + QStringLiteral(".before-restore-20260202-123000"));
+    QVERIFY(QFile::exists(result.safetyCopyPath));
+    QCOMPARE(productName(currentPath), QStringLiteral("original"));
+    QCOMPARE(productName(result.safetyCopyPath), QStringLiteral("changed"));
+}
+
+void BackupServiceTest::restoreRejectsCorruptBackupAndLeavesCurrentIntact()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    const QString currentPath = work.filePath(QStringLiteral("current.sqlite"));
+    const QString badBackupPath = work.filePath(QStringLiteral("bad.sqlite"));
+
+    {
+        data::Database db(currentPath);
+        QSqlQuery insert(db.handle());
+        QVERIFY(insert.prepare(QStringLiteral("INSERT INTO products (name) VALUES (?)")));
+        insert.addBindValue(QStringLiteral("keep me"));
+        QVERIFY(insert.exec());
+    }
+    {
+        QFile badBackup(badBackupPath);
+        QVERIFY(badBackup.open(QIODevice::WriteOnly));
+        badBackup.write("this is not a sqlite database");
+    }
+
+    const QByteArray before = readFile(currentPath);
+    const QDateTime now(QDate(2026, 2, 3), QTime(12, 0), Qt::UTC);
+    const data::BackupService::RestoreResult result =
+        data::BackupService::restore(badBackupPath, currentPath, [&now]() { return now; });
+
+    QVERIFY(!result.ok);
+    QVERIFY(!result.error.isEmpty());
+    QCOMPARE(readFile(currentPath), before);
+    QVERIFY(QDir(work.path())
+                .entryList(QStringList() << QStringLiteral("*.before-restore-*"), QDir::Files)
+                .isEmpty());
+}
+
+void BackupServiceTest::restoreRejectsNewerSchemaAndLeavesCurrentIntact()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    const QString currentPath = work.filePath(QStringLiteral("current.sqlite"));
+    const QString newerPath = work.filePath(QStringLiteral("newer.sqlite"));
+
+    {
+        data::Database db(currentPath);
+        QSqlQuery insert(db.handle());
+        QVERIFY(insert.prepare(QStringLiteral("INSERT INTO products (name) VALUES (?)")));
+        insert.addBindValue(QStringLiteral("keep me"));
+        QVERIFY(insert.exec());
+        QVERIFY2(db.backupTo(newerPath), qPrintable(db.lastError()));
+    }
+    QVERIFY(setUserVersion(newerPath, data::kSchemaVersion + 1));
+
+    const QByteArray before = readFile(currentPath);
+    const QDateTime now(QDate(2026, 2, 4), QTime(12, 0), Qt::UTC);
+    const data::BackupService::RestoreResult result =
+        data::BackupService::restore(newerPath, currentPath, [&now]() { return now; });
+
+    QVERIFY(!result.ok);
+    QVERIFY2(result.error.contains(QStringLiteral("newer"), Qt::CaseInsensitive),
+             qPrintable(result.error));
+    QCOMPARE(readFile(currentPath), before);
+    QVERIFY(QDir(work.path())
+                .entryList(QStringList() << QStringLiteral("*.before-restore-*"), QDir::Files)
+                .isEmpty());
 }
 
 QTEST_GUILESS_MAIN(BackupServiceTest)

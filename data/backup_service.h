@@ -29,9 +29,22 @@ public:
         QString error;
     };
 
+    struct RestoreResult {
+        bool ok = false;
+        QString error;
+        QString safetyCopyPath;
+    };
+
     // Creates at most one automatic copy per kMinimumIntervalHours, then trims
     // the directory to kRetentionCount copies. A skipped run is ok, not failed.
     Result runDailyBackup();
+
+    // Validates sourcePath, copies the current database to a timestamped
+    // *.before-restore file, and only then replaces it. Static and path-based
+    // because the current Database must already be closed: callers run this
+    // before opening the database on the next start, not while it is live.
+    static RestoreResult restore(const QString& sourcePath, const QString& databasePath,
+                                 Clock clock = Clock());
 
     QString backupDirectory() const;
     static QString defaultBackupDirectory();
