@@ -213,6 +213,10 @@ private slots:
     void resolve_sale_items_rejects_piece_for_a_weight_product();
     void resolve_sale_items_rejects_weight_for_a_normal_product();
     void resolve_sale_items_rejects_package_for_a_weight_product();
+    void resolve_sale_items_rejects_stock_shared_by_duplicate_lines();
+    void resolve_sale_items_accepts_duplicate_lines_that_fit_together();
+    void resolve_sale_items_allow_oversold_ignores_aggregate_stock();
+    void resolve_sale_items_sums_pieces_across_mixed_units();
 
 private:
     QTemporaryDir m_dir;
@@ -6243,6 +6247,125 @@ void DataLayerTest::resolve_sale_items_rejects_package_for_a_weight_product()
         data::resolveSaleItems(products, {item}, /*allowOversold=*/false, &error);
     QVERIFY(resolved.isEmpty());
     QVERIFY2(error.contains(QStringLiteral("sold by weight")), qPrintable(error));
+}
+
+void DataLayerTest::resolve_sale_items_rejects_stock_shared_by_duplicate_lines()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_duplicate_reject.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 100;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10, QStringLiteral("purchase"));
+
+    core::SaleItem first;
+    first.productId = productId;
+    first.quantity = 6;
+    first.unitKind = QStringLiteral("piece");
+    first.unitPriceCents = 100;
+    core::SaleItem second = first;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {first, second}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("insufficient stock")), qPrintable(error));
+}
+
+void DataLayerTest::resolve_sale_items_accepts_duplicate_lines_that_fit_together()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_duplicate_fit.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 100;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10, QStringLiteral("purchase"));
+
+    core::SaleItem first;
+    first.productId = productId;
+    first.quantity = 5;
+    first.unitKind = QStringLiteral("piece");
+    first.unitPriceCents = 100;
+    core::SaleItem second = first;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {first, second}, /*allowOversold=*/false, &error);
+    QVERIFY2(!resolved.isEmpty(), qPrintable(error));
+    QCOMPARE(resolved.size(), 2);
+    QCOMPARE(resolved[0].piecesConsumed, 5LL);
+    QCOMPARE(resolved[1].piecesConsumed, 5LL);
+}
+
+void DataLayerTest::resolve_sale_items_allow_oversold_ignores_aggregate_stock()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_duplicate_oversold.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 100;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10, QStringLiteral("purchase"));
+
+    core::SaleItem first;
+    first.productId = productId;
+    first.quantity = 6;
+    first.unitKind = QStringLiteral("piece");
+    first.unitPriceCents = 100;
+    core::SaleItem second = first;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {first, second}, /*allowOversold=*/true, &error);
+    QVERIFY2(!resolved.isEmpty(), qPrintable(error));
+    QCOMPARE(resolved.size(), 2);
+}
+
+void DataLayerTest::resolve_sale_items_sums_pieces_across_mixed_units()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_duplicate_mixed.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("بسكويت");
+    product.salePriceCents = 60;
+    product.piecesPerPackage = 6;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10, QStringLiteral("purchase"));
+
+    core::SaleItem pieces;
+    pieces.productId = productId;
+    pieces.quantity = 5;
+    pieces.unitKind = QStringLiteral("piece");
+    pieces.unitPriceCents = 60;
+    core::SaleItem package;
+    package.productId = productId;
+    package.quantity = 1;
+    package.unitKind = QStringLiteral("package");
+    package.unitPriceCents = 0;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {pieces, package}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("insufficient stock")), qPrintable(error));
 }
 
 #include "tst_data.moc"

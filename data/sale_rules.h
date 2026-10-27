@@ -2,6 +2,7 @@
 
 #include <limits>
 #include <optional>
+#include <QHash>
 #include <QString>
 #include <QVector>
 #include <QDebug>
@@ -101,6 +102,12 @@ inline QVector<core::SaleItem> resolveSaleItems(ProductRepository& products,
                                                 QString* error)
 {
     QVector<core::SaleItem> resolved = items;
+    // A product can sit on more than one line: six pieces and a carton of six
+    // are two lines but twelve pieces off the same shelf. The stock check has to
+    // be against the sum, not against each line on its own.
+    QHash<int, long long> requiredPieces;
+    QHash<int, long long> shelfPieces;
+    QHash<int, QString> productNames;
     for (core::SaleItem& item : resolved) {
         const auto product = products.findById(item.productId);
         if (!product.has_value()) {
@@ -204,17 +211,37 @@ inline QVector<core::SaleItem> resolveSaleItems(ProductRepository& products,
         }
         item.unitCostCents = product->costPriceCents;
 
-        // Grams against grams on a weight line: the shelf is counted in the
-        // same unit the line was sold in, so the comparison holds without a
-        // conversion.
-        // the shelf is counted in pieces, so the guard must be too.
-        // Comparing pieces against cartons lets a carton sale of 2 pass when 30
-        // pieces are on the shelf.
-        if (!allowOversold && product->quantity < item.piecesConsumed) {
-            if (error) {
-                *error = QStringLiteral("insufficient stock for product %1").arg(product->name);
+        if (!allowOversold) {
+            // The shelf is counted in pieces. For a package line that is the
+            // piecesConsumed computed above, not quantity, which is cartons.
+            const auto previous = requiredPieces.constFind(item.productId);
+            if (previous == requiredPieces.cend()) {
+                requiredPieces.insert(item.productId, item.piecesConsumed);
+                shelfPieces.insert(item.productId, product->quantity);
+                productNames.insert(item.productId, product->name);
+            } else {
+                if (!detail::sumFits(*previous, item.piecesConsumed)) {
+                    if (error) {
+                        *error = QStringLiteral("stock quantity overflows for product %1")
+                                     .arg(product->name);
+                    }
+                    return {};
+                }
+                const long long total = *previous + item.piecesConsumed;
+                requiredPieces[item.productId] = total;
             }
-            return {};
+        }
+    }
+
+    if (!allowOversold) {
+        for (auto required = requiredPieces.cbegin(); required != requiredPieces.cend(); ++required) {
+            if (shelfPieces.value(required.key()) < required.value()) {
+                if (error) {
+                    *error = QStringLiteral("insufficient stock for product %1")
+                                 .arg(productNames.value(required.key()));
+                }
+                return {};
+            }
         }
     }
     return resolved;
