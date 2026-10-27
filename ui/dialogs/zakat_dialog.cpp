@@ -134,7 +134,7 @@ void showZakatDialog(QWidget* parent, app::data::Database& db)
     auto* later = new QPushButton(tr("Plus tard"));
     later->setObjectName(QStringLiteral("ghost"));
 
-    auto* markPaid = new QPushButton(tr("Marquer comme payée cette année"));
+    auto* markPaid = new QPushButton(tr("تسجيل دفع الزكاة لهذا العام"));
     markPaid->setObjectName(QStringLiteral("primary"));
     markPaid->setVisible(false);
 

@@ -1252,7 +1252,7 @@ void PosPage::completeSale()
     // money taken off them. Both are worth a refusal.
     const std::optional<long long> adjustment = adjustmentFromField();
     if (!adjustment.has_value()) {
-        setNotice(tr("Ajustement invalide"), false);
+        setNotice(tr("تعديل غير صالح"), false);
         return;
     }
     const long long adjustmentCents = *adjustment;
