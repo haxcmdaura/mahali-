@@ -29,6 +29,12 @@ public:
     bool commit();
     bool rollback();
 
+    // Writes a consistent copy of this database to destinationPath. The copy is
+    // taken with VACUUM INTO, so it includes committed WAL content and is a
+    // standalone database rather than a file-level snapshot. Refuses to overwrite
+    // an existing path; the reason is left in lastError().
+    bool backupTo(const QString& destinationPath);
+
     QString lastError() const;
 
     // Records a failed statement. Repositories call this on every exec() that

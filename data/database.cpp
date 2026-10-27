@@ -5,6 +5,7 @@
 #include <QPair>
 
 #include <QCryptographicHash>
+#include <QFileInfo>
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -346,6 +347,31 @@ QSqlDatabase Database::handle() const
     // whatever ran before it is no longer about to be read.
     clearError();
     return m_db;
+}
+
+bool Database::backupTo(const QString& destinationPath)
+{
+    clearError();
+    if (destinationPath.isEmpty()) {
+        m_lastError = QStringLiteral("backupTo: destination path is empty");
+        return false;
+    }
+    // VACUUM INTO refuses an existing file itself, but checking here keeps the
+    // reason explicit and avoids depending on the driver's message for a case
+    // the caller can see before any work starts.
+    if (QFileInfo::exists(destinationPath)) {
+        m_lastError = QStringLiteral("backupTo: destination already exists: %1").arg(destinationPath);
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("VACUUM INTO ?"));
+    query.addBindValue(destinationPath);
+    if (!query.exec()) {
+        recordError(query.lastError(), QStringLiteral("Database::backupTo"));
+        return false;
+    }
+    return true;
 }
 
 bool Database::beginTransaction()

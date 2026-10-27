@@ -5,6 +5,7 @@
 #include <optional>
 #include <QTemporaryDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QList>
 #include <QSqlQuery>
 #include <QMessageLogContext>
@@ -73,6 +74,8 @@ class DataLayerTest : public QObject
 private slots:
     void initTestCase();
     void schemaContainsAllTables();
+    void backupTo_copies_rows_and_schema_version();
+    void backupTo_refuses_existing_destination();
     void productSaveAndFind();
     void product_visibility_filter();
     void product_repository_round_trips_package_fields();
@@ -240,6 +243,71 @@ void DataLayerTest::schemaContainsAllTables()
     QVERIFY(trigger.exec(
         QStringLiteral("SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_stock_after_insert'")));
     QVERIFY(trigger.next());
+}
+
+void DataLayerTest::backupTo_copies_rows_and_schema_version()
+{
+    const QString sourcePath = m_dir.filePath(QStringLiteral("backup-source.sqlite"));
+    const QString backupPath = m_dir.filePath(QStringLiteral("backup-copy.sqlite"));
+    QFile::remove(sourcePath);
+    QFile::remove(backupPath);
+
+    data::Database source(sourcePath);
+    data::ProductRepository products(source);
+
+    core::Product product;
+    product.name = QStringLiteral("Backup product");
+    product.costPriceCents = 100;
+    product.salePriceCents = 150;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10, QStringLiteral("purchase"));
+
+    data::CashSessionRepository sessions(source);
+    const int sessionId = sessions.open(1000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    const data::SaleRecordResult sale =
+        data::SaleService(source).recordSale({item}, sessionId, "desktop", false);
+    QVERIFY2(sale.ok, qPrintable(sale.error));
+
+    QVERIFY2(source.backupTo(backupPath), qPrintable(source.lastError()));
+    QVERIFY(QFileInfo::exists(backupPath));
+
+    data::Database copy(backupPath);
+    const auto countRows = [](data::Database& db, const QString& table) {
+        QSqlQuery query(db.handle());
+        if (!query.exec(QStringLiteral("SELECT COUNT(*) FROM %1").arg(table)) || !query.next()) {
+            return -1LL;
+        }
+        return query.value(0).toLongLong();
+    };
+
+    for (const QString& table : {QStringLiteral("products"), QStringLiteral("sales"),
+                                 QStringLiteral("stock_movements")}) {
+        QCOMPARE(countRows(copy, table), countRows(source, table));
+    }
+    QCOMPARE(data::readSchemaVersion(copy.handle()), data::readSchemaVersion(source.handle()));
+    QCOMPARE(data::readSchemaVersion(copy.handle()), data::kSchemaVersion);
+}
+
+void DataLayerTest::backupTo_refuses_existing_destination()
+{
+    const QString destinationPath = m_dir.filePath(QStringLiteral("backup-existing.sqlite"));
+    QFile destination(destinationPath);
+    QVERIFY(destination.open(QIODevice::WriteOnly));
+    const QByteArray original = QByteArrayLiteral("keep me");
+    QCOMPARE(destination.write(original), original.size());
+    destination.close();
+
+    QVERIFY(!m_db->backupTo(destinationPath));
+    QVERIFY(!m_db->lastError().isEmpty());
+
+    QVERIFY(destination.open(QIODevice::ReadOnly));
+    QCOMPARE(destination.readAll(), original);
 }
 
 void DataLayerTest::productSaveAndFind()
