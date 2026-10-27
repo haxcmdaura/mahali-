@@ -124,15 +124,22 @@ SaleRecordResult SaleService::recordCustomerDebt(int customerId, const QVector<c
         }
     }
 
-QString error;
+    if (!m_db.beginTransaction()) {
+        result.error = m_db.lastError();
+        return result;
+    }
+
+    QString error;
     const QVector<core::SaleItem> resolved = resolveSaleItems(m_products, items, allowOversold, &error);
     if (resolved.isEmpty()) {
+        m_db.rollback();
         result.error = error;
         return result;
     }
 
     const std::optional<long long> totalOpt = totalCentsFor(resolved);
     if (!totalOpt.has_value()) {
+        m_db.rollback();
         result.error = QStringLiteral("the sale total is too large to record");
         return result;
     }
@@ -141,18 +148,15 @@ QString error;
     // lines + adjustment, while the cost of the goods stays at the line prices,
     // which is what the profit and loss statement is built from.
     if (!detail::sumFits(*totalOpt, adjustmentCents)) {
+        m_db.rollback();
         result.error = QStringLiteral("the sale total is too large to record");
         return result;
     }
 
     const std::optional<long long> cogsOpt = cogsCentsFor(resolved);
     if (!cogsOpt.has_value()) {
+        m_db.rollback();
         result.error = QStringLiteral("the sale cost is too large to record");
-        return result;
-    }
-
-    if (!m_db.beginTransaction()) {
-        result.error = m_db.lastError();
         return result;
     }
 

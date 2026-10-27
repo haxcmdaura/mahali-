@@ -103,6 +103,7 @@ private slots:
     void customerTransactionAndItems();
     void sale_with_adjustment();
     void customer_debt_with_adjustment();
+    void customer_debt_refuses_insufficient_stock_without_writing_anything();
     void sale_without_adjustment_unchanged();
     void adjustment_migration_adds_the_column_to_a_legacy_ledger();
     void product_packages_migration_adds_columns_to_a_legacy_ledger();
@@ -1314,6 +1315,65 @@ void DataLayerTest::customer_debt_with_adjustment()
     // What the customer is said to owe is the charged amount, not the line sum:
     // an invoice that adds up to less than the balance is not an invoice.
     QCOMPARE(customers.balanceCentsFor(customerId), 150LL);
+}
+
+// A credit sale must not be written when the shelf cannot cover it. The stock
+// check lives inside resolveSaleItems, so the sale has to be opened before that
+// call: a refusal after the check still has to leave nothing behind, and a
+// concurrent write must not be able to slip in between the read and the write.
+void DataLayerTest::customer_debt_refuses_insufficient_stock_without_writing_anything()
+{
+    const QString path = m_dir.filePath(QStringLiteral("debt_insufficient_stock.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 1200;
+    product.costPriceCents = 1000;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 1, QStringLiteral("opening"));
+
+    core::Customer customer;
+    customer.name = QStringLiteral("زبون-نقص");
+    data::CustomerRepository customers(db);
+    const int customerId = customers.save(customer);
+    QVERIFY(customerId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 2;
+    item.unitPriceCents = 1200;
+
+    const auto rows = [&db](const QString& table) {
+        QSqlQuery query(db.handle());
+        if (!query.exec(QStringLiteral("SELECT COUNT(*) FROM %1").arg(table)) || !query.next()) {
+            return -1LL;
+        }
+        return query.value(0).toLongLong();
+    };
+    QCOMPARE(rows(QStringLiteral("stock_movements")), 1LL);
+
+    const data::SaleRecordResult refused =
+        data::SaleService(db).recordCustomerDebt(customerId, {item}, QStringLiteral("dev"),
+                                                 /*allowOversold=*/false);
+    QVERIFY(!refused.ok);
+    QVERIFY2(refused.error.contains(QStringLiteral("insufficient stock")),
+             qPrintable(refused.error));
+    QCOMPARE(refused.saleId, 0);
+    QCOMPARE(refused.totalCents, 0LL);
+    QCOMPARE(refused.cogsCents, 0LL);
+
+    QCOMPARE(rows(QStringLiteral("customer_transactions")), 0LL);
+    QCOMPARE(rows(QStringLiteral("customer_transaction_items")), 0LL);
+    QCOMPARE(rows(QStringLiteral("stock_movements")), 1LL);
+    QCOMPARE(rows(QStringLiteral("audit_log")), 0LL);
+    const auto stored = products.findById(productId);
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->quantity, 1LL);
+    QCOMPARE(customers.balanceCentsFor(customerId), 0LL);
 }
 
 // Every caller that existed before the adjustment parameter does still compile and
