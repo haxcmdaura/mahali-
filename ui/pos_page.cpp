@@ -1215,7 +1215,7 @@ void PosPage::enterCreditMode()
     // The balance belongs on the bar, not only in the picker that was just closed:
     // this is the figure the cashier is about to add to, and a sale that pushes an
     // account further under is the whole reason to be looking at it.
-    const long long balance = repo.balanceCentsFor(*customerId);
+    const long long balance = repo.balanceCentsFor(*customerId).value_or(0);
     m_creditLabel->setText(tr("À CRÉDIT : %1 · Solde : %2")
                                .arg(customer->name, formatMoney(balance)));
     m_creditBar->setVisible(true);

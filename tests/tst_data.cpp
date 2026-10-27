@@ -1394,7 +1394,7 @@ void DataLayerTest::customer_debt_with_adjustment()
 
     // What the customer is said to owe is the charged amount, not the line sum:
     // an invoice that adds up to less than the balance is not an invoice.
-    QCOMPARE(customers.balanceCentsFor(customerId), 150LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 150LL); };
 }
 
 // A credit sale must not be written when the shelf cannot cover it. The stock
@@ -1453,7 +1453,7 @@ void DataLayerTest::customer_debt_refuses_insufficient_stock_without_writing_any
     const auto stored = products.findById(productId);
     QVERIFY(stored.has_value());
     QCOMPARE(stored->quantity, 1LL);
-    QCOMPARE(customers.balanceCentsFor(customerId), 0LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 0LL); };
 }
 
 // Every caller that existed before the adjustment parameter does still compile and
@@ -1999,7 +1999,7 @@ void DataLayerTest::reverse_customer_debt_offsets_the_ledger_and_returns_stock()
     DebtFixture f(m_dir.filePath(QStringLiteral("reverse_customer_debt.sqlite")));
     QVERIFY(f.transactionId > 0);
     const long long stockBefore = f.stock();
-    QCOMPARE(data::CustomerRepository(f.db).balanceCentsFor(f.customerId), 14000LL);
+    { auto _v = data::CustomerRepository(f.db).balanceCentsFor(f.customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 14000LL); }
 
     data::SaleService sales(f.db);
     const data::SaleReverseResult result = sales.reverseCustomerDebt(f.transactionId);
@@ -2007,7 +2007,7 @@ void DataLayerTest::reverse_customer_debt_offsets_the_ledger_and_returns_stock()
 
     // The debt is gone, and it is gone because of a negative row against the
     // original rather than because the original was edited away.
-    QCOMPARE(data::CustomerRepository(f.db).balanceCentsFor(f.customerId), 0LL);
+    { auto _v = data::CustomerRepository(f.db).balanceCentsFor(f.customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 0LL); }
     const auto txs = data::CustomerTransactionRepository(f.db).findByCustomerId(f.customerId);
     QCOMPARE(txs.size(), std::size_t(2));
     QCOMPARE(txs[1].amountCents, -14000LL);
@@ -2061,7 +2061,7 @@ void DataLayerTest::reverse_customer_debt_refuses_a_second_reversal()
     QVERIFY2(!second.error.isEmpty(), "a refusal has to say why");
 
     // Nothing moved the second time.
-    QCOMPARE(data::CustomerRepository(f.db).balanceCentsFor(f.customerId), 0LL);
+    { auto _v = data::CustomerRepository(f.db).balanceCentsFor(f.customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 0LL); }
     QCOMPARE(f.stock(), stockAfterFirst);
     QCOMPARE(data::CustomerTransactionRepository(f.db)
                  .findByCustomerId(f.customerId)
@@ -2087,7 +2087,7 @@ void DataLayerTest::reverse_customer_debt_refuses_a_payment_row()
     QVERIFY(!result.ok);
 
     // Untouched: the repayment still stands.
-    QCOMPARE(data::CustomerRepository(f.db).balanceCentsFor(f.customerId), 9000LL);
+    { auto _v = data::CustomerRepository(f.db).balanceCentsFor(f.customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 9000LL); }
     QCOMPARE(transactions.findByCustomerId(f.customerId).size(), std::size_t(2));
 }
 
@@ -2104,7 +2104,7 @@ void DataLayerTest::reverse_customer_debt_refuses_a_missing_sale()
                  .findByCustomerId(f.customerId)
                  .size(),
              std::size_t(1));
-    QCOMPARE(data::CustomerRepository(f.db).balanceCentsFor(f.customerId), 14000LL);
+    { auto _v = data::CustomerRepository(f.db).balanceCentsFor(f.customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 14000LL); }
 }
 
 // A reversal puts back what the sale took, so it needs the sale to have recorded
@@ -2892,7 +2892,7 @@ void DataLayerTest::customer_balance_uses_opening_and_transactions()
 
     // The opening figure has to come back on its own before anything is
     // recorded against the account, or a carried-in balance is silently lost.
-    QCOMPARE(customers.balanceCentsFor(customerId), 10000LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 10000LL); };
 
     data::CustomerTransactionRepository transactions(db);
     core::CustomerTransaction debt;
@@ -2901,14 +2901,14 @@ void DataLayerTest::customer_balance_uses_opening_and_transactions()
     QVERIFY(transactions.insert(debt) > 0);
 
     // 10000 opening + 50000 credit, still nothing paid off.
-    QCOMPARE(customers.balanceCentsFor(customerId), 60000LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 60000LL); };
 
     data::PaymentRepository payments(db);
     core::Payment payment;
     payment.customerId = customerId;
     payment.amountCents = 20000;
     QVERIFY(payments.insert(payment) > 0);
-    QCOMPARE(customers.balanceCentsFor(customerId), 40000LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 40000LL); };
 
     // A reversal is written as a negative row against the original, which is
     // what reversed_transaction_id / reversed_id are for. Summing the raw
@@ -2920,14 +2920,14 @@ void DataLayerTest::customer_balance_uses_opening_and_transactions()
     reversal.amountCents = -50000;
     reversal.reversedTransactionId = 1;
     QVERIFY(transactions.insert(reversal) > 0);
-    QCOMPARE(customers.balanceCentsFor(customerId), -10000LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, -10000LL); };
 
     core::Payment refund;
     refund.customerId = customerId;
     refund.amountCents = -20000;
     refund.reversedId = 1;
     QVERIFY(payments.insert(refund) > 0);
-    QCOMPARE(customers.balanceCentsFor(customerId), 10000LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 10000LL); };
 }
 
 void DataLayerTest::customer_active_filter()

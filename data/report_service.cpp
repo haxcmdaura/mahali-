@@ -158,14 +158,14 @@ long long creditCogsFor(const std::vector<core::CustomerTransactionItem>& lines,
     return cogs;
 }
 
-long long stockValueCents(Database& db)
+std::optional<long long> stockValueCents(Database& db)
 {
     QSqlQuery query(db.handle());
     query.prepare(QStringLiteral("SELECT id, quantity, sale_price_cents, sold_by_weight FROM products "
                                  "WHERE active = 1 AND quantity > 0"));
     if (!query.exec()) {
         db.recordError(query.lastError(), QStringLiteral("ReportService::stockValueCents"));
-        return 0;
+        return std::nullopt;
     }
 
     const long long ceiling = std::numeric_limits<long long>::max();
@@ -305,7 +305,16 @@ StoreReport ReportService::build(const QDateTime& from, const QDateTime& to) con
     report.receivablesCents = report.outstandingDebtCents;
 
     core::ZakatInputs zakatInputs;
-    report.stockValueCents = stockValueCents(m_db);
+    const auto stockValue = stockValueCents(m_db);
+    if (!stockValue.has_value()) {
+        QSqlError err = m_db.lastError();
+        if (!err.isValid()) {
+            err = QSqlError(QStringLiteral(""), QStringLiteral("stock value read failed"));
+        }
+        m_db.recordError(err, QStringLiteral("ReportService::build"));
+        return report;
+    }
+    report.stockValueCents = *stockValue;
     report.cashOnHandCents = cashOnHandCents(m_db);
     zakatInputs.stockValueCents = report.stockValueCents;
     zakatInputs.cashCents = report.cashOnHandCents;

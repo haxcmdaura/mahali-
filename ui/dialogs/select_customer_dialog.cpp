@@ -42,7 +42,7 @@ std::optional<int> showSelectCustomerDialog(QWidget* parent, app::data::Database
     };
     std::vector<Row> rows;
     for (const core::Customer& customer : customers.findAll()) {
-        rows.push_back({customer, customers.balanceCentsFor(customer.id)});
+        rows.push_back({customer, customers.balanceCentsFor(customer.id).value_or(0)});
     }
 
     // Deepest debt first. The name settles ties, so two accounts owing the same
