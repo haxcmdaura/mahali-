@@ -18,12 +18,13 @@ constexpr int kSchemaVersion = 16;
 // stamps user_version. Called once from Database's constructor, after
 // createSchema().
 //
-// Deliberately non-fatal. A migration that cannot be applied (an index that a
-// duplicated ledger refuses to accept, for instance) reports a warning and leaves
-// the rest of the sequence alone: a shop whose ledger already holds a duplicate
-// reversal must still be able to open its till and sell. The protection that
-// migration would have added stays in the services, which check before they
-// write; what is lost is only the database's own second opinion.
+// A failed migration stops the sequence and throws without stamping the version,
+// so the next start retries it instead of treating a partial database as current.
+// The one exception is the duplicate-reversal index, which warns and is skipped:
+// a shop whose ledger already holds a duplicate reversal must still be able to
+// open its till and sell. The protection that index would have added stays in the
+// services, which check before they write; what is lost is only the database's
+// own second opinion.
 void runSchemaMigrations(const QSqlDatabase& db);
 
 // The version the database was last migrated to, or 0 when it predates

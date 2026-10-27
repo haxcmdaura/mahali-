@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 #include <QTemporaryDir>
 #include <QFile>
 #include <QFileInfo>
@@ -117,6 +118,7 @@ private slots:
     void audit_row_rolls_back_with_the_movement_it_describes();
     void recordSale_rolls_back_when_the_price_override_audit_cannot_be_written();
     void migration_skips_the_index_when_the_ledger_holds_a_duplicate();
+    void migration_failure_does_not_stamp_the_schema_version();
     void cash_movements_carry_correct_reference();
     void close_validation_detects_violations();
     void cash_reference_migration_keeps_legacy_null_and_adds_index();
@@ -2191,6 +2193,10 @@ void DataLayerTest::migration_skips_the_index_when_the_ledger_holds_a_duplicate(
         QCOMPARE(present, i != 0);
     }
 
+    // The allowed warning is not a failed migration: the skipped index still
+    // leaves the database stamped at the version this build applied.
+    QCOMPARE(data::readSchemaVersion(db.handle()), data::kSchemaVersion);
+
     // And the ordinary work still goes through on the ledger whose index is off,
     // which is the state the warning describes.
     QSqlQuery ordinary(db.handle());
@@ -2198,6 +2204,60 @@ void DataLayerTest::migration_skips_the_index_when_the_ledger_holds_a_duplicate(
     QVERIFY(ordinary.exec(QString::fromLatin1(kReversalTables[0].originalInsert)));
 }
 
+
+void DataLayerTest::migration_failure_does_not_stamp_the_schema_version()
+{
+    const QString path = m_dir.filePath(QStringLiteral("migration_failure.sqlite"));
+    const QString connection = QStringLiteral("migration-failure");
+
+    {
+        QSqlDatabase legacy = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        legacy.setDatabaseName(path);
+        QVERIFY(legacy.open());
+        QSqlQuery create(legacy);
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " sold_by_weight INTEGER NOT NULL DEFAULT 0, package_barcode TEXT,"
+            " package_name TEXT NOT NULL DEFAULT '',"
+            " pieces_per_package INTEGER NOT NULL DEFAULT 1,"
+            " package_cost_cents INTEGER NOT NULL DEFAULT 0)")));
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TRIGGER fail_weight_cleanup BEFORE UPDATE ON products"
+            " BEGIN SELECT RAISE(ABORT, 'injected migration failure'); END")));
+        QVERIFY(create.exec(QStringLiteral(
+            "INSERT INTO products (sold_by_weight, package_barcode, package_name,"
+            " pieces_per_package, package_cost_cents)"
+            " VALUES (1, '5c', 'carton', 5, 500)")));
+        QVERIFY(create.exec(QStringLiteral("PRAGMA user_version = 15")));
+        legacy.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+    db.setDatabaseName(path);
+    QVERIFY(db.open());
+
+    bool threw = false;
+    try {
+        data::runSchemaMigrations(db);
+    } catch (const std::runtime_error& error) {
+        threw = true;
+        const QString message = QString::fromUtf8(error.what());
+        QVERIFY2(message.contains(QStringLiteral("16")), qPrintable(message));
+        QVERIFY2(message.contains(QStringLiteral("weight"), Qt::CaseInsensitive),
+                 qPrintable(message));
+    }
+    QVERIFY2(threw, "a failing migration must abort instead of stamping the schema version");
+    QCOMPARE(data::readSchemaVersion(db), 15);
+    {
+        QSqlQuery row(db);
+        QVERIFY(row.exec(QStringLiteral("SELECT package_barcode FROM products")));
+        QVERIFY(row.next());
+        QCOMPARE(row.value(0).toString(), QStringLiteral("5c"));
+    }
+    db.close();
+    QSqlDatabase::removeDatabase(connection);
+}
 
 void DataLayerTest::audit_row_is_written_by_the_service_not_the_caller()
 {
