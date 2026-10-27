@@ -104,7 +104,7 @@ SupplierPaymentResult SupplierPaymentService::recordPayment(int supplierId,
     // make advances impossible.
 
     // B.
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = stepError(m_db, QStringLiteral("opening the transaction"));
         return result;
     }
@@ -206,7 +206,7 @@ SupplierPaymentResult SupplierPaymentService::reversePayment(int paymentId, std:
     // A second reversal is prevented by the service guard above and by the
     // partial unique index on reversed_id (migration 3). Written here inside
     // the transaction so the check and the row it guards commit as one.
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = stepError(m_db, QStringLiteral("opening the transaction"));
         return result;
     }
