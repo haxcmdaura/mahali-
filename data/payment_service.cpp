@@ -41,7 +41,7 @@ PaymentResult PaymentService::recordCustomerPayment(int customerId, long long am
         }
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
@@ -138,7 +138,7 @@ PaymentResult PaymentService::refundCustomerPayment(int paymentId, int cashSessi
         return result;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
