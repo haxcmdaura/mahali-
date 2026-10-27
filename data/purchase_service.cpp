@@ -3,11 +3,14 @@
 #include <QDateTime>
 #include <QMap>
 #include <QSqlQuery>
+#include <limits>
 
 #include "date_utils.h"
 #include "cash_drawer.h"
 #include "audit_log_repository.h"
 #include "core/cash_movement.h"
+#include "core/purchase_item.h"
+#include "sale_rules.h"
 
 namespace app::data {
 
@@ -73,11 +76,52 @@ PurchaseResult PurchaseService::recordPurchase(const core::Purchase& purchase,
             result.error = QStringLiteral("quantity must be positive");
             return result;
         }
+        if (item.unitPriceCents < 0) {
+            result.error = QStringLiteral("unit price must be non-negative");
+            return result;
+        }
+        // Check totalCents == item.quantity * item.unitPriceCents
+        if (item.unitPriceCents != 0 && item.quantity > 0) {
+            if (item.quantity > std::numeric_limits<long long>::max() / item.unitPriceCents) {
+                result.error = QStringLiteral("line total overflows");
+                return result;
+            }
+            const long long expected = item.quantity * item.unitPriceCents;
+            if (expected != item.totalCents) {
+                result.error = QStringLiteral("line total mismatch");
+                return result;
+            }
+        } else if (item.unitPriceCents == 0 || item.quantity == 0) {
+            if (item.quantity * item.unitPriceCents != item.totalCents && !(item.quantity == 0 || item.unitPriceCents == 0)) {
+                // compute
+            }
+            const long long expected = item.quantity * item.unitPriceCents;
+            if (expected != item.totalCents) {
+                result.error = QStringLiteral("line total mismatch");
+                return result;
+            }
+        }
+        if (!detail::sumFits(subtotalCents, item.totalCents)) {
+            result.error = QStringLiteral("subtotal overflow");
+            return result;
+        }
         subtotalCents += item.totalCents;
     }
     // The VAT is the caller's, not the lines': it is charged on the invoice as a
     // whole rather than on any one line, so it cannot be worked out here and is
     // taken as it was given.
+    if (purchase.vatCents < 0) {
+        result.error = QStringLiteral("vat cannot be negative");
+        return result;
+    }
+    if (purchase.paidCents < 0) {
+        result.error = QStringLiteral("paid amount cannot be negative");
+        return result;
+    }
+    if (!detail::sumFits(subtotalCents, purchase.vatCents)) {
+        result.error = QStringLiteral("total overflow");
+        return result;
+    }
     const long long vatCents = purchase.vatCents;
     const long long totalCents = subtotalCents + vatCents;
     // Paying more than the invoice is worth would leave the supplier in credit
