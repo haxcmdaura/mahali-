@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QList>
+#include <QMap>
 #include <QSqlQuery>
 #include <QMessageLogContext>
 #include <QRegularExpression>
@@ -124,6 +125,7 @@ private slots:
     void migration_is_atomic_and_backs_up_before_upgrading();
     void migration_does_not_start_when_pre_migration_backup_fails();
     void newer_schema_is_refused_without_touching_the_file();
+    void migrated_v1_schema_matches_a_fresh_install();
     void cash_movements_carry_correct_reference();
     void close_validation_detects_violations();
     void cash_reference_migration_keeps_legacy_null_and_adds_index();
@@ -2490,6 +2492,126 @@ void DataLayerTest::newer_schema_is_refused_without_touching_the_file()
     }
     QVERIFY2(threw, "a database from a newer schema must not open");
     QCOMPARE(digest(path), before);
+}
+
+void DataLayerTest::migrated_v1_schema_matches_a_fresh_install()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    const QString legacyPath = work.filePath(QStringLiteral("v1-schema.sqlite"));
+    const QString freshPath = work.filePath(QStringLiteral("fresh-schema.sqlite"));
+
+    const QString connection = QStringLiteral("v1-schema-fixture");
+    {
+        QSqlDatabase legacy = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        legacy.setDatabaseName(legacyPath);
+        QVERIFY(legacy.open());
+
+        QFile fixture(QStringLiteral(MAHALI_TEST_FIXTURES_DIR "/schema_v1.sql"));
+        QVERIFY2(fixture.open(QIODevice::ReadOnly | QIODevice::Text),
+                 qPrintable(fixture.fileName()));
+        const QStringList lines =
+            QString::fromUtf8(fixture.readAll()).split(QLatin1Char('\n'));
+        int statements = 0;
+        for (const QString& line : lines) {
+            const QString sql = line.trimmed();
+            if (sql.isEmpty() || sql.startsWith(QLatin1String("--"))) {
+                continue;
+            }
+            QSqlQuery statement(legacy);
+            QVERIFY2(statement.exec(sql),
+                     qPrintable(QStringLiteral("v1 fixture failed: %1 (%2)")
+                                    .arg(sql, statement.lastError().text())));
+            ++statements;
+        }
+        QVERIFY2(statements > 0, "the v1 fixture must execute at least one statement");
+
+        QSqlQuery version(legacy);
+        QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));
+        QVERIFY(version.next());
+        QCOMPARE(version.value(0).toInt(), 1);
+        legacy.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    data::Database migrated(legacyPath);
+    QCOMPARE(data::readSchemaVersion(migrated.handle()), data::kSchemaVersion);
+
+    data::Database fresh(freshPath);
+    QCOMPARE(data::readSchemaVersion(fresh.handle()), data::kSchemaVersion);
+
+    const auto objects = [](const QSqlDatabase& db) {
+        QStringList found;
+        QSqlQuery query(db);
+        if (!query.exec(QStringLiteral(
+                "SELECT type, name FROM sqlite_master "
+                "WHERE type IN ('table', 'index', 'trigger') "
+                "AND name NOT LIKE 'sqlite_%' ORDER BY type, name"))) {
+            return QStringList{
+                QStringLiteral("objects query failed: %1").arg(query.lastError().text())};
+        }
+        while (query.next()) {
+            found << QStringLiteral("%1:%2")
+                         .arg(query.value(0).toString(), query.value(1).toString());
+        }
+        return found;
+    };
+
+    const auto definitions = [](const QSqlDatabase& db) {
+        QStringList found;
+        QSqlQuery query(db);
+        if (!query.exec(QStringLiteral(
+                "SELECT type, name, sql FROM sqlite_master "
+                "WHERE type IN ('index', 'trigger') "
+                "AND name NOT LIKE 'sqlite_%' ORDER BY type, name"))) {
+            return QStringList{
+                QStringLiteral("definitions query failed: %1").arg(query.lastError().text())};
+        }
+        while (query.next()) {
+            found << QStringLiteral("%1:%2:%3")
+                         .arg(query.value(0).toString(), query.value(1).toString(),
+                              query.value(2).toString().simplified());
+        }
+        return found;
+    };
+
+    const auto columns = [](const QSqlDatabase& db) {
+        QStringList found;
+        QSqlQuery tables(db);
+        if (!tables.exec(QStringLiteral(
+                "SELECT name FROM sqlite_master "
+                "WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"))) {
+            return QStringList{
+                QStringLiteral("tables query failed: %1").arg(tables.lastError().text())};
+        }
+        while (tables.next()) {
+            const QString table = tables.value(0).toString();
+            QSqlQuery info(db);
+            if (!info.exec(QStringLiteral("PRAGMA table_info(%1)").arg(table))) {
+                return QStringList{QStringLiteral("table_info failed for %1: %2")
+                                       .arg(table, info.lastError().text())};
+            }
+            QMap<QString, QString> byName;
+            while (info.next()) {
+                const QString defaultValue =
+                    info.value(4).isNull() ? QStringLiteral("<null>")
+                                           : info.value(4).toString();
+                byName.insert(
+                    info.value(1).toString(),
+                    QStringLiteral("type=%1 notnull=%2 default=%3")
+                        .arg(info.value(2).toString(),
+                             QString::number(info.value(3).toInt()), defaultValue));
+            }
+            for (auto it = byName.cbegin(); it != byName.cend(); ++it) {
+                found << QStringLiteral("%1.%2 %3").arg(table, it.key(), it.value());
+            }
+        }
+        return found;
+    };
+
+    QCOMPARE(objects(migrated.handle()), objects(fresh.handle()));
+    QCOMPARE(definitions(migrated.handle()), definitions(fresh.handle()));
+    QCOMPARE(columns(migrated.handle()), columns(fresh.handle()));
 }
 
 void DataLayerTest::audit_row_is_written_by_the_service_not_the_caller()

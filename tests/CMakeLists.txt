@@ -17,6 +17,8 @@ target_link_libraries(tst_data
         mahali-data
         Qt${QT_VERSION_MAJOR}::Test
         Qt${QT_VERSION_MAJOR}::Widgets)
+target_compile_definitions(tst_data PRIVATE
+    MAHALI_TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 
 add_test(NAME data COMMAND tst_data)
 
