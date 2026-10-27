@@ -124,7 +124,7 @@ SaleRecordResult SaleService::recordCustomerDebt(int customerId, const QVector<c
         }
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
@@ -273,7 +273,7 @@ SaleRecordResult SaleService::recordSale(const QVector<core::SaleItem>& items, i
         }
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
@@ -433,7 +433,7 @@ SaleReverseResult SaleService::reverseSale(int saleId, int cashSessionId)
         return r;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         r.error = m_db.lastError().isEmpty()
             ? QStringLiteral("reverseSale: could not start the transaction")
             : m_db.lastError();
@@ -599,7 +599,7 @@ SaleReverseResult SaleService::reverseCustomerDebt(int transactionId)
         return r;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         r.error = m_db.lastError().isEmpty()
             ? QStringLiteral("could not start the transaction")
             : m_db.lastError();
