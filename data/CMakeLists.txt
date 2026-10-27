@@ -21,6 +21,7 @@ target_link_libraries(mahali-data
 
 target_sources(mahali-data PRIVATE
     database.cpp
+    backup_service.cpp
     admin_secret_repository.cpp
     audit_log_repository.cpp
     applied_op_repository.cpp

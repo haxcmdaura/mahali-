@@ -8,6 +8,7 @@
 
 #include "core/i18n.h"
 #include "core/session.h"
+#include "data/backup_service.h"
 #include "data/database.h"
 #include "data/setting_repository.h"
 #include "data/sync_key.h"
@@ -68,6 +69,19 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    // A daily copy is taken before the login gate: it protects the ledger even
+    // on a day nobody signs in, and it must never stop the till from opening.
+    // The failure is logged here and shown as a non-modal notice once the shell
+    // exists, because a startup modal in front of the login is not a notice.
+    app::data::BackupService::Result backupResult;
+    {
+        app::data::BackupService backup(*db);
+        backupResult = backup.runDailyBackup();
+        if (!backupResult.ok) {
+            qWarning("mahali: daily backup failed: %s", qPrintable(backupResult.error));
+        }
+    }
+
     // The sync key is minted random on first launch and read back on every
     // launch after (SyncKey::ensure); Settings shows the very value the server
     // signs with, so pairing a second machine is a copy from that field.
@@ -117,5 +131,18 @@ int main(int argc, char* argv[])
     // them all at their minimum sizes first. showMaximized() also happens before
     // the first paint, so the window is never seen at the smaller size and grown.
     window.showMaximized();
+
+    if (!backupResult.ok) {
+        auto* notice = new QMessageBox(
+            QMessageBox::Warning,
+            QCoreApplication::translate("main", "محلي — النسخ الاحتياطي"),
+            QCoreApplication::translate("main", "تعذّر إكمال النسخة الاحتياطية اليومية:\n%1")
+                .arg(backupResult.error),
+            QMessageBox::Ok, &window);
+        notice->setAttribute(Qt::WA_DeleteOnClose);
+        notice->setModal(false);
+        notice->show();
+    }
+
     return app.exec();
 }

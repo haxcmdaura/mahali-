@@ -20,6 +20,14 @@ target_link_libraries(tst_data
 
 add_test(NAME data COMMAND tst_data)
 
+add_executable(tst_backup tst_backup.cpp)
+target_link_libraries(tst_backup
+    PRIVATE
+        mahali-data
+        Qt${QT_VERSION_MAJOR}::Test)
+
+add_test(NAME backup COMMAND tst_backup)
+
 add_executable(tst_purchase_service tst_purchase_service.cpp)
 target_link_libraries(tst_purchase_service
     PRIVATE
