@@ -768,7 +768,11 @@ void PosPage::addEntry()
                                   tr("Ajouter « %1 » à la vente en cours ?").arg(label),
                                   QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
         if (answer == QMessageBox::Yes) {
-            addProductToCart(saved, 1, unitKind);
+            if (saved.soldByWeight) {
+                startWeightEntry(saved);
+            } else {
+                addProductToCart(saved, 1, unitKind);
+            }
             return;
         }
         m_entry->setFocus();
@@ -803,6 +807,10 @@ void PosPage::onAddQuickProduct()
     core::Product saved = *created;
     saved.id = id;
     refreshQuickItems();
+    if (saved.soldByWeight) {
+        startWeightEntry(saved);
+        return;
+    }
     addProductToCart(saved, 1);
 }
 
@@ -810,6 +818,10 @@ void PosPage::onQuickItemClicked(int productId)
 {
     const std::optional<core::Product> product = data::ProductRepository(m_db).findById(productId);
     if (!product) {
+        return;
+    }
+    if (product->soldByWeight) {
+        startWeightEntry(*product);
         return;
     }
     addProductToCart(*product, 1);

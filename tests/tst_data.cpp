@@ -209,6 +209,10 @@ private slots:
     void sync_key_remints_on_empty_value();
     void resolve_sale_items_warns_on_pieces_consumed_drift();
     void resolve_sale_items_silent_when_claim_matches();
+    void resolve_sale_items_rejects_unknown_unit();
+    void resolve_sale_items_rejects_piece_for_a_weight_product();
+    void resolve_sale_items_rejects_weight_for_a_normal_product();
+    void resolve_sale_items_rejects_package_for_a_weight_product();
 
 private:
     QTemporaryDir m_dir;
@@ -6129,6 +6133,116 @@ void DataLayerTest::resolve_sale_items_silent_when_claim_matches()
         QVERIFY2(!message.contains(QStringLiteral("sync drift")),
                  qPrintable(QStringLiteral("unexpected drift warning: %1").arg(message)));
     }
+}
+
+void DataLayerTest::resolve_sale_items_rejects_unknown_unit()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_unknown_unit.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 100;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 100, QStringLiteral("purchase"));
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    item.unitKind = QStringLiteral("kg");
+    item.unitPriceCents = 100;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {item}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("unknown unit")), qPrintable(error));
+}
+
+void DataLayerTest::resolve_sale_items_rejects_piece_for_a_weight_product()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_weight_piece.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("لوز");
+    product.salePriceCents = 120000;
+    product.soldByWeight = true;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10000, QStringLiteral("purchase"));
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 250;
+    item.unitKind = QStringLiteral("piece");
+    item.unitPriceCents = 120000;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {item}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("sold by weight")), qPrintable(error));
+}
+
+void DataLayerTest::resolve_sale_items_rejects_weight_for_a_normal_product()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_weight_normal.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 100;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 100, QStringLiteral("purchase"));
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 250;
+    item.unitKind = QStringLiteral("weight");
+    item.unitPriceCents = 100000;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {item}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("not sold by weight")), qPrintable(error));
+}
+
+void DataLayerTest::resolve_sale_items_rejects_package_for_a_weight_product()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_weight_package.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("لوز");
+    product.salePriceCents = 120000;
+    product.soldByWeight = true;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10000, QStringLiteral("purchase"));
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    item.unitKind = QStringLiteral("package");
+    item.unitPriceCents = 120000;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {item}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("sold by weight")), qPrintable(error));
 }
 
 #include "tst_data.moc"

@@ -55,6 +55,42 @@ inline bool sumFits(long long a, long long b)
 
 } // namespace detail
 
+// The three sides of a product a line can be sold as. Stored as text because
+// every ledger written before this enum existed already carries these words;
+// parsing them here is what keeps an unknown spelling from being read as an
+// ordinary piece line.
+enum class UnitKind { Piece, Package, Weight };
+
+inline QString toString(UnitKind kind)
+{
+    switch (kind) {
+    case UnitKind::Piece:
+        return QStringLiteral("piece");
+    case UnitKind::Package:
+        return QStringLiteral("package");
+    case UnitKind::Weight:
+        return QStringLiteral("weight");
+    }
+    return QStringLiteral("piece");
+}
+
+// An empty value is the pre-enum piece line. Anything else has to be one of the
+// three words above: a typo or an old free-form unit is refused rather than
+// guessed at.
+inline std::optional<UnitKind> fromString(const QString& text)
+{
+    if (text.isEmpty() || text == QStringLiteral("piece")) {
+        return UnitKind::Piece;
+    }
+    if (text == QStringLiteral("package")) {
+        return UnitKind::Package;
+    }
+    if (text == QStringLiteral("weight")) {
+        return UnitKind::Weight;
+    }
+    return std::nullopt;
+}
+
 // Shared accounting rules for recording a sale or customer debt. Both the
 // Windows-side SaleService (server apply) and the device-side DeviceLedgerService
 // (offline record) funnel through these same functions so money math never
@@ -86,12 +122,39 @@ inline QVector<core::SaleItem> resolveSaleItems(ProductRepository& products,
         // Phase 2B, and refusing it would break every existing path that has not
         // yet been taught to set it.
         if (item.unitKind.isEmpty()) {
-            item.unitKind = QStringLiteral("piece");
+            item.unitKind = toString(UnitKind::Piece);
+        }
+        const std::optional<UnitKind> unitKind = fromString(item.unitKind);
+        if (!unitKind) {
+            if (error) {
+                *error = QStringLiteral("unknown unit '%1' for product %2")
+                             .arg(item.unitKind, product->name);
+            }
+            return {};
+        }
+
+        // The product is the authority on whether it can be weighed or boxed.
+        // A weight price is quoted per kilogram while a piece price is not, so
+        // letting the two cross would divide a piece sale by a thousand or bill
+        // a kilogram line as one gram.
+        if (product->soldByWeight && *unitKind != UnitKind::Weight) {
+            if (error) {
+                *error = QStringLiteral("product %1 is sold by weight and must use the weight unit, not '%2'")
+                             .arg(product->name, item.unitKind);
+            }
+            return {};
+        }
+        if (!product->soldByWeight && *unitKind == UnitKind::Weight) {
+            if (error) {
+                *error = QStringLiteral("product %1 is not sold by weight and cannot use the weight unit")
+                             .arg(product->name);
+            }
+            return {};
         }
 
         const long long claimedPiecesConsumed = item.piecesConsumed;
 
-        if (item.unitKind == QStringLiteral("package")) {
+        if (*unitKind == UnitKind::Package) {
             // The carton price is the piece price times the count, and the caller
             // is allowed to know it already. When it does not, we compute it here
             // so a package line is always priced. Only ever the price of ONE carton:
@@ -121,10 +184,8 @@ inline QVector<core::SaleItem> resolveSaleItems(ProductRepository& products,
             }
             item.piecesConsumed = item.quantity * product->piecesPerPackage;
         } else {
-            // sold-by-weight is not a carton; its quantity is already the figure that
-            // leaves the shelf, and a piece line's is too. The caller's string is kept
-            // as it was typed rather than folded into 'piece', because 'kg' says
-            // something a reader of the ledger needs to know.
+            // A weight line is not a carton: its quantity is grams and is already
+            // the figure that leaves the shelf. A piece line's quantity is too.
             item.piecesConsumed = item.quantity;
         }
 

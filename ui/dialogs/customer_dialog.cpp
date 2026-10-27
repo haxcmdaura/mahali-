@@ -35,6 +35,7 @@
 #include "data/payment_repository.h"
 #include "data/payment_service.h"
 #include "data/product_repository.h"
+#include "data/sale_rules.h"
 #include "data/sale_service.h"
 #include "format_utils.h"
 #include "widgets/ui_helpers.h"
@@ -199,14 +200,29 @@ bool collectDebtItems(QWidget* parent, app::data::Database& db, QVector<core::Sa
             }
             unitPrice = *overridePrice;
         }
+        const QString unitKind = product->soldByWeight
+            ? data::toString(data::UnitKind::Weight)
+            : data::toString(data::UnitKind::Piece);
+        core::SaleItem preview;
+        preview.quantity = qty->value();
+        preview.unitKind = unitKind;
+        preview.unitPriceCents = unitPrice;
+        const auto lineTotal = data::totalCentsFor({preview});
+        if (!lineTotal) {
+            QMessageBox::warning(&dialog, QCoreApplication::translate("CustomerDialog", "Erreur"),
+                                 QCoreApplication::translate("CustomerDialog",
+                                                            "Montant invalide"));
+            return;
+        }
         const int row = table->rowCount();
         table->insertRow(row);
         auto* nameItem = new QTableWidgetItem(product->name);
         nameItem->setData(Qt::UserRole, productId);
+        nameItem->setData(Qt::UserRole + 1, unitKind);
         table->setItem(row, 0, nameItem);
         table->setItem(row, 1, new QTableWidgetItem(QString::number(qty->value())));
         table->setItem(row, 2, new QTableWidgetItem(formatMoney(unitPrice)));
-        table->setItem(row, 3, new QTableWidgetItem(formatMoney(unitPrice * qty->value())));
+        table->setItem(row, 3, new QTableWidgetItem(formatMoney(*lineTotal)));
         price->clear();
         refreshTotal();
     });
@@ -235,6 +251,10 @@ bool collectDebtItems(QWidget* parent, app::data::Database& db, QVector<core::Sa
         core::SaleItem item;
         item.productId = table->item(i, 0)->data(Qt::UserRole).toInt();
         item.quantity = quantity;
+        item.unitKind = table->item(i, 0)->data(Qt::UserRole + 1).toString();
+        if (item.unitKind.isEmpty()) {
+            item.unitKind = data::toString(data::UnitKind::Piece);
+        }
         item.unitPriceCents = *unitPrice;
         out->append(item);
     }

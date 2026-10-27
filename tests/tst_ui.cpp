@@ -4003,6 +4003,7 @@ void UiTest::receipt_renders_a_weight_line_with_grams()
     product.costPriceCents = 100000;
     product.salePriceCents = 120000;
     product.piecesPerPackage = 1;
+    product.soldByWeight = true;
     const int productId = products.save(product);
     QVERIFY(productId > 0);
     products.adjustStock(productId, 10000, QStringLiteral("purchase"));
