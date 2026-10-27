@@ -126,7 +126,7 @@ PurchaseResult PurchaseService::recordPurchase(const core::Purchase& purchase,
     }
 
     // B.
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = stepError(m_db, QStringLiteral("opening the transaction"));
         return result;
     }
@@ -368,7 +368,7 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
         return result;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = stepError(m_db, QStringLiteral("opening the transaction"));
         return result;
     }
