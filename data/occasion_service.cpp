@@ -56,7 +56,7 @@ bool OccasionService::activate(int occasionId)
         return false;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         return false;
     }
 
@@ -85,7 +85,7 @@ bool OccasionService::activate(int occasionId)
 
 bool OccasionService::deactivate()
 {
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         return false;
     }
 
