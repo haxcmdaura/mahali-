@@ -347,7 +347,7 @@ bool ProductRepository::canDeletePermanently(int productId) const
 
 bool ProductRepository::removePermanently(int productId) const
 {
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         return false;
     }
 
