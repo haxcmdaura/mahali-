@@ -26,6 +26,7 @@ private slots:
     void restoreReplacesDatabaseWithValidatedBackup();
     void restoreRejectsCorruptBackupAndLeavesCurrentIntact();
     void restoreRejectsNewerSchemaAndLeavesCurrentIntact();
+    void stagedRestoreAppliesBeforeNextOpen();
 
 private:
     static QStringList backupsIn(const QString& directory);
@@ -210,6 +211,47 @@ void BackupServiceTest::restoreReplacesDatabaseWithValidatedBackup()
     QVERIFY(QFile::exists(result.safetyCopyPath));
     QCOMPARE(productName(currentPath), QStringLiteral("original"));
     QCOMPARE(productName(result.safetyCopyPath), QStringLiteral("changed"));
+}
+
+void BackupServiceTest::stagedRestoreAppliesBeforeNextOpen()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    const QString currentPath = work.filePath(QStringLiteral("current.sqlite"));
+    const QString backupPath = work.filePath(QStringLiteral("backup.sqlite"));
+
+    {
+        data::Database db(currentPath);
+        QSqlQuery insert(db.handle());
+        QVERIFY(insert.prepare(QStringLiteral("INSERT INTO products (name) VALUES (?)")));
+        insert.addBindValue(QStringLiteral("original"));
+        QVERIFY(insert.exec());
+        QVERIFY2(db.backupTo(backupPath), qPrintable(db.lastError()));
+    }
+
+    {
+        data::Database db(currentPath);
+        QSqlQuery update(db.handle());
+        QVERIFY(update.exec(QStringLiteral("UPDATE products SET name = 'changed'")));
+
+        QString error;
+        QVERIFY2(data::BackupService::stageRestore(backupPath, currentPath, &error),
+                 qPrintable(error));
+    }
+
+    QCOMPARE(productName(currentPath), QStringLiteral("changed"));
+    const data::BackupService::PendingRestoreResult applied =
+        data::BackupService::applyPendingRestore(currentPath);
+    QVERIFY2(applied.ok, qPrintable(applied.error));
+    QVERIFY(applied.applied);
+    QVERIFY(QFile::exists(applied.safetyCopyPath));
+    QCOMPARE(productName(currentPath), QStringLiteral("original"));
+    QCOMPARE(productName(applied.safetyCopyPath), QStringLiteral("changed"));
+
+    const data::BackupService::PendingRestoreResult again =
+        data::BackupService::applyPendingRestore(currentPath);
+    QVERIFY2(again.ok, qPrintable(again.error));
+    QVERIFY(!again.applied);
 }
 
 void BackupServiceTest::restoreRejectsCorruptBackupAndLeavesCurrentIntact()

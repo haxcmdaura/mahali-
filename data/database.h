@@ -25,6 +25,11 @@ public:
 
     QSqlDatabase handle() const;
 
+    // The file this connection points at. Restore is path-based because it has
+    // to run before this object exists; callers that are already open use this
+    // only to name the database in a pending-restore marker.
+    QString filePath() const;
+
     bool beginTransaction();
     bool commit();
     bool rollback();

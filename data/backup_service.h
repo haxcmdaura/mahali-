@@ -35,9 +35,21 @@ public:
         QString safetyCopyPath;
     };
 
+    struct PendingRestoreResult {
+        bool ok = false;
+        bool applied = false;
+        QString error;
+        QString sourcePath;
+        QString safetyCopyPath;
+    };
+
     // Creates at most one automatic copy per kMinimumIntervalHours, then trims
     // the directory to kRetentionCount copies. A skipped run is ok, not failed.
     Result runDailyBackup();
+
+    // Manual copy to a path the operator chose. Unlike runDailyBackup(), this
+    // does not apply the daily throttle or the retention window.
+    Result backupTo(const QString& destinationPath);
 
     // Validates sourcePath, copies the current database to a timestamped
     // *.before-restore file, and only then replaces it. Static and path-based
@@ -45,6 +57,13 @@ public:
     // before opening the database on the next start, not while it is live.
     static RestoreResult restore(const QString& sourcePath, const QString& databasePath,
                                  Clock clock = Clock());
+
+    // A running app cannot replace its open database. The settings page stages
+    // a validated source instead, and applyPendingRestore() performs the swap
+    // before main() opens the Database on the next start.
+    static bool stageRestore(const QString& sourcePath, const QString& databasePath,
+                             QString* error = nullptr);
+    static PendingRestoreResult applyPendingRestore(const QString& databasePath);
 
     QString backupDirectory() const;
     static QString defaultBackupDirectory();

@@ -58,6 +58,15 @@ int main(int argc, char* argv[])
         dbPath = QDir(dataDir).filePath(QStringLiteral("mahali.sqlite"));
     }
 
+    // A restore staged in Settings cannot replace the file while the app holds
+    // it open. It is applied here, before the Database exists: the main window
+    // and the login gate then see the restored ledger, not a half-swapped one.
+    const app::data::BackupService::PendingRestoreResult pendingRestore =
+        app::data::BackupService::applyPendingRestore(dbPath);
+    if (!pendingRestore.ok) {
+        qWarning("mahali: pending restore failed: %s", qPrintable(pendingRestore.error));
+    }
+
     std::unique_ptr<app::data::Database> db;
     try {
         db = std::make_unique<app::data::Database>(dbPath, app::data::DatabaseMode::Server);
@@ -138,6 +147,18 @@ int main(int argc, char* argv[])
             QCoreApplication::translate("main", "محلي — النسخ الاحتياطي"),
             QCoreApplication::translate("main", "تعذّر إكمال النسخة الاحتياطية اليومية:\n%1")
                 .arg(backupResult.error),
+            QMessageBox::Ok, &window);
+        notice->setAttribute(Qt::WA_DeleteOnClose);
+        notice->setModal(false);
+        notice->show();
+    }
+
+    if (!pendingRestore.ok) {
+        auto* notice = new QMessageBox(
+            QMessageBox::Warning,
+            QCoreApplication::translate("main", "محلي — الاستعادة"),
+            QCoreApplication::translate("main", "تعذّرت استعادة النسخة الاحتياطية:\n%1")
+                .arg(pendingRestore.error),
             QMessageBox::Ok, &window);
         notice->setAttribute(Qt::WA_DeleteOnClose);
         notice->setModal(false);

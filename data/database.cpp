@@ -371,6 +371,11 @@ QSqlDatabase Database::handle() const
     return m_db;
 }
 
+QString Database::filePath() const
+{
+    return m_db.databaseName();
+}
+
 bool Database::backupTo(const QString& destinationPath)
 {
     clearError();

@@ -139,6 +139,7 @@ private slots:
     void receipt_shows_the_adjustment_and_the_payable_matches_the_row();
     void settings_page_saves_and_restores_receipt_printing();
     void settings_page_saves_auto_print();
+    void settings_page_backs_up_now();
     void receipt_printer_writes_a_pdf();
     void product_dialog_reveals_the_weight_checkbox();
     void product_dialog_saves_the_weight_flag();
@@ -3523,6 +3524,33 @@ void UiTest::settings_page_saves_auto_print()
     auto* autoBox = reopened.findChild<QCheckBox*>(QStringLiteral("receiptAutoPrint"));
     QVERIFY(autoBox);
     QVERIFY(autoBox->isChecked());
+}
+
+// The settings page is the whole manual-backup entry point: the button exists,
+// and the path it gives the service produces a readable copy without asking a
+// modal dialog where to put it.
+void UiTest::settings_page_backs_up_now()
+{
+    const QString path = m_dir.filePath(QStringLiteral("settings-backup.sqlite"));
+    const QString backupPath = m_dir.filePath(QStringLiteral("settings-manual.sqlite"));
+    QFile::remove(path);
+    QFile::remove(backupPath);
+    data::Database db(path);
+    data::SettingRepository(db).set(QStringLiteral("shop_name"), QStringLiteral("Boutique Test"));
+
+    ui::SettingsPage page(db);
+    QVERIFY(page.findChild<QPushButton*>(QStringLiteral("backupNowButton")));
+    QVERIFY(page.findChild<QPushButton*>(QStringLiteral("restoreBackupButton")));
+
+    QString error;
+    QVERIFY2(page.backupNowTo(backupPath, &error), qPrintable(error));
+    QVERIFY(QFile::exists(backupPath));
+
+    data::Database copy(backupPath);
+    QCOMPARE(data::SettingRepository(copy)
+                 .value(QStringLiteral("shop_name"))
+                 .value_or(QString()),
+             QStringLiteral("Boutique Test"));
 }
 
 void UiTest::receipt_printer_writes_a_pdf()

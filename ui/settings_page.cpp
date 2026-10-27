@@ -3,6 +3,10 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDateTime>
+#include <QDir>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -15,6 +19,7 @@
 
 #include "core/i18n.h"
 #include "core/update_checker.h"
+#include "data/backup_service.h"
 #include "data/setting_repository.h"
 #include "data/sync_key.h"
 
@@ -167,6 +172,16 @@ SettingsPage::SettingsPage(app::data::Database& db, QWidget* parent)
     m_checkUpdates->setObjectName(QStringLiteral("linkButton"));
     m_checkUpdates->setCursor(Qt::PointingHandCursor);
 
+    auto* backupNow = new QPushButton(tr("نسخ احتياطي الآن"));
+    backupNow->setObjectName(QStringLiteral("backupNowButton"));
+    auto* restoreBackup = new QPushButton(tr("استعادة من نسخة"));
+    restoreBackup->setObjectName(QStringLiteral("restoreBackupButton"));
+    auto* backupRow = new QHBoxLayout;
+    backupRow->setContentsMargins(0, 0, 0, 0);
+    backupRow->setSpacing(8);
+    backupRow->addWidget(backupNow);
+    backupRow->addWidget(restoreBackup);
+
     auto* card = makeCard();
     // Fixed rather than merely capped: a maximum alone leaves the card at its
     // size hint, which measured 140px in Arabic and 291px in French for the same
@@ -178,6 +193,7 @@ SettingsPage::SettingsPage(app::data::Database& db, QWidget* parent)
     cardLayout->addWidget(m_preview);
     cardLayout->addSpacing(21);
     cardLayout->addWidget(m_save);
+    cardLayout->addLayout(backupRow);
     cardLayout->addWidget(m_checkUpdates);
     cardLayout->addWidget(m_notice);
 
@@ -220,8 +236,7 @@ SettingsPage::SettingsPage(app::data::Database& db, QWidget* parent)
                 // Announced before the notice, so the shell's icons are already
                 // the new colour by the time the page says the theme changed.
                 emit themeChanged();
-                m_notice->setText(tr("طُبّقت السمة الجديدة — احفظ للإبقاء عليها"));
-                m_notice->setVisible(!m_notice->text().isEmpty());
+                showNotice(tr("طُبّقت السمة الجديدة — احفظ للإبقاء عليها"), true);
             });
 
     // Phase A1: the choice is stored and the catalogue is swapped in, but the
@@ -240,6 +255,42 @@ SettingsPage::SettingsPage(app::data::Database& db, QWidget* parent)
 
     connect(m_save, &QPushButton::clicked, this, &SettingsPage::save);
     connect(m_checkUpdates, &QPushButton::clicked, this, &SettingsPage::checkForUpdates);
+    connect(backupNow, &QPushButton::clicked, this, [this]() {
+        const QString dir = data::BackupService::defaultBackupDirectory();
+        QDir().mkpath(dir);
+        const QString suggested =
+            QDir(dir).filePath(QStringLiteral("mahali-%1.sqlite")
+                                   .arg(QDateTime::currentDateTime().toString(
+                                       QStringLiteral("yyyyMMdd-HHmmss"))));
+        const QString path = QFileDialog::getSaveFileName(
+            this, tr("حفظ النسخة الاحتياطية"), suggested,
+            tr("قواعد بيانات SQLite (*.sqlite)"));
+        if (path.isEmpty()) {
+            return;
+        }
+        QString error;
+        if (backupNowTo(path, &error)) {
+            showNotice(tr("تم إنشاء النسخة الاحتياطية: %1")
+                           .arg(QFileInfo(path).fileName()), true);
+        } else {
+            showNotice(tr("تعذّر إنشاء النسخة الاحتياطية: %1").arg(error), false);
+        }
+    });
+    connect(restoreBackup, &QPushButton::clicked, this, [this]() {
+        const QString path = QFileDialog::getOpenFileName(
+            this, tr("اختيار نسخة احتياطية"),
+            data::BackupService::defaultBackupDirectory(),
+            tr("قواعد بيانات SQLite (*.sqlite)"));
+        if (path.isEmpty()) {
+            return;
+        }
+        QString error;
+        if (requestRestoreFrom(path, &error)) {
+            showNotice(tr("ستُستعاد النسخة عند إعادة تشغيل البرنامج"), true);
+        } else {
+            showNotice(tr("تعذّرت الاستعادة: %1").arg(error), false);
+        }
+    });
 
     refresh();
 }
@@ -321,8 +372,7 @@ void SettingsPage::refresh()
     const auto autoPrintRow = settings.value(QStringLiteral("receipt_auto_print"));
     m_receiptAutoPrint->setChecked(autoPrintRow.has_value() && *autoPrintRow == QLatin1String("1"));
 
-    m_notice->clear();
-    m_notice->setVisible(false);
+    showNotice(QString(), true);
     m_preview->setText(tr("معاينة: %1").arg(formatMoney(12345)));
 }
 
@@ -354,6 +404,36 @@ QString SettingsPage::syncKey() const
 QString SettingsPage::noticeText() const
 {
     return m_notice->text();
+}
+
+bool SettingsPage::backupNowTo(const QString& destinationPath, QString* error)
+{
+    const auto result = data::BackupService(m_db).backupTo(destinationPath);
+    if (!result.ok && error) {
+        *error = result.error;
+    }
+    return result.ok;
+}
+
+bool SettingsPage::requestRestoreFrom(const QString& sourcePath, QString* error)
+{
+    QString reason;
+    if (!data::BackupService::stageRestore(sourcePath, m_db.filePath(), &reason)) {
+        if (error) {
+            *error = reason;
+        }
+        return false;
+    }
+    return true;
+}
+
+void SettingsPage::showNotice(const QString& text, bool ok)
+{
+    m_notice->setObjectName(ok ? QStringLiteral("noticeOk") : QStringLiteral("noticeErr"));
+    m_notice->style()->unpolish(m_notice);
+    m_notice->style()->polish(m_notice);
+    m_notice->setText(text);
+    m_notice->setVisible(!text.isEmpty());
 }
 
 void SettingsPage::setShopName(const QString& name)
@@ -399,8 +479,7 @@ void SettingsPage::save()
 
     app::ui::setCurrencySymbol(currencySymbol());
     m_preview->setText(tr("معاينة: %1").arg(formatMoney(12345)));
-    m_notice->setText(tr("حُفظت الإعدادات"));
-    m_notice->setVisible(!m_notice->text().isEmpty());
+    showNotice(tr("حُفظت الإعدادات"), true);
 }
 
 } // namespace app::ui

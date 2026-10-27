@@ -128,7 +128,150 @@ QString uniqueSafetyPath(const QString& databasePath, const QString& stamp)
     }
 }
 
+bool validateRestoreSource(const QString& sourcePath, const QString& databasePath,
+                           QString* error)
+{
+    if (!QFileInfo(sourcePath).isFile()) {
+        if (error) {
+            *error = QStringLiteral("backup does not exist: %1").arg(sourcePath);
+        }
+        return false;
+    }
+    if (!QFileInfo(databasePath).isFile()) {
+        if (error) {
+            *error = QStringLiteral("current database does not exist: %1").arg(databasePath);
+        }
+        return false;
+    }
+    if (QFileInfo(sourcePath).canonicalFilePath()
+        == QFileInfo(databasePath).canonicalFilePath()) {
+        if (error) {
+            *error = QStringLiteral("backup is the current database");
+        }
+        return false;
+    }
+
+    const BackupCheck check = checkBackup(sourcePath);
+    if (!check.ok) {
+        if (error) {
+            *error = check.error;
+        }
+        return false;
+    }
+    if (check.schemaVersion > kSchemaVersion) {
+        if (error) {
+            *error = QStringLiteral("backup schema version %1 is newer than this build's %2")
+                         .arg(check.schemaVersion)
+                         .arg(kSchemaVersion);
+        }
+        return false;
+    }
+    return true;
+}
+
+QString pendingRestoreMarker(const QString& databasePath)
+{
+    return databasePath + QStringLiteral(".pending-restore");
+}
+
 } // namespace
+
+BackupService::Result BackupService::backupTo(const QString& destinationPath)
+{
+    Result result;
+    if (destinationPath.isEmpty()) {
+        result.error = QStringLiteral("backup destination is empty");
+        return result;
+    }
+    if (!QFileInfo(destinationPath).absoluteDir().exists()) {
+        result.error = QStringLiteral("backup directory does not exist: %1")
+                           .arg(QFileInfo(destinationPath).absolutePath());
+        return result;
+    }
+    if (!m_db.backupTo(destinationPath)) {
+        result.error = m_db.lastError();
+        return result;
+    }
+    result.ok = true;
+    result.created = true;
+    result.path = destinationPath;
+    return result;
+}
+
+bool BackupService::stageRestore(const QString& sourcePath, const QString& databasePath,
+                                 QString* error)
+{
+    QString validationError;
+    if (!validateRestoreSource(sourcePath, databasePath, &validationError)) {
+        if (error) {
+            *error = validationError;
+        }
+        return false;
+    }
+
+    QSaveFile marker(pendingRestoreMarker(databasePath));
+    if (!marker.open(QIODevice::WriteOnly)) {
+        if (error) {
+            *error = QStringLiteral("could not stage restore: %1").arg(marker.errorString());
+        }
+        return false;
+    }
+    const QByteArray payload = QFileInfo(sourcePath).absoluteFilePath().toUtf8();
+    if (marker.write(payload) != payload.size()) {
+        marker.cancelWriting();
+        if (error) {
+            *error = QStringLiteral("could not stage restore: %1").arg(marker.errorString());
+        }
+        return false;
+    }
+    if (!marker.commit()) {
+        if (error) {
+            *error = QStringLiteral("could not stage restore: %1").arg(marker.errorString());
+        }
+        return false;
+    }
+    return true;
+}
+
+BackupService::PendingRestoreResult
+BackupService::applyPendingRestore(const QString& databasePath)
+{
+    PendingRestoreResult result;
+    const QString markerPath = pendingRestoreMarker(databasePath);
+    if (!QFileInfo::exists(markerPath)) {
+        result.ok = true;
+        return result;
+    }
+
+    QFile marker(markerPath);
+    if (!marker.open(QIODevice::ReadOnly)) {
+        result.error = QStringLiteral("could not read pending restore: %1")
+                           .arg(marker.errorString());
+        return result;
+    }
+    const QString sourcePath = QString::fromUtf8(marker.readAll());
+    marker.close();
+    if (sourcePath.isEmpty()) {
+        QFile::remove(markerPath);
+        result.error = QStringLiteral("pending restore names no backup");
+        return result;
+    }
+    if (!QFile::remove(markerPath)) {
+        result.error = QStringLiteral("could not clear pending restore: %1").arg(markerPath);
+        return result;
+    }
+
+    const RestoreResult restored = restore(sourcePath, databasePath);
+    if (!restored.ok) {
+        result.error = restored.error;
+        return result;
+    }
+    result.ok = true;
+    result.applied = true;
+    result.sourcePath = sourcePath;
+    result.safetyCopyPath = restored.safetyCopyPath;
+    return result;
+}
 
 BackupService::RestoreResult BackupService::restore(const QString& sourcePath,
                                                    const QString& databasePath,
@@ -136,29 +279,9 @@ BackupService::RestoreResult BackupService::restore(const QString& sourcePath,
 {
     RestoreResult result;
 
-    if (!QFileInfo(sourcePath).isFile()) {
-        result.error = QStringLiteral("backup does not exist: %1").arg(sourcePath);
-        return result;
-    }
-    if (!QFileInfo(databasePath).isFile()) {
-        result.error = QStringLiteral("current database does not exist: %1").arg(databasePath);
-        return result;
-    }
-    if (QFileInfo(sourcePath).canonicalFilePath()
-        == QFileInfo(databasePath).canonicalFilePath()) {
-        result.error = QStringLiteral("backup is the current database");
-        return result;
-    }
-
-    const BackupCheck check = checkBackup(sourcePath);
-    if (!check.ok) {
-        result.error = check.error;
-        return result;
-    }
-    if (check.schemaVersion > kSchemaVersion) {
-        result.error = QStringLiteral("backup schema version %1 is newer than this build's %2")
-                           .arg(check.schemaVersion)
-                           .arg(kSchemaVersion);
+    QString validationError;
+    if (!validateRestoreSource(sourcePath, databasePath, &validationError)) {
+        result.error = validationError;
         return result;
     }
 
