@@ -17,7 +17,7 @@
 #include "core/zakat_notifier.h"
 #include "data/report_service.h"
 #include "data/setting_repository.h"
-#include "data/zakat_history_repository.h"
+#include "data/zakat_service.h"
 
 #include "format_utils.h"
 #include "scan_safe_dialog.h"
@@ -275,34 +275,16 @@ void showZakatDialog(QWidget* parent, app::data::Database& db)
         const QDate zakatDate = QDate::fromString(storedDate.trimmed(), QStringLiteral("yyyy-MM-dd"));
         const int year = core::zakatYearFor(today, zakatDate);
 
-        data::SettingRepository settings(db);
-        // The nisab as well: marking the payment is the operator saying they
-        // worked this out and acted on it, and they should not also have to
-        // press the threshold button first for it to be on file.
-        settings.set(QStringLiteral("nisab_cents"), QString::number(nisabCents));
-        settings.set(QStringLiteral("zakat_paid_year"), QString::number(year));
-        settings.set(QStringLiteral("zakat_paid_cents"), QString::number(dueCents));
-        settings.set(QStringLiteral("zakat_paid_date"), today.toString(Qt::ISODate));
-
-        // The year is recorded in the history, not just in settings: settings
-        // keeps only the latest and would lose every year before it. The
-        // settings writes above stay for the notifier, but they are a mirror of
-        // this row and not the record of it.
-        //
-        // insertOrIgnore first, because markPaid only updates a row that is
-        // already there — a payment for a year nobody assessed would otherwise
-        // be silently dropped.
-        data::ZakatHistoryRepository history(db);
-        history.insertOrIgnore(year, nisabCents, baseCents, dueCents, goldPriceCents);
-        history.markPaid(year, dueCents, today.toString(Qt::ISODate));
-
-        // Paying is the only thing that settles the year, so paying is what claims
-        // it. shouldNotifyZakat no longer writes, so without this the reminder
-        // would keep asking about a year that has been paid.
-        core::markZakatYearAsSeen(db, year);
+        data::ZakatService service(db);
+        if (!service.markPaid(year, nisabCents, baseCents, dueCents, goldPriceCents, today)) {
+            QMessageBox::warning(&dialog, tr("الزكاة"), service.lastError().isEmpty()
+                                   ? tr("تعذّر تسجيل دفع الزكاة")
+                                   : service.lastError());
+            return;
+        }
 
         QMessageBox::information(&dialog, tr("الزكاة"),
-                                 tr("Zakat payée pour %1. بارك الله فيك.").arg(year));
+                                 tr("دُفعت الزكاة عن عام %1. بارك الله فيك.").arg(year));
         dialog.accept();
     });
 

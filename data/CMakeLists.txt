@@ -75,7 +75,9 @@ target_sources(mahali-data PRIVATE
     sync_sequence_repository.cpp
     user_repository.cpp
     zakat_history_repository.cpp
-    zakat_history_repository.h)
+    zakat_history_repository.h
+    zakat_service.cpp
+    zakat_service.h)
 
 set_target_properties(mahali-data PROPERTIES
     POSITION_INDEPENDENT_CODE ON)
