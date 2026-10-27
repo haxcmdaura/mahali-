@@ -137,7 +137,7 @@ bool CustomerRepository::setActive(int id, bool active)
 
 bool CustomerRepository::remove(int id)
 {
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         m_db.recordError(QSqlError(QStringLiteral(""), QStringLiteral("cannot begin transaction")),
                          QStringLiteral("CustomerRepository::remove"));
         return false;
