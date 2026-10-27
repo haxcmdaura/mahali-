@@ -920,13 +920,47 @@ void runSchemaMigrations(const QSqlDatabase& db)
         return;
     }
 
+    // Each migration commits on its own, with its version stamp in the same
+    // transaction. A failure halfway through therefore leaves the database at the
+    // last version that completed instead of holding uncommitted ALTERs from a
+    // migration that never finished. Stamping every version is what makes the
+    // next start resume at the right entry rather than replay the whole table.
     for (const Migration& migration : kMigrations) {
         if (migration.version <= from || migration.version > kSchemaVersion) {
             continue;
         }
+        bool transactionOpen = false;
         try {
+            QSqlQuery begin(db);
+            if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) {
+                fail(QStringLiteral("begin schema migration %1 (%2)")
+                         .arg(migration.version)
+                         .arg(QString::fromLatin1(migration.name)),
+                     begin.lastError().text());
+            }
+            transactionOpen = true;
+
             migration.apply(db);
+            run(db,
+                QStringLiteral("PRAGMA user_version = %1").arg(migration.version),
+                QStringLiteral("stamp schema version %1").arg(migration.version));
+
+            QSqlQuery commit(db);
+            if (!commit.exec(QStringLiteral("COMMIT"))) {
+                fail(QStringLiteral("commit schema migration %1 (%2)")
+                         .arg(migration.version)
+                         .arg(QString::fromLatin1(migration.name)),
+                     commit.lastError().text());
+            }
+            transactionOpen = false;
         } catch (const std::exception& error) {
+            if (transactionOpen) {
+                QSqlQuery rollback(db);
+                if (!rollback.exec(QStringLiteral("ROLLBACK"))) {
+                    qWarning() << "schema migration: rollback of" << migration.name
+                               << "failed:" << rollback.lastError().text();
+                }
+            }
             throw std::runtime_error(
                 QStringLiteral("schema migration %1 (%2) failed: %3")
                     .arg(migration.version)
@@ -935,14 +969,8 @@ void runSchemaMigrations(const QSqlDatabase& db)
         }
     }
 
-    // Reached only when every migration returned. The one migration allowed to
-    // warn instead of throw is the duplicate-reversal index below: the shop has
-    // to keep opening, and its services still hold the same line. That warning
-    // returns normally, so the version is stamped.
-    QSqlQuery stamp(db);
-    if (!stamp.exec(QStringLiteral("PRAGMA user_version = %1").arg(kSchemaVersion))) {
-        fail(QStringLiteral("stamp user_version"), stamp.lastError().text());
-    }
+    // The duplicate-reversal index migration is allowed to warn and return
+    // normally; it stamps its own version like every other completed migration.
 }
 
 } // namespace app::data

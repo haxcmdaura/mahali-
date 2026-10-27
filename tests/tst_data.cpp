@@ -1,6 +1,7 @@
 #include <QtTest/QtTest>
 
 #include <QApplication>
+#include <QDir>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -119,6 +120,8 @@ private slots:
     void recordSale_rolls_back_when_the_price_override_audit_cannot_be_written();
     void migration_skips_the_index_when_the_ledger_holds_a_duplicate();
     void migration_failure_does_not_stamp_the_schema_version();
+    void migration_is_atomic_and_backs_up_before_upgrading();
+    void migration_does_not_start_when_pre_migration_backup_fails();
     void cash_movements_carry_correct_reference();
     void close_validation_detects_violations();
     void cash_reference_migration_keeps_legacy_null_and_adds_index();
@@ -2256,6 +2259,198 @@ void DataLayerTest::migration_failure_does_not_stamp_the_schema_version()
         QCOMPARE(row.value(0).toString(), QStringLiteral("5c"));
     }
     db.close();
+    QSqlDatabase::removeDatabase(connection);
+}
+
+void DataLayerTest::migration_is_atomic_and_backs_up_before_upgrading()
+{
+    const QString path = m_dir.filePath(QStringLiteral("atomic_migration.sqlite"));
+    QFile::remove(path);
+    const QString connection = QStringLiteral("atomic-migration");
+    {
+        QSqlDatabase legacy = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        legacy.setDatabaseName(path);
+        QVERIFY(legacy.open());
+        QSqlQuery create(legacy);
+        // The shape before cartons: products has no package columns yet, and
+        // sale_items has neither unit_kind nor pieces_consumed.
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " barcode TEXT UNIQUE, name TEXT NOT NULL,"
+            " cost_price_cents INTEGER NOT NULL DEFAULT 0,"
+            " sale_price_cents INTEGER NOT NULL DEFAULT 0,"
+            " quantity INTEGER NOT NULL DEFAULT 0,"
+            " unit TEXT NOT NULL DEFAULT '',"
+            " package_size INTEGER NOT NULL DEFAULT 1,"
+            " active INTEGER NOT NULL DEFAULT 1,"
+            " sold_by_weight INTEGER NOT NULL DEFAULT 0)")));
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE sale_items (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " sale_id INTEGER NOT NULL, product_id INTEGER NOT NULL,"
+            " quantity INTEGER NOT NULL, unit_price_cents INTEGER NOT NULL,"
+            " unit_cost_cents INTEGER NOT NULL,"
+            " reversed_id INTEGER NOT NULL DEFAULT 0)")));
+        // Still before migration 12, so the adjustment column has to be added by
+        // the migration that completes before 13 fails.
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE sales (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " created_at TEXT NOT NULL, total_cents INTEGER NOT NULL,"
+            " device_id TEXT NOT NULL, oversold INTEGER NOT NULL DEFAULT 0,"
+            " reversed_sale_id INTEGER NOT NULL DEFAULT 0)")));
+        QVERIFY(create.exec(QStringLiteral(
+            "INSERT INTO products (id, name, quantity) VALUES (1, 'Cola', 10)")));
+        QVERIFY(create.exec(QStringLiteral(
+            "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price_cents,"
+            " unit_cost_cents) VALUES (1, 1, 2, 100, 50)")));
+        // Migration 13 adds the line columns and then backfills them; aborting
+        // the backfill is what leaves the earlier ALTERs uncommitted.
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TRIGGER fail_sale_item_backfill BEFORE UPDATE ON sale_items"
+            " BEGIN SELECT RAISE(ABORT, 'injected backfill failure'); END")));
+        QVERIFY(create.exec(QStringLiteral("PRAGMA user_version = 11")));
+        legacy.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    bool threw = false;
+    try {
+        data::Database db(path);
+    } catch (const std::runtime_error& error) {
+        threw = true;
+        const QString message = QString::fromUtf8(error.what());
+        QVERIFY2(message.contains(QStringLiteral("13")), qPrintable(message));
+        QVERIFY2(message.contains(QStringLiteral("product packages"), Qt::CaseInsensitive),
+                 qPrintable(message));
+    }
+    QVERIFY2(threw, "the injected migration failure must abort opening the database");
+
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        check.setDatabaseName(path);
+        QVERIFY(check.open());
+        QCOMPARE(data::readSchemaVersion(check), 12);
+        {
+            QSqlQuery columns(check);
+            QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(sales)")));
+            bool hasAdjustment = false;
+            while (columns.next()) {
+                hasAdjustment = hasAdjustment
+                                || columns.value(1).toString()
+                                       == QStringLiteral("adjustment_cents");
+            }
+            QVERIFY2(hasAdjustment, "migration 12 did not commit before 13 failed");
+        }
+        {
+            QSqlQuery columns(check);
+            QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(products)")));
+            bool hasPackageName = false;
+            while (columns.next()) {
+                hasPackageName = hasPackageName
+                                 || columns.value(1).toString()
+                                        == QStringLiteral("package_name");
+            }
+            QVERIFY2(!hasPackageName, "a failed migration left its products ALTER committed");
+        }
+        {
+            QSqlQuery columns(check);
+            QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(sale_items)")));
+            bool hasPiecesConsumed = false;
+            while (columns.next()) {
+                hasPiecesConsumed = hasPiecesConsumed
+                                    || columns.value(1).toString()
+                                           == QStringLiteral("pieces_consumed");
+            }
+            QVERIFY2(!hasPiecesConsumed,
+                     "a failed migration left its sale_items ALTER committed");
+        }
+        check.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    const QDir backupDirectory(
+        QFileInfo(path).absoluteDir().filePath(QStringLiteral("backups")));
+    const QStringList backups =
+        backupDirectory.entryList(QStringList() << QStringLiteral("pre-migration-v11-*.sqlite"),
+                                  QDir::Files);
+    QCOMPARE(backups.size(), 1);
+    const QString backupPath = backupDirectory.filePath(backups.first());
+    {
+        QSqlDatabase backup = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        backup.setDatabaseName(backupPath);
+        backup.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+        QVERIFY(backup.open());
+        QCOMPARE(data::readSchemaVersion(backup), 11);
+        QSqlQuery columns(backup);
+        QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(products)")));
+        bool hasPackageName = false;
+        while (columns.next()) {
+            hasPackageName = hasPackageName
+                             || columns.value(1).toString() == QStringLiteral("package_name");
+        }
+        QVERIFY2(!hasPackageName, "the pre-migration backup is not the old schema");
+        backup.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+}
+
+void DataLayerTest::migration_does_not_start_when_pre_migration_backup_fails()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    const QString path = work.filePath(QStringLiteral("blocked_migration_backup.sqlite"));
+    const QString connection = QStringLiteral("blocked-migration-backup");
+    {
+        QSqlDatabase legacy = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        legacy.setDatabaseName(path);
+        QVERIFY(legacy.open());
+        QSqlQuery create(legacy);
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " barcode TEXT UNIQUE, name TEXT NOT NULL,"
+            " cost_price_cents INTEGER NOT NULL DEFAULT 0,"
+            " sale_price_cents INTEGER NOT NULL DEFAULT 0,"
+            " quantity INTEGER NOT NULL DEFAULT 0,"
+            " unit TEXT NOT NULL DEFAULT '',"
+            " package_size INTEGER NOT NULL DEFAULT 1,"
+            " active INTEGER NOT NULL DEFAULT 1,"
+            " sold_by_weight INTEGER NOT NULL DEFAULT 0)")));
+        QVERIFY(create.exec(QStringLiteral("PRAGMA user_version = 12")));
+        legacy.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    // A file where the backup directory has to go makes mkpath fail without
+    // depending on filesystem permissions.
+    QFile blocker(QFileInfo(path).absoluteDir().filePath(QStringLiteral("backups")));
+    QVERIFY(blocker.open(QIODevice::WriteOnly));
+    blocker.close();
+
+    bool threw = false;
+    try {
+        data::Database db(path);
+    } catch (const std::runtime_error& error) {
+        threw = true;
+        const QString message = QString::fromUtf8(error.what());
+        QVERIFY2(message.contains(QStringLiteral("pre-migration backup"), Qt::CaseInsensitive),
+                 qPrintable(message));
+    }
+    QVERIFY2(threw, "a failed pre-migration backup must stop the upgrade");
+
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        check.setDatabaseName(path);
+        QVERIFY(check.open());
+        QCOMPARE(data::readSchemaVersion(check), 12);
+        QSqlQuery columns(check);
+        QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(products)")));
+        bool hasPackageName = false;
+        while (columns.next()) {
+            hasPackageName = hasPackageName
+                             || columns.value(1).toString() == QStringLiteral("package_name");
+        }
+        QVERIFY2(!hasPackageName, "a migration ran despite the failed backup");
+        check.close();
+    }
     QSqlDatabase::removeDatabase(connection);
 }
 

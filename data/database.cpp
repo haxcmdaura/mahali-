@@ -7,6 +7,8 @@
 #include <stdexcept>
 
 #include <QCryptographicHash>
+#include <QDateTime>
+#include <QDir>
 #include <QFileInfo>
 #include <QDebug>
 #include <QSqlError>
@@ -45,6 +47,22 @@ void runQuickCheck(const QSqlDatabase& db)
         throw std::runtime_error(
             QStringLiteral("Database quick_check failed: %1").arg(result).toStdString());
     }
+}
+
+QString preMigrationBackupPath(const QString& databasePath, int fromVersion)
+{
+    const QDir backupDirectory(
+        QFileInfo(databasePath).absoluteDir().filePath(QStringLiteral("backups")));
+    const QString base =
+        QStringLiteral("pre-migration-v%1-%2")
+            .arg(fromVersion)
+            .arg(QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss")));
+    QString path = backupDirectory.filePath(base + QStringLiteral(".sqlite"));
+    for (int suffix = 2; QFileInfo::exists(path); ++suffix) {
+        path = backupDirectory.filePath(
+            QStringLiteral("%1-%2.sqlite").arg(base).arg(suffix));
+    }
+    return path;
 }
 
 QStringList tableColumns(const QSqlDatabase& db, const QString& table)
@@ -341,17 +359,55 @@ Database::Database(const QString& filePath, DatabaseMode mode)
     const QString connectionName = uniqueConnectionName();
     m_db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
     m_db.setDatabaseName(filePath);
-    if (!m_db.open()) {
-        throw std::runtime_error(
-            QStringLiteral("Failed to open database: %1").arg(m_db.lastError().text()).toStdString());
+
+    // A constructor that throws does not run the destructor, so anything that
+    // fails below has to close and unregister this connection here. A failed
+    // upgrade otherwise leaves the file locked until the process exits.
+    try {
+        if (!m_db.open()) {
+            throw std::runtime_error(
+                QStringLiteral("Failed to open database: %1")
+                    .arg(m_db.lastError().text())
+                    .toStdString());
+        }
+        applyPragmas();
+        runQuickCheck(m_db);
+
+        // Take the copy before createSchema() touches a carried-over database, so
+        // it is the state the previous build left behind, not a half-upgraded
+        // one. A fresh file is version 0 and has nothing worth preserving. If the
+        // copy fails, the migration must not start: the point of the copy is to
+        // be the way back from a failed upgrade.
+        const int versionBeforeUpgrade = readSchemaVersion(m_db);
+        if (versionBeforeUpgrade > 0 && versionBeforeUpgrade < kSchemaVersion) {
+            const QDir backupDirectory(
+                QFileInfo(filePath).absoluteDir().filePath(QStringLiteral("backups")));
+            if (!QDir().mkpath(backupDirectory.absolutePath())) {
+                throw std::runtime_error(
+                    QStringLiteral("Could not create pre-migration backup directory: %1")
+                        .arg(backupDirectory.absolutePath())
+                        .toStdString());
+            }
+            const QString backupPath = preMigrationBackupPath(filePath, versionBeforeUpgrade);
+            if (!backupTo(backupPath)) {
+                throw std::runtime_error(
+                    QStringLiteral("Pre-migration backup failed: %1")
+                        .arg(m_lastError)
+                        .toStdString());
+            }
+        }
+
+        createSchema();
+        // A fresh install gets the whole current shape from createSchema() above
+        // and has nothing to replay. A database carried over from an older build
+        // gets the shape it was created with and is walked forward from here.
+        runSchemaMigrations(m_db);
+    } catch (...) {
+        m_db.close();
+        m_db = QSqlDatabase();
+        QSqlDatabase::removeDatabase(connectionName);
+        throw;
     }
-    applyPragmas();
-    runQuickCheck(m_db);
-    createSchema();
-    // A fresh install gets the whole current shape from createSchema() above and
-    // has nothing to replay. A database carried over from an older build gets the
-    // shape it was created with and is walked forward from here.
-    runSchemaMigrations(m_db);
 }
 
 Database::~Database()
