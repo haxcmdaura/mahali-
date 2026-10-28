@@ -12,6 +12,7 @@
 #include <QFileInfo>
 #include <QList>
 #include <QMap>
+#include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QMessageLogContext>
 #include <QRegularExpression>
@@ -210,6 +211,7 @@ private slots:
     void sync_key_mints_random_on_absent();
     void sync_key_keeps_existing_value();
     void sync_key_remints_on_empty_value();
+    void old_customers_schema_without_opening_balance_cents();
     void resolve_sale_items_warns_on_pieces_consumed_drift();
     void resolve_sale_items_silent_when_claim_matches();
     void resolve_sale_items_rejects_unknown_unit();
@@ -6698,4 +6700,32 @@ void DataLayerTest::sync_key_remints_on_empty_value()
     QCOMPARE(data::SyncKey::ensure(db), key);
     QCOMPARE(settings.value(QStringLiteral("sync_hmac_key")),
              QString::fromLatin1(key));
+}
+
+void DataLayerTest::old_customers_schema_without_opening_balance_cents()
+{
+    const QString dbPath = m_dir.filePath(QStringLiteral("old-customers-no-opening.sqlite"));
+    {
+        QSqlDatabase setup = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("old_cust_setup"));
+        setup.setDatabaseName(dbPath);
+        QVERIFY(setup.open());
+        QSqlQuery q(setup);
+        QVERIFY(q.exec(QStringLiteral("CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL DEFAULT '')")));
+        QVERIFY(q.exec(QStringLiteral("CREATE TABLE customer_transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER NOT NULL, amount_cents INTEGER NOT NULL, adjustment_cents INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, reversed_transaction_id INTEGER NOT NULL DEFAULT 0, receipt_number TEXT)")));
+        QVERIFY(q.exec(QStringLiteral("INSERT INTO customers (name, phone) VALUES ('Ali', '123')")));
+        setup.close();
+    }
+    QSqlDatabase::removeDatabase(QStringLiteral("old_cust_setup"));
+
+    data::Database db(dbPath);
+    QVERIFY2(db.lastError().isEmpty(), qPrintable(db.lastError()));
+
+    data::CustomerRepository customers(db);
+    const auto customer = customers.findById(1);
+    QVERIFY(customer.has_value());
+    QCOMPARE(customer->openingBalanceCents, 0LL);
+
+    const auto balanceOpt = customers.balanceCentsFor(1);
+    QVERIFY(balanceOpt.has_value());
+    QCOMPARE(*balanceOpt, 0LL);
 }
