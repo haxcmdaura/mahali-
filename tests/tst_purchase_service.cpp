@@ -1047,12 +1047,17 @@ void PurchaseServiceTest::purchase_weight_product_uses_kg_input_unit()
     product.name = QStringLiteral("Tomates");
     product.salePriceCents = 3000;
     product.costPriceCents = 1000;
-    product.quantity = 5000;
     product.unit = QStringLiteral("kg");
     product.active = true;
     product.soldByWeight = true;
     const int productId = f.products.save(product);
     QVERIFY(productId > 0);
+    // Seed initial stock through a real stock movement (5000 g at 1000 c/kg)
+    f.products.adjustStock(productId, 5000LL, QStringLiteral("opening"));
+    const auto productBefore = f.products.findById(productId);
+    QVERIFY(productBefore.has_value());
+    QCOMPARE(productBefore->costPriceCents, 1000LL);
+    QCOMPARE(productBefore->quantity, 5000LL);
 
     core::Purchase purchase = makePurchase(supplierId, 200000LL, 0LL, 200000LL, true);
     data::PurchaseResult result = f.service.recordPurchase(
