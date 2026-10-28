@@ -222,6 +222,8 @@ private slots:
     void resolve_sale_items_accepts_duplicate_lines_that_fit_together();
     void resolve_sale_items_allow_oversold_ignores_aggregate_stock();
     void resolve_sale_items_sums_pieces_across_mixed_units();
+    void record_customer_debt_rejects_piece_for_weight_product();
+    void record_customer_debt_rejects_duplicate_lines_over_stock();
 
 private:
     QTemporaryDir m_dir;
@@ -6728,4 +6730,60 @@ void DataLayerTest::old_customers_schema_without_opening_balance_cents()
     const auto balanceOpt = customers.balanceCentsFor(1);
     QVERIFY(balanceOpt.has_value());
     QCOMPARE(*balanceOpt, 0LL);
+}
+
+void DataLayerTest::record_customer_debt_rejects_piece_for_weight_product()
+{
+    AdjustmentFixture f(m_dir.filePath(QStringLiteral("debt_piece_for_weight.sqlite")));
+    core::Customer customer;
+    customer.name = QStringLiteral("زبون-ذ");
+    data::CustomerRepository customers(f.db);
+    const int customerId = customers.save(customer);
+    QVERIFY(customerId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("طماطم");
+    product.salePriceCents = 3000;
+    product.costPriceCents = 1000;
+    product.quantity = 10000;
+    product.unit = QStringLiteral("kg");
+    product.active = true;
+    product.soldByWeight = true;
+    const int productId = data::ProductRepository(f.db).save(product);
+    QVERIFY(productId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1000;
+    item.unitPriceCents = 3000;
+    item.unitKind = QStringLiteral("piece");
+    QVector<core::SaleItem> items{item};
+    const auto result = data::SaleService(f.db).recordCustomerDebt(customerId, items, QStringLiteral("dev"), false);
+    QVERIFY(!result.ok);
+    QVERIFY(!result.error.isEmpty());
+}
+
+void DataLayerTest::record_customer_debt_rejects_duplicate_lines_over_stock()
+{
+    AdjustmentFixture f(m_dir.filePath(QStringLiteral("debt_dup_over_stock.sqlite")));
+    core::Customer customer;
+    customer.name = QStringLiteral("زبون-ر");
+    data::CustomerRepository customers(f.db);
+    const int customerId = customers.save(customer);
+    QVERIFY(customerId > 0);
+
+    core::SaleItem a;
+    a.productId = f.productId;
+    a.quantity = 6;
+    a.unitPriceCents = 100;
+    a.unitKind = QStringLiteral("piece");
+    core::SaleItem b;
+    b.productId = f.productId;
+    b.quantity = 6;
+    b.unitPriceCents = 100;
+    b.unitKind = QStringLiteral("piece");
+    QVector<core::SaleItem> items2{a, b};
+    const auto result = data::SaleService(f.db).recordCustomerDebt(customerId, items2, QStringLiteral("dev"), false);
+    QVERIFY(!result.ok);
+    QVERIFY(!result.error.isEmpty());
 }
