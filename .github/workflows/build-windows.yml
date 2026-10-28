@@ -25,6 +25,15 @@ jobs:
         run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
       - name: Build
         run: cmake --build build --config Release --target mahali-desktop
+      - name: Build tests
+        continue-on-error: true
+        run: cmake --build build --config Release
+      - name: Run tests
+        continue-on-error: true
+        # TODO: investigate Windows test failures
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build -C Release --output-on-failure
       - name: Deploy
         shell: pwsh
         run: |
