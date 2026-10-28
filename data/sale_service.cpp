@@ -440,11 +440,14 @@ SaleReverseResult SaleService::reverseSale(int saleId, int cashSessionId)
         return r;
     }
 
-    // Nothing stops the same sale being reversed twice, and reversed_sale_id
-    // has no unique index, so the guard has to be a lookup. Inside the
-    // transaction on purpose: the lookup and the inserts it protects commit or
-    // roll back as one, so a second click that arrives while the first is still
-    // running cannot pass the check against a snapshot that is about to change.
+    // Nothing stops the same sale being reversed twice, and reversal columns have
+    // no unique index in all legacy schemas; migration 4 adds partial unique
+    // indexes (uq_sales_one_reversal / uq_customer_transactions_one_reversal)
+    // where possible but may skip when duplicates exist, so the lookup remains
+    // as a second defence. Inside the transaction on purpose: the lookup and
+    // the inserts it protects commit or roll back as one, so a second click
+    // that arrives while the first is still running cannot pass the check
+    // against a snapshot that is about to change.
     QSqlQuery existing(m_db.handle());
     existing.prepare(QStringLiteral("SELECT 1 FROM sales WHERE reversed_sale_id = ? LIMIT 1"));
     existing.addBindValue(saleId);
@@ -590,10 +593,10 @@ SaleReverseResult SaleService::reverseCustomerDebt(int transactionId)
         return r;
     }
 
-    // A payment settles debt by writing a negative row here, and one of those is
-    // not a credit sale waiting to be cancelled. Only a positive row is a sale.
-    // Reversing one would book a second amount onto a ledger that was already
-    // credited — the customer's debt would shrink by the payment as well.
+    // Payments are written to the payments table, not as negative rows in
+    // customer_transactions. Only a positive customer_transaction row is a credit
+    // sale waiting to be cancelled. Reversing a payment or a non-sale row would
+    // book a second amount onto a ledger that was already credited.
     if (original->amountCents <= 0) {
         r.error = QStringLiteral("only a credit sale can be cancelled, and this is not one");
         return r;
@@ -607,9 +610,9 @@ SaleReverseResult SaleService::reverseCustomerDebt(int transactionId)
     }
 
     // Same reason as in reverseSale, and the same placement: inside the
-    // transaction, so the check and the rows it guards commit together. No
-    // unique index backs reversed_transaction_id yet, so this lookup is the only
-    // thing stopping a second cancellation of the same sale.
+    // transaction, so the check and the rows it guards commit together. A
+    // partial unique index may exist (migration 4) but can be skipped when
+    // duplicate data exists, so this lookup remains as a second defence.
     QSqlQuery existing(m_db.handle());
     existing.prepare(
         QStringLiteral("SELECT 1 FROM customer_transactions WHERE reversed_transaction_id = ? LIMIT 1"));
