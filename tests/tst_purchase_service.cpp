@@ -154,6 +154,7 @@ private slots:
     void void_purchase_never_leaves_negative_stock();
     void void_purchase_supplier_balance_restored();
     void void_purchase_reversal_appears_in_supplier_report();
+    void purchase_weight_product_uses_kg_input_unit();
 
 private:
     QTemporaryDir m_dir;
@@ -1030,6 +1031,40 @@ void PurchaseServiceTest::void_purchase_reversal_appears_in_supplier_report()
         }
     }
     QVERIFY2(reportHasReversal, "the supplier report should list the reversed payment");
+}
+
+void PurchaseServiceTest::purchase_weight_product_uses_kg_input_unit()
+{
+    Fixture f(m_dir.filePath(QStringLiteral("purchase_weight_product_uses_kg_input_unit.sqlite")));
+    core::Supplier supplier;
+    supplier.name = QStringLiteral("Vendeur");
+    supplier.active = true;
+    const int supplierId = f.suppliers.save(supplier);
+    QVERIFY(supplierId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("Tomates");
+    product.salePriceCents = 3000;
+    product.costPriceCents = 1000;
+    product.quantity = 5000;
+    product.unit = QStringLiteral("kg");
+    product.active = true;
+    product.soldByWeight = true;
+    const int productId = f.products.save(product);
+    QVERIFY(productId > 0);
+
+    core::Purchase purchase = makePurchase(supplierId, 200000LL, 0LL, 200000LL, true);
+    data::PurchaseResult result = f.service.recordPurchase(
+        purchase, {makeLine(productId, 10, 2000)}, {});
+    QVERIFY2(result.ok, qPrintable(result.error));
+
+    const auto productAfter = f.products.findById(productId);
+    QVERIFY(productAfter.has_value());
+    QCOMPARE(productAfter->quantity, 15000LL);
+    QCOMPARE(productAfter->costPriceCents, 1667LL);
+    const auto movements = f.stockMovements.findByProductId(productId);
+    QVERIFY(!movements.empty());
+    QCOMPARE(movements.back().delta, 10000LL);
 }
 
 QTEST_GUILESS_MAIN(PurchaseServiceTest)
