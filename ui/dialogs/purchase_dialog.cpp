@@ -593,15 +593,15 @@ PurchaseDialogResult showPurchaseDialog(QWidget* parent, app::data::Database& db
                 return;
             }
 
-            core::PurchaseItem line;
-            line.productId = product->id;
-            line.description = product->name;
-            line.quantity = qty->value();
-            line.unit = product->unit.isEmpty() ? QStringLiteral("piece") : product->unit;
-            line.unitPriceCents = *unitPrice;
-            line.totalCents = line.quantity * line.unitPriceCents;
-            subtotal += line.totalCents;
-            lines.append(line);
+            const data::PurchaseLineResult made =
+                data::makePurchaseItem(*product, qty->value(), *unitPrice);
+            if (!made.ok) {
+                QMessageBox::warning(&dialog, tr("Erreur"),
+                                     tr("Ligne %1 : quantité invalide").arg(number));
+                return;
+            }
+            subtotal += made.item.totalCents;
+            lines.append(made.item);
         }
 
         const long long vat = parseMoney(vatField->text()).value_or(0);

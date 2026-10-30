@@ -182,6 +182,9 @@ private slots:
     void void_purchase_reversal_appears_in_supplier_report();
     void line_total_cents_cases();
     void line_total_cents_matches_total_cents_for();
+    void make_purchase_item_weight_product_uses_grams();
+    void make_purchase_item_normal_product_unchanged();
+    void make_purchase_item_rejects_invalid_quantity_and_overflow();
     void purchase_weight_product_uses_grams();
     void purchase_weight_product_250_grams();
     void purchase_weight_product_rejects_piece_unit();
@@ -1121,6 +1124,80 @@ void PurchaseServiceTest::line_total_cents_matches_total_cents_for()
             }
         }
     }
+}
+
+void PurchaseServiceTest::make_purchase_item_weight_product_uses_grams()
+{
+    core::Product product;
+    product.id = 41;
+    product.name = QStringLiteral("Sucre");
+    product.unit = QStringLiteral("kg");
+    product.soldByWeight = true;
+
+    const data::PurchaseLineResult made = data::makePurchaseItem(product, 2500, 400);
+
+    QVERIFY2(made.ok, qPrintable(made.error));
+    QCOMPARE(made.item.productId, std::optional<int>(41));
+    QCOMPARE(made.item.description, product.name);
+    QCOMPARE(made.item.quantity, 2500LL);
+    QCOMPARE(made.item.unitPriceCents, 400LL);
+    QCOMPARE(made.item.totalCents, 1000LL);
+    QCOMPARE(made.item.unit, QStringLiteral("kg"));
+    QCOMPARE(made.item.unitKind, QStringLiteral("weight"));
+}
+
+void PurchaseServiceTest::make_purchase_item_normal_product_unchanged()
+{
+    core::Product product;
+    product.id = 42;
+    product.name = QStringLiteral("Savon");
+    product.unit = QStringLiteral("piece");
+    product.soldByWeight = false;
+
+    const data::PurchaseLineResult made = data::makePurchaseItem(product, 3, 250);
+
+    QVERIFY2(made.ok, qPrintable(made.error));
+    QCOMPARE(made.item.productId, std::optional<int>(42));
+    QCOMPARE(made.item.description, product.name);
+    QCOMPARE(made.item.quantity, 3LL);
+    QCOMPARE(made.item.unitPriceCents, 250LL);
+    QCOMPARE(made.item.totalCents, 750LL);
+    QCOMPARE(made.item.unit, QStringLiteral("piece"));
+    QCOMPARE(made.item.unitKind, QStringLiteral("piece"));
+
+    core::Product noUnit = product;
+    noUnit.unit.clear();
+    const data::PurchaseLineResult fallback = data::makePurchaseItem(noUnit, 1, 100);
+    QVERIFY2(fallback.ok, qPrintable(fallback.error));
+    QCOMPARE(fallback.item.unit, QStringLiteral("piece"));
+}
+
+void PurchaseServiceTest::make_purchase_item_rejects_invalid_quantity_and_overflow()
+{
+    core::Product product;
+    product.name = QStringLiteral("Savon");
+    product.unit = QStringLiteral("piece");
+
+    const data::PurchaseLineResult zero = data::makePurchaseItem(product, 0, 100);
+    QVERIFY(!zero.ok);
+    QVERIFY(!zero.error.isEmpty());
+
+    const data::PurchaseLineResult negative = data::makePurchaseItem(product, -1, 100);
+    QVERIFY(!negative.ok);
+    QVERIFY(!negative.error.isEmpty());
+
+    const data::PurchaseLineResult overflow =
+        data::makePurchaseItem(product, std::numeric_limits<long long>::max(), 2);
+    QVERIFY(!overflow.ok);
+    QCOMPARE(overflow.error, QStringLiteral("line total overflows"));
+
+    core::Product weight = product;
+    weight.soldByWeight = true;
+    weight.unit = QStringLiteral("kg");
+    const data::PurchaseLineResult weightOverflow =
+        data::makePurchaseItem(weight, std::numeric_limits<long long>::max(), 2);
+    QVERIFY(!weightOverflow.ok);
+    QCOMPARE(weightOverflow.error, QStringLiteral("line total overflows"));
 }
 
 void PurchaseServiceTest::purchase_weight_product_uses_grams()

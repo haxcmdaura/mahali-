@@ -9,10 +9,50 @@
 #include "cash_drawer.h"
 #include "audit_log_repository.h"
 #include "core/cash_movement.h"
+#include "core/line_total.h"
 #include "core/purchase_item.h"
 #include "sale_rules.h"
 
 namespace app::data {
+
+PurchaseLineResult makePurchaseItem(const core::Product& product, long long quantity,
+                                    long long unitPriceCents)
+{
+    PurchaseLineResult result;
+    if (quantity <= 0) {
+        result.error = QStringLiteral("quantity must be positive");
+        return result;
+    }
+    if (unitPriceCents < 0) {
+        result.error = QStringLiteral("unit price must be non-negative");
+        return result;
+    }
+
+    // The product is the authority on the unit: a weight product's price is per
+    // kilogram and its quantity is already grams, so the shared function divides
+    // the thousand out exactly as the sale path does.
+    const UnitKind kind = product.soldByWeight ? UnitKind::Weight : UnitKind::Piece;
+    const std::optional<long long> total = core::lineTotalCents(quantity, unitPriceCents, kind);
+    if (!total.has_value()) {
+        result.error = QStringLiteral("line total overflows");
+        return result;
+    }
+
+    core::PurchaseItem item;
+    item.productId = product.id;
+    item.description = product.name;
+    item.quantity = quantity;
+    item.unit = product.soldByWeight
+        ? QStringLiteral("kg")
+        : (product.unit.isEmpty() ? QStringLiteral("piece") : product.unit);
+    item.unitPriceCents = unitPriceCents;
+    item.totalCents = *total;
+    item.unitKind = toString(kind);
+
+    result.item = item;
+    result.ok = true;
+    return result;
+}
 
 PurchaseService::PurchaseService(Database& db, PurchaseRepository& purchases, PurchaseItemRepository& items,
                                  ProductRepository& products, StockMovementRepository& stockMovements,
