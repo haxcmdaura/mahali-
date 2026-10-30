@@ -80,26 +80,43 @@ PurchaseResult PurchaseService::recordPurchase(const core::Purchase& purchase,
             result.error = QStringLiteral("unit price must be non-negative");
             return result;
         }
-        // Check totalCents == item.quantity * item.unitPriceCents
-        if (item.unitPriceCents != 0 && item.quantity > 0) {
-            if (item.quantity > std::numeric_limits<long long>::max() / item.unitPriceCents) {
-                result.error = QStringLiteral("line total overflows");
-                return result;
+        QString unitKind = item.unitKind.isEmpty() ? QStringLiteral("piece") : item.unitKind;
+        const std::optional<UnitKind> parsedKind = fromString(unitKind);
+        if (!parsedKind.has_value()) {
+            result.error = QStringLiteral("unknown unit '%1'").arg(unitKind);
+            return result;
+        }
+        if (*parsedKind == UnitKind::Package) {
+            result.error = QStringLiteral("purchase lines cannot use the package unit");
+            return result;
+        }
+        if (item.productId.has_value()) {
+            const auto product = m_products.findById(*item.productId);
+            if (product.has_value()) {
+                if (product->soldByWeight && *parsedKind != UnitKind::Weight) {
+                    result.error =
+                        QStringLiteral("product %1 is sold by weight and must use the weight unit").arg(product->name);
+                    return result;
+                }
+                if (!product->soldByWeight && *parsedKind == UnitKind::Weight) {
+                    result.error = QStringLiteral("product %1 is not sold by weight and cannot use the weight unit")
+                                       .arg(product->name);
+                    return result;
+                }
             }
-            const long long expected = item.quantity * item.unitPriceCents;
-            if (expected != item.totalCents) {
-                result.error = QStringLiteral("line total mismatch");
-                return result;
-            }
-        } else if (item.unitPriceCents == 0 || item.quantity == 0) {
-            if (item.quantity * item.unitPriceCents != item.totalCents && !(item.quantity == 0 || item.unitPriceCents == 0)) {
-                // compute
-            }
-            const long long expected = item.quantity * item.unitPriceCents;
-            if (expected != item.totalCents) {
-                result.error = QStringLiteral("line total mismatch");
-                return result;
-            }
+        }
+        // A weight line stores grams at a per-kilogram price, so the thousand
+        // that separates the two is divided out here just as the sale path does.
+        if (!detail::productFits(item.quantity, item.unitPriceCents)) {
+            result.error = QStringLiteral("line total overflows");
+            return result;
+        }
+        const long long expectedTotal = *parsedKind == UnitKind::Weight
+            ? (item.quantity * item.unitPriceCents) / 1000LL
+            : item.quantity * item.unitPriceCents;
+        if (expectedTotal != item.totalCents) {
+            result.error = QStringLiteral("line total mismatch");
+            return result;
         }
         if (!detail::sumFits(subtotalCents, item.totalCents)) {
             result.error = QStringLiteral("subtotal overflow");

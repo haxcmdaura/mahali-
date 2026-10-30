@@ -7,6 +7,7 @@
 #include <QVector>
 #include <QDebug>
 
+#include "core/sale_item.h"
 #include "product_repository.h"
 #include "stock_movement_repository.h"
 

@@ -25,7 +25,9 @@
 #include "data/supplier_payment_repository.h"
 #include "data/supplier_payment_service.h"
 #include "data/supplier_report_service.h"
+#include "data/supplier_return_item_repository.h"
 #include "data/supplier_return_repository.h"
+#include "data/supplier_return_service.h"
 
 #include <algorithm>
 
@@ -90,8 +92,29 @@ core::PurchaseItem makeLine(std::optional<int> productId, long long quantity, lo
     line.description = QStringLiteral("Purchased line");
     line.quantity = quantity;
     line.unitPriceCents = unitPriceCents;
+    line.unitKind = QStringLiteral("piece");
     line.totalCents = quantity * unitPriceCents;
     return line;
+}
+
+core::PurchaseItem makeWeightLine(std::optional<int> productId, long long grams, long long pricePerKgCents)
+{
+    core::PurchaseItem line = makeLine(productId, grams, pricePerKgCents);
+    line.unitKind = QStringLiteral("weight");
+    line.totalCents = (grams * pricePerKgCents) / 1000LL;
+    return line;
+}
+
+long long movementDeltaForReason(const data::StockMovementRepository& movements, int productId,
+                                 const QString& reason)
+{
+    long long total = 0;
+    for (const core::StockMovement& movement : movements.findByProductId(productId)) {
+        if (movement.reason == reason) {
+            total += movement.delta;
+        }
+    }
+    return total;
 }
 
 core::Purchase makePurchase(int supplierId, long long totalCents, long long paidCents, bool addToStock,
@@ -154,7 +177,14 @@ private slots:
     void void_purchase_never_leaves_negative_stock();
     void void_purchase_supplier_balance_restored();
     void void_purchase_reversal_appears_in_supplier_report();
-    void purchase_weight_product_uses_kg_input_unit();
+    void purchase_weight_product_uses_grams();
+    void purchase_weight_product_250_grams();
+    void purchase_weight_product_rejects_piece_unit();
+    void purchase_normal_product_rejects_weight_unit();
+    void purchase_package_unit_is_refused();
+    void void_weight_purchase_restores_stock_exactly();
+    void supplier_return_of_weight_line_returns_grams();
+    void void_old_style_purchase_reverses_stored_quantity();
 
 private:
     QTemporaryDir m_dir;
@@ -1033,10 +1063,9 @@ void PurchaseServiceTest::void_purchase_reversal_appears_in_supplier_report()
     QVERIFY2(reportHasReversal, "the supplier report should list the reversed payment");
 }
 
-void PurchaseServiceTest::purchase_weight_product_uses_kg_input_unit()
+void PurchaseServiceTest::purchase_weight_product_uses_grams()
 {
-    QEXPECT_FAIL("", "PurchaseService does not convert kg to grams for weight products (V3/R2)", Continue);
-    Fixture f(m_dir.filePath(QStringLiteral("purchase_weight_product_uses_kg_input_unit.sqlite")));
+    Fixture f(m_dir.filePath(QStringLiteral("purchase_weight_product_uses_grams.sqlite")));
     core::Supplier supplier;
     supplier.name = QStringLiteral("Vendeur");
     supplier.active = true;
@@ -1059,18 +1088,210 @@ void PurchaseServiceTest::purchase_weight_product_uses_kg_input_unit()
     QCOMPARE(productBefore->costPriceCents, 1000LL);
     QCOMPARE(productBefore->quantity, 5000LL);
 
-    core::Purchase purchase = makePurchase(supplierId, 200000LL, 0LL, 200000LL, true);
-    data::PurchaseResult result = f.service.recordPurchase(
-        purchase, {makeLine(productId, 10, 2000)}, {});
+    const core::Purchase purchase = makePurchase(supplierId, 20000LL, 0LL, true);
+    const data::PurchaseResult result =
+        f.service.recordPurchase(purchase, {makeWeightLine(productId, 10000, 2000)}, {});
     QVERIFY2(result.ok, qPrintable(result.error));
 
     const auto productAfter = f.products.findById(productId);
     QVERIFY(productAfter.has_value());
     QCOMPARE(productAfter->quantity, 15000LL);
-    QCOMPARE(productAfter->costPriceCents, 1667LL);
-    const auto movements = f.stockMovements.findByProductId(productId);
-    QVERIFY(!movements.empty());
-    QCOMPARE(movements.back().delta, 10000LL);
+    // (5000 g x 1000) + (10000 g x 2000), divided by 15000 g, truncates to 1666.
+    QCOMPARE(productAfter->costPriceCents, 1666LL);
+    QCOMPARE(movementDeltaForReason(f.stockMovements, productId, QStringLiteral("purchase")), 10000LL);
+
+    const auto storedItems = f.items.findByPurchase(result.purchaseId);
+    QCOMPARE(storedItems.size(), 1);
+    QCOMPARE(storedItems.front().quantity, 10000LL);
+    QCOMPARE(storedItems.front().unitKind, QStringLiteral("weight"));
+}
+
+void PurchaseServiceTest::purchase_weight_product_250_grams()
+{
+    Fixture f(m_dir.filePath(QStringLiteral("purchase_weight_product_250_grams.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("Vendeur"));
+    QVERIFY(supplierId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("Fromage");
+    product.salePriceCents = 3000;
+    product.active = true;
+    product.soldByWeight = true;
+    const int productId = f.products.save(product);
+    QVERIFY(productId > 0);
+
+    const data::PurchaseResult result = f.service.recordPurchase(
+        makePurchase(supplierId, 500LL, 0LL, true), {makeWeightLine(productId, 250, 2000)}, {});
+    QVERIFY2(result.ok, qPrintable(result.error));
+
+    const auto after = f.products.findById(productId);
+    QVERIFY(after.has_value());
+    QCOMPARE(after->quantity, 250LL);
+    QCOMPARE(movementDeltaForReason(f.stockMovements, productId, QStringLiteral("purchase")), 250LL);
+
+    const auto storedItems = f.items.findByPurchase(result.purchaseId);
+    QCOMPARE(storedItems.size(), 1);
+    QCOMPARE(storedItems.front().quantity, 250LL);
+    QCOMPARE(storedItems.front().totalCents, 500LL);
+}
+
+void PurchaseServiceTest::purchase_weight_product_rejects_piece_unit()
+{
+    Fixture f(m_dir.filePath(QStringLiteral("purchase_weight_product_rejects_piece_unit.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("Vendeur"));
+    QVERIFY(supplierId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("Tomates");
+    product.salePriceCents = 3000;
+    product.active = true;
+    product.soldByWeight = true;
+    const int productId = f.products.save(product);
+    QVERIFY(productId > 0);
+
+    const core::PurchaseItem line = makeLine(productId, 10000, 2000);
+    const data::PurchaseResult result =
+        f.service.recordPurchase(makePurchase(supplierId, line.totalCents, 0LL, true), {line}, {});
+    QVERIFY(!result.ok);
+    QVERIFY2(result.error.contains(QStringLiteral("weight")), qPrintable(result.error));
+    QCOMPARE(countRows(f.db, QStringLiteral("purchases")), 0);
+}
+
+void PurchaseServiceTest::purchase_normal_product_rejects_weight_unit()
+{
+    Fixture f(m_dir.filePath(QStringLiteral("purchase_normal_product_rejects_weight_unit.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("Vendeur"));
+    QVERIFY(supplierId > 0);
+    const int productId = addProduct(f.products, QStringLiteral("Sucre"), 1000);
+    QVERIFY(productId > 0);
+
+    const data::PurchaseResult result = f.service.recordPurchase(
+        makePurchase(supplierId, 2000LL, 0LL, true), {makeWeightLine(productId, 1000, 2000)}, {});
+    QVERIFY(!result.ok);
+    QVERIFY2(result.error.contains(QStringLiteral("not sold by weight")), qPrintable(result.error));
+    QCOMPARE(countRows(f.db, QStringLiteral("purchases")), 0);
+}
+
+void PurchaseServiceTest::purchase_package_unit_is_refused()
+{
+    Fixture f(m_dir.filePath(QStringLiteral("purchase_package_unit_is_refused.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("Vendeur"));
+    QVERIFY(supplierId > 0);
+    const int productId = addProduct(f.products, QStringLiteral("Sucre"), 1000);
+    QVERIFY(productId > 0);
+
+    core::PurchaseItem line = makeLine(productId, 2, 500);
+    line.unitKind = QStringLiteral("package");
+    line.totalCents = 1000;
+    const data::PurchaseResult result =
+        f.service.recordPurchase(makePurchase(supplierId, line.totalCents, 0LL, true), {line}, {});
+    QVERIFY(!result.ok);
+    QVERIFY2(result.error.contains(QStringLiteral("package")), qPrintable(result.error));
+    QCOMPARE(countRows(f.db, QStringLiteral("purchases")), 0);
+    QCOMPARE(f.products.findById(productId)->quantity, 0LL);
+}
+
+void PurchaseServiceTest::void_weight_purchase_restores_stock_exactly()
+{
+    Fixture f(m_dir.filePath(QStringLiteral("void_weight_purchase_restores_stock_exactly.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("Vendeur"));
+    QVERIFY(supplierId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("Tomates");
+    product.salePriceCents = 3000;
+    product.costPriceCents = 1000;
+    product.active = true;
+    product.soldByWeight = true;
+    const int productId = f.products.save(product);
+    QVERIFY(productId > 0);
+    f.products.adjustStock(productId, 5000LL, QStringLiteral("opening"));
+
+    const data::PurchaseResult purchase = f.service.recordPurchase(
+        makePurchase(supplierId, 7500LL, 0LL, true), {makeWeightLine(productId, 2500, 3000)}, {});
+    QVERIFY2(purchase.ok, qPrintable(purchase.error));
+    QCOMPARE(f.products.findById(productId)->quantity, 7500LL);
+
+    const data::PurchaseResult voided = f.service.voidPurchase(purchase.purchaseId, std::nullopt);
+    QVERIFY2(voided.ok, qPrintable(voided.error));
+    QCOMPARE(f.products.findById(productId)->quantity, 5000LL);
+    QCOMPARE(movementDeltaForReason(f.stockMovements, productId, QStringLiteral("purchase_void")), -2500LL);
+}
+
+void PurchaseServiceTest::supplier_return_of_weight_line_returns_grams()
+{
+    Fixture f(m_dir.filePath(QStringLiteral("supplier_return_of_weight_line_returns_grams.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("Vendeur"));
+    QVERIFY(supplierId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("Tomates");
+    product.salePriceCents = 3000;
+    product.costPriceCents = 1000;
+    product.active = true;
+    product.soldByWeight = true;
+    const int productId = f.products.save(product);
+    QVERIFY(productId > 0);
+    f.products.adjustStock(productId, 5000LL, QStringLiteral("opening"));
+
+    const data::PurchaseResult purchase = f.service.recordPurchase(
+        makePurchase(supplierId, 20000LL, 0LL, true), {makeWeightLine(productId, 10000, 2000)}, {});
+    QVERIFY2(purchase.ok, qPrintable(purchase.error));
+    QCOMPARE(f.products.findById(productId)->quantity, 15000LL);
+
+    data::SupplierReturnRepository returns(f.db);
+    data::SupplierReturnItemRepository returnItems(f.db);
+    data::SupplierReturnService returnsService(f.db, returns, returnItems, f.suppliers, f.purchases,
+                                               f.products, f.stockMovements);
+    core::SupplierReturnItem returnLine;
+    returnLine.productId = productId;
+    returnLine.quantity = 2500;
+    returnLine.unitPriceCents = 2000;
+    returnLine.totalCents = (2500LL * 2000LL) / 1000LL;
+    returnLine.unitKind = QStringLiteral("weight");
+
+    const data::SupplierReturnResult returned = returnsService.recordLinkedReturn(
+        supplierId, purchase.purchaseId, {returnLine}, data::nowIso(), QString());
+    QVERIFY2(returned.ok, qPrintable(returned.error));
+
+    QCOMPARE(f.products.findById(productId)->quantity, 12500LL);
+    QCOMPARE(movementDeltaForReason(f.stockMovements, productId, QStringLiteral("supplier_return")), -2500LL);
+}
+
+void PurchaseServiceTest::void_old_style_purchase_reverses_stored_quantity()
+{
+    Fixture f(m_dir.filePath(QStringLiteral("void_old_style_purchase_reverses_stored_quantity.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("Vendeur"));
+    QVERIFY(supplierId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("Tomates");
+    product.salePriceCents = 3000;
+    product.costPriceCents = 1000;
+    product.active = true;
+    product.soldByWeight = true;
+    const int productId = f.products.save(product);
+    QVERIFY(productId > 0);
+    f.products.adjustStock(productId, 5000LL, QStringLiteral("opening"));
+
+    // A row from before unit_kind was stored: it is a piece row carrying the
+    // quantity the old dialog wrote, and there is no stock movement behind it.
+    const int oldPurchaseId = f.purchases.insert(makePurchase(supplierId, 20000LL, 0LL, true));
+    QVERIFY(oldPurchaseId > 0);
+    core::PurchaseItem oldLine;
+    oldLine.purchaseId = oldPurchaseId;
+    oldLine.productId = productId;
+    oldLine.description = QStringLiteral("Old weight purchase");
+    oldLine.quantity = 10;
+    oldLine.unitPriceCents = 2000;
+    oldLine.totalCents = 20000;
+    QCOMPARE(oldLine.unitKind, QStringLiteral("piece"));
+    QVERIFY(f.items.insert(oldLine) > 0);
+
+    const data::PurchaseResult voided = f.service.voidPurchase(oldPurchaseId, std::nullopt);
+    QVERIFY2(voided.ok, qPrintable(voided.error));
+    QCOMPARE(f.products.findById(productId)->quantity, 4990LL);
+    QCOMPARE(movementDeltaForReason(f.stockMovements, productId, QStringLiteral("purchase_void")), -10LL);
 }
 
 QTEST_GUILESS_MAIN(PurchaseServiceTest)
