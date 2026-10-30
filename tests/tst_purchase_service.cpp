@@ -5,6 +5,7 @@
 
 #include "core/cash_movement.h"
 #include "core/cash_session_calculator.h"
+#include "core/line_total.h"
 #include "core/supplier_payment.h"
 #include "data/date_utils.h"
 #include "data/database.h"
@@ -18,6 +19,7 @@
 #include "data/purchase_repository.h"
 #include "data/purchase_service.h"
 #include "data/report_service.h"
+#include "data/sale_rules.h"
 #include "data/sale_service.h"
 #include "data/setting_repository.h"
 #include "data/stock_movement_repository.h"
@@ -30,6 +32,7 @@
 #include "data/supplier_return_service.h"
 
 #include <algorithm>
+#include <limits>
 
 using namespace app;
 
@@ -177,6 +180,8 @@ private slots:
     void void_purchase_never_leaves_negative_stock();
     void void_purchase_supplier_balance_restored();
     void void_purchase_reversal_appears_in_supplier_report();
+    void line_total_cents_cases();
+    void line_total_cents_matches_total_cents_for();
     void purchase_weight_product_uses_grams();
     void purchase_weight_product_250_grams();
     void purchase_weight_product_rejects_piece_unit();
@@ -1061,6 +1066,61 @@ void PurchaseServiceTest::void_purchase_reversal_appears_in_supplier_report()
         }
     }
     QVERIFY2(reportHasReversal, "the supplier report should list the reversed payment");
+}
+
+void PurchaseServiceTest::line_total_cents_cases()
+{
+    using core::UnitKind;
+
+    // 2675 g at 1234 c/kg truncates to 3300 c, the sale convention.
+    QCOMPARE(core::lineTotalCents(2675, 1234, UnitKind::Weight), std::optional<long long>(3300));
+    QCOMPARE(core::lineTotalCents(1000, 2000, UnitKind::Weight), std::optional<long long>(2000));
+    QCOMPARE(core::lineTotalCents(1000, 2000, UnitKind::Piece), std::optional<long long>(2000000));
+    QCOMPARE(core::lineTotalCents(7, 250, UnitKind::Package), std::optional<long long>(1750));
+
+    QCOMPARE(core::lineTotalCents(0, 1234, UnitKind::Weight), std::optional<long long>(0));
+    QCOMPARE(core::lineTotalCents(1234, 0, UnitKind::Piece), std::optional<long long>(0));
+
+    QVERIFY(!core::lineTotalCents(std::numeric_limits<long long>::max(), 2, UnitKind::Piece).has_value());
+    // The guard runs before the division, exactly as totalCentsFor does: a line
+    // whose raw product overflows is refused even though /1000 would fit.
+    QVERIFY(!core::lineTotalCents(std::numeric_limits<long long>::max(), 2, UnitKind::Weight).has_value());
+    QVERIFY(core::lineTotalCents(std::numeric_limits<long long>::max(), 1, UnitKind::Weight).has_value());
+}
+
+void PurchaseServiceTest::line_total_cents_matches_total_cents_for()
+{
+    const QVector<QPair<long long, long long>> cases = {
+        {0, 0},
+        {1, 1},
+        {2675, 1234},
+        {1000, 2000},
+        {250, 2000},
+        {999999, 123456},
+        {std::numeric_limits<long long>::max() / 2, 2},
+        {std::numeric_limits<long long>::max(), 1},
+        {std::numeric_limits<long long>::max(), 2},
+    };
+    const QVector<core::UnitKind> kinds = {
+        core::UnitKind::Piece, core::UnitKind::Package, core::UnitKind::Weight};
+
+    for (const core::UnitKind kind : kinds) {
+        for (const auto& input : cases) {
+            core::SaleItem item;
+            item.quantity = input.first;
+            item.unitPriceCents = input.second;
+            item.unitKind = data::toString(kind);
+
+            const std::optional<long long> shared =
+                core::lineTotalCents(input.first, input.second, kind);
+            const std::optional<long long> sale = data::totalCentsFor({item});
+
+            QCOMPARE(shared.has_value(), sale.has_value());
+            if (shared.has_value()) {
+                QCOMPARE(*shared, *sale);
+            }
+        }
+    }
 }
 
 void PurchaseServiceTest::purchase_weight_product_uses_grams()

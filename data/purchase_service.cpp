@@ -105,16 +105,16 @@ PurchaseResult PurchaseService::recordPurchase(const core::Purchase& purchase,
                 }
             }
         }
-        // A weight line stores grams at a per-kilogram price, so the thousand
-        // that separates the two is divided out here just as the sale path does.
-        if (!detail::productFits(item.quantity, item.unitPriceCents)) {
+        // A weight line stores grams at a per-kilogram price. The shared
+        // function divides the thousand out, so a purchase and a sale agree to
+        // the cent, and returns nullopt when the multiplication cannot fit.
+        const std::optional<long long> expectedTotal =
+            core::lineTotalCents(item.quantity, item.unitPriceCents, *parsedKind);
+        if (!expectedTotal.has_value()) {
             result.error = QStringLiteral("line total overflows");
             return result;
         }
-        const long long expectedTotal = *parsedKind == UnitKind::Weight
-            ? (item.quantity * item.unitPriceCents) / 1000LL
-            : item.quantity * item.unitPriceCents;
-        if (expectedTotal != item.totalCents) {
+        if (*expectedTotal != item.totalCents) {
             result.error = QStringLiteral("line total mismatch");
             return result;
         }
