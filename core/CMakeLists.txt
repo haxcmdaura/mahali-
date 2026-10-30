@@ -36,6 +36,7 @@ target_sources(mahali-core PRIVATE
     customer_transaction_item.h
     device.h
     expense.h
+    line_total.h
     owner_drawing.h
     payment.h
     product.h
