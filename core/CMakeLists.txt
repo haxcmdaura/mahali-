@@ -68,6 +68,7 @@ target_sources(mahali-core PRIVATE
     user.h
     version.cpp
     version.h
+    weight_parser.h
     zakat_calculator.cpp
     zakat_calculator.h)
 
