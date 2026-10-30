@@ -5,6 +5,7 @@
 #include <QString>
 #include <QVector>
 
+#include "core/sale_item.h"
 #include "product_repository.h"
 #include "stock_movement_repository.h"
 
