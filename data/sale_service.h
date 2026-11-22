@@ -74,13 +74,15 @@ public:
     // are untouched.
     SaleRecordResult recordSale(const QVector<core::SaleItem>& items, int cashSessionId, const QString& deviceId,
                                 bool allowOversold, const core::SyncApplyToken* applyToken = nullptr,
-                                long long adjustmentCents = 0, const QVector<PriceOverride>& overrides = {});
+                                long long adjustmentCents = 0, const QVector<PriceOverride>& overrides = {},
+                                const QDateTime& occurredAt = {});
 
     SaleRecordResult recordCustomerDebt(int customerId, const QVector<core::SaleItem>& items,
                                         const QString& deviceId, bool allowOversold,
                                         const core::SyncApplyToken* applyToken = nullptr,
                                         long long adjustmentCents = 0,
-                                        const QVector<PriceOverride>& overrides = {});
+                                        const QVector<PriceOverride>& overrides = {},
+                                        const QDateTime& occurredAt = {});
 
     SaleReverseResult reverseSale(int saleId, int cashSessionId);
 

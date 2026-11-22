@@ -30,6 +30,7 @@ core::PurchaseItem purchaseItemFromQuery(const QSqlQuery& query)
     if (item.unitKind.isEmpty()) {
         item.unitKind = QStringLiteral("piece");
     }
+    item.piecesReceived = query.value(9).toLongLong();
     return item;
 }
 
@@ -41,7 +42,7 @@ QVector<core::PurchaseItem> PurchaseItemRepository::findByPurchase(int purchaseI
     QSqlQuery query(m_db.handle());
     query.prepare(QStringLiteral(
         "SELECT id, purchase_id, product_id, description, quantity, unit, "
-        "unit_price_cents, total_cents, unit_kind "
+        "unit_price_cents, total_cents, unit_kind, pieces_received "
         "FROM purchase_items WHERE purchase_id = ? ORDER BY id"));
     query.addBindValue(purchaseId);
     if (!query.exec()) {
@@ -59,8 +60,8 @@ int PurchaseItemRepository::insert(const core::PurchaseItem& item)
     QSqlQuery query(m_db.handle());
     query.prepare(QStringLiteral(
         "INSERT INTO purchase_items (purchase_id, product_id, description, "
-        "quantity, unit, unit_price_cents, total_cents, unit_kind) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"));
+        "quantity, unit, unit_price_cents, total_cents, unit_kind, pieces_received) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     query.addBindValue(item.purchaseId);
     if (item.productId.has_value()) {
         query.addBindValue(*item.productId);
@@ -75,6 +76,7 @@ int PurchaseItemRepository::insert(const core::PurchaseItem& item)
     query.addBindValue(item.unitPriceCents);
     query.addBindValue(item.totalCents);
     query.addBindValue(item.unitKind.isEmpty() ? QStringLiteral("piece") : item.unitKind);
+    query.addBindValue(item.piecesReceived > 0 ? item.piecesReceived : item.quantity);
     if (!query.exec()) {
         m_db.recordError(query.lastError(), QStringLiteral("PurchaseItemRepository::insert"));
         return 0;

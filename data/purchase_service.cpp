@@ -48,6 +48,9 @@ PurchaseLineResult makePurchaseItem(const core::Product& product, long long quan
     item.unitPriceCents = unitPriceCents;
     item.totalCents = *total;
     item.unitKind = toString(kind);
+    // Purchases cannot use the package unit yet, so the pieces received are the
+    // quantity. Storing it now keeps the column truthful for when they can.
+    item.piecesReceived = quantity;
 
     result.item = item;
     result.ok = true;
@@ -255,6 +258,9 @@ PurchaseResult PurchaseService::recordPurchase(const core::Purchase& purchase,
     QVector<core::PurchaseItem> lines = items;
     for (core::PurchaseItem& line : lines) {
         line.purchaseId = purchaseId;
+        if (line.piecesReceived <= 0) {
+            line.piecesReceived = line.quantity;
+        }
     }
     for (const core::PurchaseItem& line : lines) {
         if (m_items.insert(line) == 0) {

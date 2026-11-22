@@ -6,6 +6,8 @@
 #include <QSqlQuery>
 #include <QVariant>
 
+#include "core/line_total.h"
+
 namespace app::data {
 
 ProductRepository::ProductRepository(Database& db)
@@ -283,11 +285,41 @@ void ProductRepository::adjustStock(int productId, long long delta, const QStrin
 bool ProductRepository::updateAverageCost(int productId, long long oldQty, long long oldCostCents,
                                           long long addedQty, long long addedCostCents)
 {
+    // Every product below is checked before it is formed. Signed overflow is
+    // undefined behaviour, and a wrapped average cost is not a wrong number: it
+    // is a plausible number written into every future sale's frozen cost.
+    if (!core::detail::sumFits(oldQty, addedQty)) {
+        m_db.recordError(
+            QSqlError(QStringLiteral("average cost quantity overflow"),
+                      QStringLiteral("oldQty + addedQty does not fit in long long"),
+                      QSqlError::UnknownError),
+            QStringLiteral("ProductRepository::updateAverageCost"));
+        return false;
+    }
     const long long newQty = oldQty + addedQty;
     if (newQty <= 0) {
         return true;
     }
-    const long long newCost = (oldQty * oldCostCents + addedQty * addedCostCents) / newQty;
+    if (!core::detail::productFits(oldQty, oldCostCents)
+        || !core::detail::productFits(addedQty, addedCostCents)) {
+        m_db.recordError(
+            QSqlError(QStringLiteral("average cost value overflow"),
+                      QStringLiteral("quantity * cost does not fit in long long"),
+                      QSqlError::UnknownError),
+            QStringLiteral("ProductRepository::updateAverageCost"));
+        return false;
+    }
+    const long long oldValue = oldQty * oldCostCents;
+    const long long addedValue = addedQty * addedCostCents;
+    if (!core::detail::sumFits(oldValue, addedValue)) {
+        m_db.recordError(
+            QSqlError(QStringLiteral("average cost total overflow"),
+                      QStringLiteral("old value + added value does not fit in long long"),
+                      QSqlError::UnknownError),
+            QStringLiteral("ProductRepository::updateAverageCost"));
+        return false;
+    }
+    const long long newCost = (oldValue + addedValue) / newQty;
 
     QSqlQuery query(m_db.handle());
     query.prepare(QStringLiteral("UPDATE products SET cost_price_cents = ? WHERE id = ?"));

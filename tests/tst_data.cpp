@@ -208,6 +208,8 @@ private slots:
     void stockValueCents_divides_weight_products_by_a_thousand();
     void stockValueCents_zero_when_only_an_empty_weight_product();
     void daily_report_uses_grams_for_a_weight_line();
+    void daily_report_uses_pieces_for_a_package_line();
+    void update_average_cost_refuses_overflow();
     void sync_key_mints_random_on_absent();
     void sync_key_keeps_existing_value();
     void sync_key_remints_on_empty_value();
@@ -6641,6 +6643,83 @@ void DataLayerTest::daily_report_uses_grams_for_a_weight_line()
     QCOMPARE(report.grossProfitCents, 5000LL);
     QVERIFY(!report.topProducts.isEmpty());
     QCOMPARE(report.topProducts.front().revenueCents, 30000LL);
+}
+
+void DataLayerTest::daily_report_uses_pieces_for_a_package_line()
+{
+    const QString path = m_dir.filePath(QStringLiteral("daily_package.sqlite"));
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product carton;
+    carton.barcode = QStringLiteral("P003");
+    carton.name = QStringLiteral("حليب علبة");
+    carton.salePriceCents = 3000;
+    carton.costPriceCents = 100;
+    carton.piecesPerPackage = 12;
+    const int productId = products.save(carton);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, +120, QStringLiteral("opening"));
+
+    data::CashSessionRepository sessions(db);
+    const int sessionId = sessions.open(5000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 2;
+    item.unitKind = QStringLiteral("package");
+    item.unitPriceCents = 3000;
+
+    data::SaleService saleService(db);
+    const data::SaleRecordResult sold = saleService.recordSale({item}, sessionId, QStringLiteral("dev"), false);
+    QVERIFY2(sold.ok, qPrintable(sold.error));
+
+    data::SaleRepository sales(db);
+    data::ExpenseRepository expenses(db);
+    data::OwnerDrawingRepository drawings(db);
+    data::CustomerTransactionRepository customerTx(db);
+    const data::DailyReport report = data::DailyReportService(
+        db, sales, expenses, drawings, customerTx, sessions)
+        .forDay(QDate::currentDate().toString(Qt::ISODate));
+
+    QVERIFY2(report.ok, qPrintable(report.error));
+    // Two cartons at 30.00 is 60.00. Costing them as two pieces would report
+    // 2.00 of goods; the shelf lost 24 pieces, so the cost is 24.00.
+    QCOMPARE(report.salesTotalCents, 6000LL);
+    QCOMPARE(report.cogsTotalCents, 2400LL);
+    QCOMPARE(report.grossProfitCents, 3600LL);
+}
+
+void DataLayerTest::update_average_cost_refuses_overflow()
+{
+    const QString path = m_dir.filePath(QStringLiteral("average_cost_overflow.sqlite"));
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("زيت");
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+
+    // oldQty * oldCost is the first product the average is built from. A wrapped
+    // product here is not a wrong average, it is a plausible wrong cost for every
+    // piece still on the shelf.
+    QVERIFY(products.updateAverageCost(productId, std::numeric_limits<long long>::max(), 2,
+                                       1, 0)
+            == false);
+    QVERIFY(!db.lastError().isEmpty());
+    const auto afterFirst = products.findById(productId);
+    QVERIFY(afterFirst.has_value());
+    QCOMPARE(afterFirst->costPriceCents, 0LL);
+
+    // The new purchase's own product can overflow even when the old one fits.
+    QVERIFY(products.updateAverageCost(productId, 1, 1,
+                                       std::numeric_limits<long long>::max(), 2)
+            == false);
+    const auto afterSecond = products.findById(productId);
+    QVERIFY(afterSecond.has_value());
+    QCOMPARE(afterSecond->costPriceCents, 0LL);
 }
 
 void DataLayerTest::sync_key_mints_random_on_absent()

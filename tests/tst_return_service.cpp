@@ -3,9 +3,11 @@
 #include <QSqlQuery>
 #include <QTemporaryDir>
 
+#include "core/line_total.h"
 #include "data/database.h"
 #include "data/date_utils.h"
 #include "data/product_repository.h"
+#include "data/purchase_item_repository.h"
 #include "data/purchase_repository.h"
 #include "data/stock_movement_repository.h"
 #include "data/supplier_payment_repository.h"
@@ -27,10 +29,12 @@ struct Fixture {
         , returnItems(db)
         , suppliers(db)
         , purchases(db)
+        , purchaseItems(db)
         , products(db)
         , stockMovements(db)
         , payments(db)
-        , service(db, returns, returnItems, suppliers, purchases, products, stockMovements)
+        , service(db, returns, returnItems, suppliers, purchases, purchaseItems, products,
+                  stockMovements)
     {
     }
 
@@ -39,6 +43,7 @@ struct Fixture {
     data::SupplierReturnItemRepository returnItems;
     data::SupplierRepository suppliers;
     data::PurchaseRepository purchases;
+    data::PurchaseItemRepository purchaseItems;
     data::ProductRepository products;
     data::StockMovementRepository stockMovements;
     data::SupplierPaymentRepository payments;
@@ -91,6 +96,30 @@ int addPurchase(data::PurchaseRepository& purchases, int supplierId, long long t
     return purchases.insert(purchase);
 }
 
+int addPurchaseLine(Fixture& f, int purchaseId, int productId, long long quantity,
+                    long long unitPriceCents, const QString& unitKind = QStringLiteral("piece"))
+{
+    core::PurchaseItem item;
+    item.purchaseId = purchaseId;
+    item.productId = productId;
+    item.description = QStringLiteral("line");
+    item.quantity = quantity;
+    item.unit = unitKind;
+    item.unitPriceCents = unitPriceCents;
+    item.unitKind = unitKind;
+    const auto kind = core::fromString(unitKind);
+    if (!kind.has_value()) {
+        return 0;
+    }
+    const auto total = core::lineTotalCents(quantity, unitPriceCents, *kind);
+    if (!total.has_value()) {
+        return 0;
+    }
+    item.totalCents = *total;
+    item.piecesReceived = quantity;
+    return f.purchaseItems.insert(item);
+}
+
 core::SupplierReturnItem line(int productId, long long quantity, long long unitPriceCents)
 {
     core::SupplierReturnItem item;
@@ -113,6 +142,18 @@ std::vector<core::StockMovement> returnMovements(const data::StockMovementReposi
         }
     }
     return filtered;
+}
+
+long long movementDeltaForReason(const data::StockMovementRepository& stockMovements,
+                                 int productId, const QString& reason)
+{
+    long long total = 0;
+    for (const core::StockMovement& movement : stockMovements.findByProductId(productId)) {
+        if (movement.reason == reason) {
+            total += movement.delta;
+        }
+    }
+    return total;
 }
 
 // Row counts read straight from the database, so a rollback is checked where it
@@ -155,6 +196,10 @@ private slots:
     void return_rejects_empty_items();
     void return_rollback_on_item_failure();
     void return_does_not_change_average_cost();
+    void linked_weight_return_uses_grams();
+    void linked_package_return_expands_to_pieces();
+    void linked_return_cannot_exceed_purchased_quantity();
+    void linked_return_rejects_a_legacy_weight_line();
 };
 
 void SupplierReturnServiceTest::linked_return_simple()
@@ -167,6 +212,7 @@ void SupplierReturnServiceTest::linked_return_simple()
     QVERIFY(purchaseId > 0);
     const int productId = addProduct(f.products, f.stockMovements, QStringLiteral("سكر"), 100);
     QVERIFY(productId > 0);
+    QVERIFY(addPurchaseLine(f, purchaseId, productId, 100, 500) > 0);
 
     const data::SupplierReturnResult result =
         f.service.recordLinkedReturn(supplierId, purchaseId, {line(productId, 20, 500)},
@@ -266,6 +312,7 @@ void SupplierReturnServiceTest::linked_return_quantity_exceeds_stock_warns()
     QVERIFY(purchaseId > 0);
     const int productId = addProduct(f.products, f.stockMovements, QStringLiteral("جبن"), 5);
     QVERIFY(productId > 0);
+    QVERIFY(addPurchaseLine(f, purchaseId, productId, 10, 500) > 0);
 
     // Returning more than was on the shelf is a stock count that was already
     // wrong. The goods did go back, so the return is recorded and the caller is
@@ -357,6 +404,7 @@ void SupplierReturnServiceTest::return_rollback_on_item_failure()
     QVERIFY(purchaseId > 0);
     const int productId = addProduct(f.products, f.stockMovements, QStringLiteral("خبز"), 50);
     QVERIFY(productId > 0);
+    QVERIFY(addPurchaseLine(f, purchaseId, productId, 5, 500) > 0);
 
     // The first line is fine, the second names a product that does not exist.
     // The whole return has to disappear, including the first line and the credit
@@ -390,6 +438,7 @@ void SupplierReturnServiceTest::return_does_not_change_average_cost()
     QVERIFY(purchaseId > 0);
     const int productId = addProduct(f.products, f.stockMovements, QStringLiteral("لبن"), 100, 900);
     QVERIFY(productId > 0);
+    QVERIFY(addPurchaseLine(f, purchaseId, productId, 100, 500) > 0);
 
     const data::SupplierReturnResult result =
         f.service.recordLinkedReturn(supplierId, purchaseId, {line(productId, 20, 500)},
@@ -403,6 +452,161 @@ void SupplierReturnServiceTest::return_does_not_change_average_cost()
     QVERIFY(product.has_value());
     QCOMPARE(product->quantity, 80LL);
     QCOMPARE(product->costPriceCents, 900LL);
+}
+
+void SupplierReturnServiceTest::linked_weight_return_uses_grams()
+{
+    QTemporaryDir m_dir;
+    Fixture f(m_dir.filePath(QStringLiteral("linked_weight_return_uses_grams.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("مورد وزن"));
+    QVERIFY(supplierId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("طماطم");
+    product.soldByWeight = true;
+    product.costPriceCents = 500;
+    product.salePriceCents = 1000;
+    const int productId = f.products.save(product);
+    QVERIFY(productId > 0);
+    f.products.adjustStock(productId, 12500LL, QStringLiteral("opening"));
+
+    const int purchaseId = addPurchase(f.purchases, supplierId, 6250);
+    QVERIFY(purchaseId > 0);
+    QVERIFY(addPurchaseLine(f, purchaseId, productId, 12500, 500, QStringLiteral("weight")) > 0);
+
+    core::SupplierReturnItem line;
+    line.productId = productId;
+    line.quantity = 2500;
+    line.unitPriceCents = 500;
+    line.unitKind = QStringLiteral("weight");
+    const data::SupplierReturnResult result =
+        f.service.recordLinkedReturn(supplierId, purchaseId, {line}, data::nowIso(), QString());
+    QVERIFY2(result.ok, qPrintable(result.error));
+
+    // 2.5 kg at 5.00 per kg is 12.50, not 12500.00: the thousand is divided out
+    // exactly as the purchase and sale paths do it.
+    const auto stored = f.returns.findById(result.returnId);
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->amountCents, 1250LL);
+
+    const auto items = f.returnItems.findByReturn(result.returnId);
+    QCOMPARE(items.size(), std::size_t(1));
+    QCOMPARE(items[0].unitKind, QStringLiteral("weight"));
+    QCOMPARE(items[0].piecesConsumed, 2500LL);
+
+    QCOMPARE(f.products.findById(productId)->quantity, 10000LL);
+    QCOMPARE(movementDeltaForReason(f.stockMovements, productId, QStringLiteral("supplier_return")),
+             -2500LL);
+}
+
+void SupplierReturnServiceTest::linked_package_return_expands_to_pieces()
+{
+    QTemporaryDir m_dir;
+    Fixture f(m_dir.filePath(QStringLiteral("linked_package_return_expands_to_pieces.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("مورد علب"));
+    QVERIFY(supplierId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("حليب");
+    product.piecesPerPackage = 12;
+    product.costPriceCents = 100;
+    product.salePriceCents = 200;
+    const int productId = f.products.save(product);
+    QVERIFY(productId > 0);
+    f.products.adjustStock(productId, 120LL, QStringLiteral("opening"));
+
+    const int purchaseId = addPurchase(f.purchases, supplierId, 12000);
+    QVERIFY(purchaseId > 0);
+    QVERIFY(addPurchaseLine(f, purchaseId, productId, 10, 1200, QStringLiteral("package")) > 0);
+
+    core::SupplierReturnItem line;
+    line.productId = productId;
+    line.quantity = 2;
+    line.unitPriceCents = 1200;
+    line.unitKind = QStringLiteral("package");
+    const data::SupplierReturnResult result =
+        f.service.recordLinkedReturn(supplierId, purchaseId, {line}, data::nowIso(), QString());
+    QVERIFY2(result.ok, qPrintable(result.error));
+
+    QCOMPARE(f.returns.findById(result.returnId)->amountCents, 2400LL);
+    const auto items = f.returnItems.findByReturn(result.returnId);
+    QCOMPARE(items.size(), std::size_t(1));
+    QCOMPARE(items[0].unitKind, QStringLiteral("package"));
+    QCOMPARE(items[0].piecesConsumed, 24LL);
+
+    // Two cartons are twenty-four pieces off the shelf, not two.
+    QCOMPARE(f.products.findById(productId)->quantity, 96LL);
+    QCOMPARE(movementDeltaForReason(f.stockMovements, productId, QStringLiteral("supplier_return")),
+             -24LL);
+}
+
+void SupplierReturnServiceTest::linked_return_cannot_exceed_purchased_quantity()
+{
+    QTemporaryDir m_dir;
+    Fixture f(m_dir.filePath(QStringLiteral("linked_return_cannot_exceed_purchased_quantity.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("مورد كمية"));
+    QVERIFY(supplierId > 0);
+    const int productId = addProduct(f.products, f.stockMovements, QStringLiteral("عدس"), 100);
+    QVERIFY(productId > 0);
+    const int purchaseId = addPurchase(f.purchases, supplierId, 5000);
+    QVERIFY(purchaseId > 0);
+    QVERIFY(addPurchaseLine(f, purchaseId, productId, 10, 500) > 0);
+
+    const auto first = f.service.recordLinkedReturn(
+        supplierId, purchaseId, {line(productId, 6, 500)}, data::nowIso(), QString());
+    QVERIFY2(first.ok, qPrintable(first.error));
+    QCOMPARE(f.products.findById(productId)->quantity, 94LL);
+
+    // Six of ten already went back. Five more would return eleven, which is one
+    // more than the invoice can support.
+    const auto second = f.service.recordLinkedReturn(
+        supplierId, purchaseId, {line(productId, 5, 500)}, data::nowIso(), QString());
+    QVERIFY(!second.ok);
+    QVERIFY2(second.error.contains(QStringLiteral("only 4")), qPrintable(second.error));
+    QCOMPARE(countRows(f.db, QStringLiteral("supplier_returns")), 1);
+    QCOMPARE(f.products.findById(productId)->quantity, 94LL);
+
+    // The remaining four are returnable, and the cap is cumulative.
+    const auto rest = f.service.recordLinkedReturn(
+        supplierId, purchaseId, {line(productId, 4, 500)}, data::nowIso(), QString());
+    QVERIFY2(rest.ok, qPrintable(rest.error));
+    QCOMPARE(f.products.findById(productId)->quantity, 90LL);
+
+    const auto beyond = f.service.recordLinkedReturn(
+        supplierId, purchaseId, {line(productId, 1, 500)}, data::nowIso(), QString());
+    QVERIFY(!beyond.ok);
+    QVERIFY2(beyond.error.contains(QStringLiteral("only 0")), qPrintable(beyond.error));
+}
+
+void SupplierReturnServiceTest::linked_return_rejects_a_legacy_weight_line()
+{
+    QTemporaryDir m_dir;
+    Fixture f(m_dir.filePath(QStringLiteral("linked_return_rejects_a_legacy_weight_line.sqlite")));
+    const int supplierId = addSupplier(f.suppliers, QStringLiteral("مورد قديم"));
+    QVERIFY(supplierId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("بطاطا");
+    product.soldByWeight = true;
+    product.costPriceCents = 500;
+    product.salePriceCents = 1000;
+    const int productId = f.products.save(product);
+    QVERIFY(productId > 0);
+    f.products.adjustStock(productId, 12500LL, QStringLiteral("opening"));
+
+    const int purchaseId = addPurchase(f.purchases, supplierId, 5000);
+    QVERIFY(purchaseId > 0);
+    // A row written before weight units existed: it says "piece" while the
+    // product is sold by weight, so there is no way to know whether 10 means
+    // grams or kilograms.
+    QVERIFY(addPurchaseLine(f, purchaseId, productId, 10, 500, QStringLiteral("piece")) > 0);
+
+    const auto result = f.service.recordLinkedReturn(
+        supplierId, purchaseId, {line(productId, 5, 500)}, data::nowIso(), QString());
+    QVERIFY(!result.ok);
+    QVERIFY2(result.error.contains(QStringLiteral("sold by weight")), qPrintable(result.error));
+    QCOMPARE(countRows(f.db, QStringLiteral("supplier_returns")), 0);
+    QCOMPARE(f.products.findById(productId)->quantity, 12500LL);
 }
 
 QTEST_GUILESS_MAIN(SupplierReturnServiceTest)

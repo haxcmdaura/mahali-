@@ -1379,7 +1379,7 @@ void PurchaseServiceTest::supplier_return_of_weight_line_returns_grams()
     data::SupplierReturnRepository returns(f.db);
     data::SupplierReturnItemRepository returnItems(f.db);
     data::SupplierReturnService returnsService(f.db, returns, returnItems, f.suppliers, f.purchases,
-                                               f.products, f.stockMovements);
+                                               f.items, f.products, f.stockMovements);
     core::SupplierReturnItem returnLine;
     returnLine.productId = productId;
     returnLine.quantity = 2500;

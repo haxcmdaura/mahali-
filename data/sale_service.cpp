@@ -110,7 +110,8 @@ SaleRecordResult SaleService::recordCustomerDebt(int customerId, const QVector<c
                                                  const QString& deviceId, bool allowOversold,
                                                  const core::SyncApplyToken* applyToken,
                                                  long long adjustmentCents,
-                                                 const QVector<PriceOverride>& overrides)
+                                                 const QVector<PriceOverride>& overrides,
+                                                 const QDateTime& occurredAt)
 {
     SaleRecordResult result;
     if (items.isEmpty()) {
@@ -167,7 +168,9 @@ SaleRecordResult SaleService::recordCustomerDebt(int customerId, const QVector<c
     transaction.customerId = customerId;
     transaction.amountCents = total;
     transaction.adjustmentCents = adjustmentCents;
-    transaction.createdAt = QDateTime::currentDateTime();
+    // A synced operation carries the moment the other device recorded it, so a
+    // late batch lands on the day it happened instead of the day it arrived.
+    transaction.createdAt = occurredAt.isValid() ? occurredAt : QDateTime::currentDateTime();
     const QString receiptNumber = mintReceiptNumber(m_db);
     if (receiptNumber.isEmpty()) {
         m_db.rollback();
@@ -259,7 +262,8 @@ SaleRecordResult SaleService::recordSale(const QVector<core::SaleItem>& items, i
                                          const QString& deviceId, bool allowOversold,
                                          const core::SyncApplyToken* applyToken,
                                          long long adjustmentCents,
-                                         const QVector<PriceOverride>& overrides)
+                                         const QVector<PriceOverride>& overrides,
+                                         const QDateTime& occurredAt)
 {
     SaleRecordResult result;
     if (items.isEmpty()) {
@@ -321,7 +325,7 @@ SaleRecordResult SaleService::recordSale(const QVector<core::SaleItem>& items, i
     const long long cogs = *cogsOpt;
 
     core::Sale sale;
-    sale.createdAt = QDateTime::currentDateTime();
+    sale.createdAt = occurredAt.isValid() ? occurredAt : QDateTime::currentDateTime();
     sale.totalCents = total;
     sale.adjustmentCents = adjustmentCents;
     sale.deviceId = deviceId;

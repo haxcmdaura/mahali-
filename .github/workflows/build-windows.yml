@@ -3,6 +3,7 @@ name: Build Windows
 on:
   push:
     branches: [ main, master ]
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -26,11 +27,8 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --target mahali-desktop
       - name: Build tests
-        continue-on-error: true
         run: cmake --build build --config Release
       - name: Run tests
-        continue-on-error: true
-        # TODO: investigate Windows test failures
         env:
           QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build -C Release --output-on-failure

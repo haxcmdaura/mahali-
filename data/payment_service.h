@@ -26,7 +26,8 @@ public:
 
     PaymentResult recordCustomerPayment(int customerId, long long amountCents, int cashSessionId,
                                         const QString& note,
-                                        const core::SyncApplyToken* applyToken = nullptr);
+                                        const core::SyncApplyToken* applyToken = nullptr,
+                                        const QDateTime& occurredAt = {});
 
     // Refunds an earlier payment on the open session: a reversed (negative)
     // payment row plus a negative "refund" cash movement.

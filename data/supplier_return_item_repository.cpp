@@ -24,10 +24,17 @@ core::SupplierReturnItem itemFromQuery(const QSqlQuery& query)
     item.quantity = query.value(3).toLongLong();
     item.unitPriceCents = query.value(4).toLongLong();
     item.totalCents = query.value(5).toLongLong();
+    item.unitKind = query.value(6).toString();
+    if (item.unitKind.isEmpty()) {
+        item.unitKind = QStringLiteral("piece");
+    }
+    item.piecesConsumed = query.value(7).toLongLong();
     return item;
 }
 
-const char* kItemColumns = "id, return_id, product_id, quantity, unit_price_cents, total_cents";
+const char* kItemColumns =
+    "id, return_id, product_id, quantity, unit_price_cents, total_cents, "
+    "unit_kind, pieces_consumed";
 
 } // namespace
 
@@ -52,7 +59,8 @@ int SupplierReturnItemRepository::insert(const core::SupplierReturnItem& item)
 {
     QSqlQuery query(m_db.handle());
     query.prepare(QStringLiteral("INSERT INTO supplier_return_items (return_id, product_id, quantity, "
-                                 "unit_price_cents, total_cents) VALUES (?, ?, ?, ?, ?)"));
+                                 "unit_price_cents, total_cents, unit_kind, pieces_consumed) "
+                                 "VALUES (?, ?, ?, ?, ?, ?, ?)"));
     query.addBindValue(item.returnId);
     if (item.productId.has_value()) {
         query.addBindValue(*item.productId);
@@ -64,6 +72,8 @@ int SupplierReturnItemRepository::insert(const core::SupplierReturnItem& item)
     query.addBindValue(item.quantity);
     query.addBindValue(item.unitPriceCents);
     query.addBindValue(item.totalCents);
+    query.addBindValue(item.unitKind.isEmpty() ? QStringLiteral("piece") : item.unitKind);
+    query.addBindValue(item.piecesConsumed);
     if (!query.exec()) {
         m_db.recordError(query.lastError(), QStringLiteral("SupplierReturnItemRepository::insert"));
         return 0;
