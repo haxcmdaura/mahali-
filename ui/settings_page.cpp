@@ -12,14 +12,23 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QProgressDialog>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
+#include <QTimer>
 #include <QVBoxLayout>
+
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 #include "core/i18n.h"
 #include "core/update_checker.h"
 #include "data/backup_service.h"
+#include "data/product_cleanup.h"
+#include "data/product_repository.h"
 #include "data/setting_repository.h"
 #include "data/sync_key.h"
 
@@ -176,11 +185,14 @@ SettingsPage::SettingsPage(app::data::Database& db, QWidget* parent)
     backupNow->setObjectName(QStringLiteral("backupNowButton"));
     auto* restoreBackup = new QPushButton(tr("استعادة من نسخة"));
     restoreBackup->setObjectName(QStringLiteral("restoreBackupButton"));
+    m_cleanupInactive = new QPushButton(tr("تنظيف المنتجات غير المستخدمة"));
+    m_cleanupInactive->setObjectName(QStringLiteral("cleanupInactiveProductsButton"));
     auto* backupRow = new QHBoxLayout;
     backupRow->setContentsMargins(0, 0, 0, 0);
     backupRow->setSpacing(8);
     backupRow->addWidget(backupNow);
     backupRow->addWidget(restoreBackup);
+    backupRow->addWidget(m_cleanupInactive);
 
     auto* card = makeCard();
     // Fixed rather than merely capped: a maximum alone leaves the card at its
@@ -291,6 +303,8 @@ SettingsPage::SettingsPage(app::data::Database& db, QWidget* parent)
             showNotice(tr("تعذّرت الاستعادة: %1").arg(error), false);
         }
     });
+    connect(m_cleanupInactive, &QPushButton::clicked,
+            this, &SettingsPage::cleanupInactiveProducts);
 
     refresh();
 }
@@ -330,6 +344,175 @@ void SettingsPage::finishUpdateCheck(core::UpdateChecker* checker)
     m_checkUpdates->setEnabled(true);
     m_checkUpdates->setText(tr("Vérifier les mises à jour"));
     checker->deleteLater();
+}
+
+void SettingsPage::cleanupInactiveProducts()
+{
+    m_cleanupInactive->setEnabled(false);
+
+    const QString dir = data::BackupService::defaultBackupDirectory();
+    QDir().mkpath(dir);
+    const QString backupPath =
+        QDir(dir).filePath(QStringLiteral("mahali-cleanup-%1.sqlite")
+                               .arg(QDateTime::currentDateTime().toString(
+                                   QStringLiteral("yyyyMMdd-HHmmss-zzz"))));
+    QString error;
+    if (!backupNowTo(backupPath, &error)) {
+        m_cleanupInactive->setEnabled(true);
+        showNotice(tr("تعذّر إنشاء النسخة الاحتياطية: %1").arg(error), false);
+        return;
+    }
+
+    data::ProductRepository products(m_db);
+    const std::vector<core::Product> all =
+        products.findAll(data::ProductRepository::Visibility::All);
+    std::vector<core::Product> inactive;
+    for (const core::Product& product : all) {
+        if (!product.active) {
+            inactive.push_back(product);
+        }
+    }
+
+    const auto makeProgress = [this](const QString& label, int maximum) {
+        auto* progress = new QProgressDialog(label, tr("إلغاء"), 0, maximum, this);
+        progress->setWindowModality(Qt::WindowModal);
+        progress->setMinimumDuration(0);
+        progress->setValue(0);
+        return progress;
+    };
+    const auto enableButton = [this]() {
+        m_cleanupInactive->setEnabled(true);
+    };
+
+    struct ScanState {
+        std::size_t index = 0;
+        std::vector<core::Product> candidates;
+        int skipped = 0;
+    };
+    struct DeleteState {
+        std::size_t index = 0;
+        int deleted = 0;
+        int failed = 0;
+    };
+
+    auto* scanProgress = makeProgress(tr("فحص المنتجات غير النشطة..."),
+                                      static_cast<int>(inactive.size()));
+    auto scanState = std::make_shared<ScanState>();
+    auto* scanTimer = new QTimer(this);
+
+    QObject::connect(scanTimer, &QTimer::timeout, this,
+                     [this, scanTimer, scanProgress, scanState, products, inactive, makeProgress,
+                      enableButton, backupPath]() {
+                         if (scanProgress->wasCanceled()) {
+                             scanTimer->stop();
+                             scanTimer->deleteLater();
+                             scanProgress->hide();
+                             scanProgress->deleteLater();
+                             enableButton();
+                             showNotice(tr("تم إلغاء فحص المنتجات."), false);
+                             return;
+                         }
+
+                         const std::size_t begin = scanState->index;
+                         const std::size_t end = std::min(begin + 100, inactive.size());
+                         const std::vector<core::Product> chunk(
+                             inactive.begin() + static_cast<std::ptrdiff_t>(begin),
+                             inactive.begin() + static_cast<std::ptrdiff_t>(end));
+                         const std::vector<core::Product> unused =
+                             data::inactiveUnusedProducts(chunk, [&products](int id) {
+                                 return !products.canDeletePermanently(id);
+                             });
+                         scanState->candidates.insert(scanState->candidates.end(),
+                                                      unused.begin(), unused.end());
+                         scanState->skipped += static_cast<int>(chunk.size() - unused.size());
+                         scanState->index = end;
+                         scanProgress->setValue(static_cast<int>(scanState->index));
+                         if (scanState->index < inactive.size()) {
+                             return;
+                         }
+
+                         scanTimer->stop();
+                         scanTimer->deleteLater();
+                         scanProgress->hide();
+                         scanProgress->deleteLater();
+
+                         QMessageBox confirm(this);
+                         confirm.setIcon(QMessageBox::Warning);
+                         confirm.setWindowTitle(tr("تنظيف المنتجات غير المستخدمة"));
+                         confirm.setText(tr("سيتم حذف %1 منتج غير نشط وغير مستخدم نهائياً.")
+                                             .arg(QString::number(scanState->candidates.size())));
+                         confirm.setInformativeText(
+                             tr("سيتم تخطي %1 منتج مستخدم. النسخة الاحتياطية: %2")
+                                 .arg(scanState->skipped)
+                                 .arg(QFileInfo(backupPath).fileName()));
+                         confirm.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
+                         confirm.setDefaultButton(QMessageBox::Cancel);
+                         if (confirm.exec() != QMessageBox::Ok) {
+                             enableButton();
+                             showNotice(tr("تم إلغاء التنظيف."), false);
+                             return;
+                         }
+                         if (scanState->candidates.empty()) {
+                             enableButton();
+                             showNotice(tr("لا توجد منتجات غير مستخدمة للحذف."), true);
+                             return;
+                         }
+
+                         auto* deleteProgress = makeProgress(tr("حذف المنتجات..."),
+                                                             static_cast<int>(
+                                                                 scanState->candidates.size()));
+                         auto deleteState = std::make_shared<DeleteState>();
+                         auto* deleteTimer = new QTimer(this);
+                         QObject::connect(deleteTimer, &QTimer::timeout, this,
+                                          [this, deleteTimer, deleteProgress, deleteState,
+                                           scanState, products, enableButton]() {
+                                              if (deleteProgress->wasCanceled()) {
+                                                  deleteTimer->stop();
+                                                  deleteTimer->deleteLater();
+                                                  deleteProgress->hide();
+                                                  deleteProgress->deleteLater();
+                                                  enableButton();
+                                                  showNotice(tr("تم إلغاء التنظيف بعد حذف %1 منتج.")
+                                                                 .arg(deleteState->deleted),
+                                                             false);
+                                                  return;
+                                              }
+
+                                              const std::size_t begin = deleteState->index;
+                                              const std::size_t end =
+                                                  std::min(begin + 100,
+                                                           scanState->candidates.size());
+                                              for (std::size_t index = begin; index < end;
+                                                   ++index) {
+                                                  if (products.removePermanently(
+                                                          scanState->candidates.at(index).id)) {
+                                                      ++deleteState->deleted;
+                                                  } else {
+                                                      ++deleteState->failed;
+                                                  }
+                                              }
+                                              deleteState->index = end;
+                                              deleteProgress->setValue(
+                                                  static_cast<int>(deleteState->index));
+                                              if (deleteState->index
+                                                  < scanState->candidates.size()) {
+                                                  return;
+                                              }
+
+                                              deleteTimer->stop();
+                                              deleteTimer->deleteLater();
+                                              deleteProgress->hide();
+                                              deleteProgress->deleteLater();
+                                              enableButton();
+                                              showNotice(tr("تم حذف %1 منتج، وتخطي %2 منتج مستخدم، وتعذّر حذف %3 منتج.")
+                                                             .arg(deleteState->deleted)
+                                                             .arg(scanState->skipped)
+                                                             .arg(deleteState->failed),
+                                                         deleteState->failed == 0);
+                                          });
+                         deleteTimer->start();
+                     });
+    scanTimer->start();
 }
 
 void SettingsPage::refresh()

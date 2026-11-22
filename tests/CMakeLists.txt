@@ -112,6 +112,14 @@ target_link_libraries(tst_product_name_matcher
 
 add_test(NAME product_name_matcher COMMAND tst_product_name_matcher)
 
+add_executable(tst_product_cleanup tst_product_cleanup.cpp)
+target_link_libraries(tst_product_cleanup
+    PRIVATE
+        mahali-core
+        Qt${QT_VERSION_MAJOR}::Test)
+
+add_test(NAME product_cleanup COMMAND tst_product_cleanup)
+
 add_executable(tst_sync tst_sync.cpp)
 target_link_libraries(tst_sync
     PRIVATE

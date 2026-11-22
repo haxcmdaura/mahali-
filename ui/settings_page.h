@@ -59,6 +59,7 @@ public slots:
 private slots:
     // Manual update check, reported to the user rather than logged.
     void checkForUpdates();
+    void cleanupInactiveProducts();
 
 private:
     void finishUpdateCheck(app::core::UpdateChecker* checker);
@@ -78,6 +79,7 @@ private:
     QLineEdit* m_receiptFolder = nullptr;
     QPushButton* m_save;
     QPushButton* m_checkUpdates = nullptr;
+    QPushButton* m_cleanupInactive = nullptr;
     QLabel* m_preview;
     QLabel* m_notice;
 };
