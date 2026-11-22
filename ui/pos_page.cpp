@@ -28,6 +28,7 @@
 #include <functional>
 
 #include "core/barcode_utils.h"
+#include "core/product_name_matcher.h"
 #include "core/sale_item.h"
 #include "core/session.h"
 #include "data/cash_session_repository.h"
@@ -40,6 +41,7 @@
 #include "data/sale_service.h"
 #include "dialogs/product_dialog.h"
 #include "dialogs/select_customer_dialog.h"
+#include "dialogs/select_product_dialog.h"
 #include "format_utils.h"
 #include "quick_items_bar.h"
 #include "widgets/app_icon.h"
@@ -614,15 +616,20 @@ std::optional<core::Product> PosPage::findProduct(const QString& text, QString* 
         }
         return byBarcode;
     }
-    for (const core::Product& candidate : products.findAll()) {
-        if (candidate.active && candidate.name == text) {
-            if (unitKind) {
-                *unitKind = QStringLiteral("piece");
-            }
-            return candidate;
+    const std::vector<core::Product> matches = findProductNameMatches(text);
+    if (matches.size() == 1) {
+        if (unitKind) {
+            *unitKind = QStringLiteral("piece");
         }
+        return matches.front();
     }
     return std::nullopt;
+}
+
+std::vector<core::Product> PosPage::findProductNameMatches(const QString& text) const
+{
+    data::ProductRepository products(m_db);
+    return core::matchProductsByName(products.findAll(), text);
 }
 
 int PosPage::productIdForPackageBarcode(const QString& barcode) const
@@ -727,6 +734,29 @@ void PosPage::addEntry()
     QString unitKind = QStringLiteral("piece");
     const std::optional<core::Product> product = findProduct(text, &unitKind);
     if (!product) {
+        const std::vector<core::Product> matches = findProductNameMatches(text);
+        if (matches.size() == 1) {
+            if (matches.front().soldByWeight) {
+                startWeightEntry(matches.front());
+            } else {
+                addProductToCart(matches.front(), 1);
+            }
+            return;
+        }
+        if (matches.size() > 1) {
+            const std::optional<core::Product> chosen = showSelectProductDialog(this, matches);
+            if (chosen) {
+                if (chosen->soldByWeight) {
+                    startWeightEntry(*chosen);
+                } else {
+                    addProductToCart(*chosen, 1);
+                }
+            } else {
+                m_entry->setFocus();
+            }
+            return;
+        }
+
         // A code nobody has registered yet is the normal first sale of a new
         // product, so the register offers to create it instead of complaining.
         core::Product draft;

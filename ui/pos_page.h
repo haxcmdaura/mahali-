@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 
 #include <QString>
 #include <QVector>
@@ -135,13 +136,14 @@ private:
     // the catalogue table is gone, so a product that has no quick item can only
     // be brought in by its barcode.
     void refreshQuickItems();
-    // Looks up by barcode first, then by exact name, since the entry field
-    // advertises both. Returns nothing when neither matches.
+    // Looks up by barcode first, then by name, since the entry field advertises
+    // both. Returns nothing when neither matches, or when the name is ambiguous.
     //
     // A scan ending in 'c' is a carton code and is looked up as one first; see
     // the body for the full order. unitKind is set to the side of the product the
     // scan belongs to, which is what the line it becomes is priced as.
     std::optional<core::Product> findProduct(const QString& text, QString* unitKind = nullptr) const;
+    std::vector<core::Product> findProductNameMatches(const QString& text) const;
     // The product whose package barcode is exactly this, by id only. Its own
     // repository has no such lookup, and the page may not add one.
     int productIdForPackageBarcode(const QString& barcode) const;

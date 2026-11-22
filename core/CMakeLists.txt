@@ -40,6 +40,8 @@ target_sources(mahali-core PRIVATE
     owner_drawing.h
     payment.h
     product.h
+    product_name_matcher.cpp
+    product_name_matcher.h
     profit_loss_calculator.cpp
     profit_loss_calculator.h
     purchase.h

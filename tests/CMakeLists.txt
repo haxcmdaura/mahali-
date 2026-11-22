@@ -104,6 +104,14 @@ target_link_libraries(tst_finance
 
 add_test(NAME finance COMMAND tst_finance)
 
+add_executable(tst_product_name_matcher tst_product_name_matcher.cpp)
+target_link_libraries(tst_product_name_matcher
+    PRIVATE
+        mahali-core
+        Qt${QT_VERSION_MAJOR}::Test)
+
+add_test(NAME product_name_matcher COMMAND tst_product_name_matcher)
+
 add_executable(tst_sync tst_sync.cpp)
 target_link_libraries(tst_sync
     PRIVATE
