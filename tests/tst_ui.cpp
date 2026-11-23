@@ -133,7 +133,7 @@ private slots:
     void sales_page_details_shows_the_receipt_number();
     void sale_details_line_formats_weight_and_piece_items();
     void sales_page_prints_the_selected_sale_as_pdf();
-    void receipt_print_and_save_writes_pdf_and_returns_path();
+    void receipt_print_and_save_writes_pdf_regardless_of_printer_state();
     void receipt_is_a_single_page_on_thermal_paper();
     void receipt_renders_a_cash_sale();
     void receipt_shows_customer_name_on_a_credit_sale();
@@ -143,6 +143,7 @@ private slots:
     void settings_page_saves_auto_print();
     void settings_page_backs_up_now();
     void receipt_printer_writes_a_pdf();
+    void printer_availability_rejects_an_unlisted_printer();
     void product_dialog_reveals_the_weight_checkbox();
     void product_dialog_saves_the_weight_flag();
     void product_dialog_hides_package_fields_for_a_weight_product();
@@ -1733,10 +1734,7 @@ void UiTest::sales_page_prints_the_selected_sale_as_pdf()
     delete doc;
 }
 
-// The printer half is not exercised: CI has no printer, and
-// QPrinterInfo::defaultPrinter() on a headless machine is invalid, which the
-// code already skips.
-void UiTest::receipt_print_and_save_writes_pdf_and_returns_path()
+void UiTest::receipt_print_and_save_writes_pdf_regardless_of_printer_state()
 {
     const QString folder = m_dir.filePath(QStringLiteral("receipts"));
     QVERIFY(!QDir(folder).exists());
@@ -1782,17 +1780,22 @@ void UiTest::receipt_print_and_save_writes_pdf_and_returns_path()
     const QString out = ui::printAndSaveReceipt(doc, ui::ReceiptPaper::Thermal80, db, &error);
     delete doc;
 
-    QVERIFY(!out.isEmpty());
-    QVERIFY(out.endsWith(QStringLiteral(".pdf")));
-    QVERIFY2(QFileInfo(out).exists(), qPrintable(out));
-    QVERIFY(QFileInfo(out).size() > 1000);
-    QFile f(out);
+    const QString expected =
+        folder + QLatin1Char('/') + data.receiptNumber + QStringLiteral(".pdf");
+    QVERIFY2(QFileInfo(expected).exists(), qPrintable(expected));
+    QVERIFY(QFileInfo(expected).size() > 1000);
+    QFile f(expected);
     QVERIFY(f.open(QIODevice::ReadOnly));
     QByteArray first = f.read(4);
     QVERIFY(first == "%PDF");
     f.close();
     QVERIFY(QDir(folder).exists());
-    QVERIFY(error.isEmpty());
+    if (out.isEmpty()) {
+        QVERIFY2(!error.isEmpty(), "an offline printer must report why no job was sent");
+    } else {
+        QCOMPARE(out, expected);
+        QVERIFY(error.isEmpty());
+    }
 }
 // to hit the default (OK) button, saving and closing the form mid-entry.
 
@@ -3637,6 +3640,16 @@ void UiTest::receipt_printer_writes_a_pdf()
     delete doc;
 }
 
+void UiTest::printer_availability_rejects_an_unlisted_printer()
+{
+    QPrinter candidate(QPrinter::HighResolution);
+    candidate.setPrinterName(QStringLiteral("Citizen"));
+    QPrinter other(QPrinter::HighResolution);
+    other.setPrinterName(QStringLiteral("Autre"));
+
+    QVERIFY(!ui::isPrinterAvailable(QPrinterInfo(candidate), {QPrinterInfo(other)}));
+    QVERIFY(!ui::isPrinterAvailable(QPrinterInfo(), {QPrinterInfo(other)}));
+}
 
 void UiTest::product_dialog_reveals_the_weight_checkbox()
 {

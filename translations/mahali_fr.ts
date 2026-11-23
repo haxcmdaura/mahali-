@@ -2603,6 +2603,11 @@ Stock : %4</translation>
         <source>تعذّر إنشاء مجلد الإيصالات</source>
         <translation>Impossible de créer le dossier des reçus</translation>
     </message>
+    <message>
+        <location line="+61"/>
+        <source>الطابعة غير متصلة. تأكد من تشغيلها.</source>
+        <translation>L'imprimante n'est pas connectée. Vérifiez qu'elle est allumée.</translation>
+    </message>
 </context>
 <context>
     <name>app::ui::RefundsPage</name>

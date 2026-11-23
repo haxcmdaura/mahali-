@@ -2649,6 +2649,11 @@ Stock : %4</source>
         <source>تعذّر إنشاء مجلد الإيصالات</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <location line="+61"/>
+        <source>الطابعة غير متصلة. تأكد من تشغيلها.</source>
+        <translation>The printer is offline. Make sure it is powered on.</translation>
+    </message>
 </context>
 <context>
     <name>app::ui::RefundsPage</name>

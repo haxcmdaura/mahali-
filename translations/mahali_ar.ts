@@ -2603,6 +2603,11 @@ Stock : %4</translation>
         <source>تعذّر إنشاء مجلد الإيصالات</source>
         <translation>تعذّر إنشاء مجلد الإيصالات</translation>
     </message>
+    <message>
+        <location line="+61"/>
+        <source>الطابعة غير متصلة. تأكد من تشغيلها.</source>
+        <translation>الطابعة غير متصلة. تأكد من تشغيلها.</translation>
+    </message>
 </context>
 <context>
     <name>app::ui::RefundsPage</name>
