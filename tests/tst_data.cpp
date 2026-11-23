@@ -197,6 +197,8 @@ private slots:
     void supplier_returns_schema_exists();
     void occasion_roundtrip();
     void occasion_service_activate_deactivate();
+    void occasion_current_uses_system_date_and_latest_start();
+    void occasion_offer_schema_v17_exists();
     void findBetween_includes_boundary_days();
     void receipt_number_migration_adds_columns_and_backfills();
     void receipt_number_mints_sequentially_within_a_year();
@@ -1753,7 +1755,7 @@ void DataLayerTest::product_packages_migration_adds_columns_to_a_legacy_ledger()
         // assertion true whatever the stamp was and stop it testing anything. The
         // figure moves with every new migration, which is the whole point: a bump
         // that forgot to actually stamp this database would leave it one short.
-        QCOMPARE(data::readSchemaVersion(migratedDb), 16);
+        QCOMPARE(data::readSchemaVersion(migratedDb), 17);
         migratedDb.close();
     }
     QSqlDatabase::removeDatabase(connectionName);
@@ -1822,7 +1824,7 @@ void DataLayerTest::migration_14_backfills_pieces_per_package_from_package_size(
 
         // Pinned to the literal for the same reason as the package migration test:
         // it must move with each new migration, or it stops testing the stamp.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 16);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 17);
 
         // A second run changes nothing. The first run moved row 1's new column off
         // the default, so the guard's WHERE clause no longer matches it, and the two
@@ -1839,7 +1841,7 @@ void DataLayerTest::migration_14_backfills_pieces_per_package_from_package_size(
         }
         QVERIFY(!again.next());
         // Still stamped after the second, idempotent run.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 16);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 17);
 
         legacyDb.close();
     }
@@ -1918,7 +1920,7 @@ void DataLayerTest::weight_products_migration_drops_the_package_fields()
 
         // Pinned to the literal for the same reason as the other migration tests:
         // it must move with each new migration, or it stops testing the stamp.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 16);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 17);
 
         // A second run changes nothing. Row 1 no longer matches the guard because
         // its values are already the defaults, and the rows it does not match were
@@ -1934,7 +1936,7 @@ void DataLayerTest::weight_products_migration_drops_the_package_fields()
         QCOMPARE(again.value(1).toString(), QString());
         QCOMPARE(again.value(2).toInt(), 1);
         QCOMPARE(again.value(3).toInt(), 0);
-        QCOMPARE(data::readSchemaVersion(legacyDb), 16);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 17);
 
         legacyDb.close();
     }
@@ -5466,6 +5468,7 @@ void DataLayerTest::occasion_roundtrip()
     o.icon = QStringLiteral("☀️");
     o.active = true;
     o.createdAt = data::nowIso();
+    o.themeKey = QStringLiteral("summer");
     const int id = occasions.insert(o);
     QVERIFY2(id > 0, qPrintable(m_db->lastError()));
 
@@ -5478,15 +5481,18 @@ void DataLayerTest::occasion_roundtrip()
     QCOMPARE(stored->icon, o.icon);
     QCOMPARE(stored->active, true);
     QCOMPARE(stored->createdAt, o.createdAt);
+    QCOMPARE(stored->themeKey, o.themeKey);
 
     core::Occasion edited = *stored;
     edited.name = QStringLiteral("تخفيضات الخريف");
     edited.icon = QStringLiteral("🍂");
+    edited.themeKey = QStringLiteral("autumn");
     QVERIFY(occasions.update(edited));
     const auto afterUpdate = occasions.findById(id);
     QVERIFY(afterUpdate.has_value());
     QCOMPARE(afterUpdate->name, QStringLiteral("تخفيضات الخريف"));
     QCOMPARE(afterUpdate->icon, QStringLiteral("🍂"));
+    QCOMPARE(afterUpdate->themeKey, QStringLiteral("autumn"));
 
     // setActive is how an occasion is retired without losing its history, so the
     // two lists have to agree with each other about the row that was switched
@@ -5517,19 +5523,130 @@ void DataLayerTest::occasion_service_activate_deactivate()
     const int id = occasions.insert(occasionFixture(QStringLiteral("رمضان")));
     QVERIFY(id > 0);
 
-    QVERIFY(!service.current().has_value());
+    const std::optional<core::Occasion> automatic = service.current();
+    QVERIFY(automatic.has_value());
+    QCOMPARE(automatic->id, id);
 
     QVERIFY(service.activate(id));
-    const std::optional<core::Occasion> current = service.current();
-    QVERIFY(current.has_value());
-    QCOMPARE(current->id, id);
+    const std::optional<core::Occasion> manual = service.current();
+    QVERIFY(manual.has_value());
+    QCOMPARE(manual->id, id);
+    QCOMPARE(settings.value(QStringLiteral("active_occasion_id")).value_or(QString()),
+             QString::number(id));
 
-    service.deactivate();
-    QVERIFY(!service.current().has_value());
-
-    // The setting is dropped, not emptied, so an absent occasion is told from
-    // one stored as an empty value.
+    QVERIFY(service.deactivate());
     QVERIFY(!settings.value(QStringLiteral("active_occasion_id")).has_value());
+    const std::optional<core::Occasion> afterDeactivate = service.current();
+    QVERIFY(afterDeactivate.has_value());
+    QCOMPARE(afterDeactivate->id, id);
+}
+
+void DataLayerTest::occasion_current_uses_system_date_and_latest_start()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    data::Database db(work.filePath(QStringLiteral("occasion-current.sqlite")));
+    {
+        data::OccasionRepository occasions(db);
+        data::SettingRepository settings(db);
+        data::OccasionService service(db, occasions, settings);
+
+        const QDate todayDate = QDate::currentDate();
+        const QString today = todayDate.toString(Qt::ISODate);
+        const QString yesterday = todayDate.addDays(-1).toString(Qt::ISODate);
+        const QString tomorrow = todayDate.addDays(1).toString(Qt::ISODate);
+
+        const auto insertOccasion = [&occasions](const QString& name,
+                                                 const QString& startsAt,
+                                                 const QString& endsAt) {
+            core::Occasion o;
+            o.name = name;
+            o.startsAt = startsAt;
+            o.endsAt = endsAt;
+            o.active = true;
+            o.createdAt = data::nowIso();
+            return occasions.insert(o);
+        };
+
+        const int pastId = insertOccasion(QStringLiteral("past"),
+                                          yesterday + QStringLiteral("T00:00:00.000"),
+                                          yesterday + QStringLiteral("T23:59:59.999"));
+        const int earlierId = insertOccasion(QStringLiteral("earlier"),
+                                             today + QStringLiteral("T00:00:00.000"),
+                                             today + QStringLiteral("T11:59:59.999"));
+        const int laterId = insertOccasion(QStringLiteral("later"),
+                                           today + QStringLiteral("T12:00:00.000"),
+                                           today + QStringLiteral("T23:59:59.999"));
+        const int futureId = insertOccasion(QStringLiteral("future"),
+                                            tomorrow + QStringLiteral("T00:00:00.000"),
+                                            tomorrow + QStringLiteral("T23:59:59.999"));
+        QVERIFY(pastId > 0);
+        QVERIFY(earlierId > 0);
+        QVERIFY(laterId > 0);
+        QVERIFY(futureId > 0);
+
+        const std::optional<core::Occasion> current = service.current();
+        QVERIFY(current.has_value());
+        QCOMPARE(current->id, laterId);
+
+        QVERIFY(service.activate(earlierId));
+        const std::optional<core::Occasion> manual = service.current();
+        QVERIFY(manual.has_value());
+        QCOMPARE(manual->id, earlierId);
+
+        QVERIFY(service.deactivate());
+        const std::optional<core::Occasion> afterDeactivate = service.current();
+        QVERIFY(afterDeactivate.has_value());
+        QCOMPARE(afterDeactivate->id, laterId);
+
+        QVERIFY(service.activate(pastId));
+        const std::optional<core::Occasion> staleManual = service.current();
+        QVERIFY(staleManual.has_value());
+        QCOMPARE(staleManual->id, laterId);
+    }
+}
+
+void DataLayerTest::occasion_offer_schema_v17_exists()
+{
+    QSqlQuery columns(m_db->handle());
+    QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(occasions)")));
+    bool hasThemeKey = false;
+    while (columns.next()) {
+        if (columns.value(1).toString() != QLatin1StringView("theme_key")) {
+            continue;
+        }
+        hasThemeKey = true;
+        QCOMPARE(columns.value(2).toString(), QLatin1StringView("TEXT"));
+        QCOMPARE(columns.value(3).toInt(), 0);
+    }
+    QVERIFY2(hasThemeKey, "missing occasions.theme_key");
+
+    QSqlQuery tables(m_db->handle());
+    QVERIFY(tables.exec(QStringLiteral(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='occasion_offers'")));
+    QVERIFY2(tables.next(), "missing occasion_offers table");
+
+    QSqlQuery offerColumns(m_db->handle());
+    QVERIFY(offerColumns.exec(QStringLiteral("PRAGMA table_info(occasion_offers)")));
+    QMap<QString, QString> types;
+    QMap<QString, int> notNull;
+    while (offerColumns.next()) {
+        const QString name = offerColumns.value(1).toString();
+        types.insert(name, offerColumns.value(2).toString());
+        notNull.insert(name, offerColumns.value(3).toInt());
+    }
+    QCOMPARE(types.value(QStringLiteral("id")), QLatin1StringView("INTEGER"));
+    QCOMPARE(types.value(QStringLiteral("occasion_id")), QLatin1StringView("INTEGER"));
+    QCOMPARE(notNull.value(QStringLiteral("occasion_id")), 1);
+    QCOMPARE(types.value(QStringLiteral("product_id")), QLatin1StringView("INTEGER"));
+    QCOMPARE(notNull.value(QStringLiteral("product_id")), 1);
+    QCOMPARE(types.value(QStringLiteral("offer_price_cents")), QLatin1StringView("INTEGER"));
+    QCOMPARE(notNull.value(QStringLiteral("offer_price_cents")), 0);
+    QCOMPARE(types.value(QStringLiteral("discount_percent")), QLatin1StringView("INTEGER"));
+    QCOMPARE(notNull.value(QStringLiteral("discount_percent")), 0);
+    QCOMPARE(types.value(QStringLiteral("bonus_pieces")), QLatin1StringView("INTEGER"));
+    QCOMPARE(notNull.value(QStringLiteral("bonus_pieces")), 0);
+    QCOMPARE(data::readSchemaVersion(m_db->handle()), data::kSchemaVersion);
 }
 
 void DataLayerTest::findBetween_includes_boundary_days()

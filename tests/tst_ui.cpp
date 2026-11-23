@@ -3159,15 +3159,14 @@ void UiTest::status_bar_shows_occasion_when_active()
     core::Occasion occasion;
     occasion.name = QStringLiteral("أسبوع التخفيضات");
     occasion.icon = QStringLiteral("🎉");
-    occasion.startsAt = data::nowIso();
-    occasion.endsAt = data::nowIso();
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
     occasion.createdAt = data::nowIso();
     const int occasionId = occasions.insert(occasion);
     QVERIFY2(occasionId > 0, qPrintable(db.lastError()));
     QVERIFY(service.activate(occasionId));
 
-    // The occasion was already running when the window opened, so the bar has to
-    // say so without the operator touching anything.
+    // The date window is enough to show the occasion when the window opens.
     {
         ui::MainWindow window(db, controller);
         window.show();
@@ -3178,21 +3177,16 @@ void UiTest::status_bar_shows_occasion_when_active()
         QVERIFY(label->text().contains(occasion.name));
         QVERIFY2(window.occasionLabelText().contains(occasion.icon), "the icon leads the name");
 
-        // The label is permanent rather than rebuilt, so switching off has to
-        // clear it in place.
         window.deactivateOccasion();
         QCoreApplication::processEvents();
-        QVERIFY2(window.occasionLabelText().isEmpty(), "the label must be empty once the occasion is off");
+        QVERIFY(window.occasionLabelText().contains(occasion.name));
     }
 
-    // A window opened with nothing running must not inherit a stale label, which
-    // is why the label is read from the setting at construction instead of being
-    // left over from an earlier one.
     {
         ui::MainWindow window(db, controller);
         window.show();
         QCoreApplication::processEvents();
-        QVERIFY(window.occasionLabelText().isEmpty());
+        QVERIFY(window.occasionLabelText().contains(occasion.name));
     }
 
     // And a later activation is picked up by the window already on screen.

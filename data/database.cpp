@@ -617,7 +617,17 @@ void Database::createSchema()
             "ends_at TEXT NOT NULL,"
             "icon TEXT NOT NULL DEFAULT '',"
             "active INTEGER NOT NULL DEFAULT 1,"
-            "created_at TEXT NOT NULL);"),
+            "created_at TEXT NOT NULL,"
+            "theme_key TEXT);"),
+
+        QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS occasion_offers ("
+            "id INTEGER PRIMARY KEY,"
+            "occasion_id INTEGER NOT NULL,"
+            "product_id INTEGER NOT NULL,"
+            "offer_price_cents INTEGER,"
+            "discount_percent INTEGER,"
+            "bonus_pieces INTEGER);"),
 
         QStringLiteral(
             "CREATE TABLE IF NOT EXISTS sale_items ("

@@ -828,6 +828,25 @@ void migrateWeightProductsDropPackageFields(const QSqlDatabase& db)
         QStringLiteral("clear package fields on weight products"));
 }
 
+void migrateOccasionOffers(const QSqlDatabase& db)
+{
+    const QStringList occasions = tableColumns(db, QStringLiteral("occasions"));
+    if (!occasions.isEmpty() && !occasions.contains(QStringLiteral("theme_key"))) {
+        run(db,
+            QStringLiteral("ALTER TABLE occasions ADD COLUMN theme_key TEXT"),
+            QStringLiteral("add occasions.theme_key"));
+    }
+    run(db,
+        QStringLiteral("CREATE TABLE IF NOT EXISTS occasion_offers ("
+                       "id INTEGER PRIMARY KEY,"
+                       "occasion_id INTEGER NOT NULL,"
+                       "product_id INTEGER NOT NULL,"
+                       "offer_price_cents INTEGER,"
+                       "discount_percent INTEGER,"
+                       "bonus_pieces INTEGER);"),
+        QStringLiteral("create occasion_offers table"));
+}
+
 // ---------------------------------------------------------------------------
 // The table below is keyed by schema version, and runSchemaMigrations() walks it
 // so a database that has already run it never runs it twice. Every entry is
@@ -900,6 +919,7 @@ const Migration kMigrations[] = {
     // no reader ever wanted. Clear the four fields on those rows so nothing a
     // future reader might trust is left behind.
     {16, "weight product package cleanup", migrateWeightProductsDropPackageFields},
+    {17, "occasion offers", migrateOccasionOffers},
 };
 
 } // namespace

@@ -1,7 +1,8 @@
 #include "occasion_service.h"
 
 #include "audit_log_repository.h"
-#include "date_utils.h"
+
+#include <QDate>
 
 namespace app::data {
 
@@ -10,6 +11,15 @@ namespace {
 // written in one place: a second spelling of it would leave an occasion running
 // that nothing can turn off.
 const char* kActiveOccasionKey = "active_occasion_id";
+
+std::optional<QDate> datePart(const QString& value)
+{
+    const QDate date = QDate::fromString(value.trimmed().left(10), Qt::ISODate);
+    if (!date.isValid()) {
+        return std::nullopt;
+    }
+    return date;
+}
 } // namespace
 
 OccasionService::OccasionService(Database& db,
@@ -24,26 +34,28 @@ OccasionService::OccasionService(Database& db,
 
 std::optional<core::Occasion> OccasionService::current() const
 {
+    const QString today = QDate::currentDate().toString(Qt::ISODate);
+
     const std::optional<QString> stored =
         m_settings.value(QString::fromLatin1(kActiveOccasionKey));
-    if (!stored.has_value()) {
-        return std::nullopt;
+    if (stored.has_value()) {
+        bool ok = false;
+        const int id = stored->toInt(&ok);
+        if (ok && id > 0) {
+            const std::optional<core::Occasion> manual = m_occasions.findById(id);
+            if (manual.has_value() && manual->active && isWithinRange(*manual, today)) {
+                return manual;
+            }
+        }
     }
 
-    // A setting that is not a number, or points at nothing, is treated as no
-    // occasion rather than trusted: a stale key must not put a half-readable
-    // occasion on the status bar.
-    bool ok = false;
-    const int id = stored->toInt(&ok);
-    if (!ok || id <= 0) {
-        return std::nullopt;
+    const QVector<core::Occasion> open = m_occasions.findCurrent(today);
+    for (const core::Occasion& occasion : open) {
+        if (isWithinRange(occasion, today)) {
+            return occasion;
+        }
     }
-
-    const std::optional<core::Occasion> occasion = m_occasions.findById(id);
-    if (!occasion.has_value() || !occasion->active) {
-        return std::nullopt;
-    }
-    return occasion;
+    return std::nullopt;
 }
 
 bool OccasionService::activate(int occasionId)
@@ -106,20 +118,12 @@ bool OccasionService::deactivate()
 
 bool OccasionService::isWithinRange(const core::Occasion& o, const QString& nowIso) const
 {
-    // Bounds and the moment are all stored as ISO text. Parsing them keeps the
-    // comparison on instants rather than on characters, so an occasion recorded
-    // in a different zone or precision is still judged by when it happens. A
-    // bound that will not parse leaves the occasion with no usable window, and
-    // an unparseable moment cannot be placed inside one.
-    const std::optional<QDateTime> start = fromIso(o.startsAt);
-    const std::optional<QDateTime> end = fromIso(o.endsAt);
-    const std::optional<QDateTime> now = fromIso(nowIso);
+    const std::optional<QDate> start = datePart(o.startsAt);
+    const std::optional<QDate> end = datePart(o.endsAt);
+    const std::optional<QDate> now = datePart(nowIso);
     if (!start.has_value() || !end.has_value() || !now.has_value()) {
         return false;
     }
-
-    // Inclusive at both ends, so an occasion that opens and closes at the same
-    // moment covers that moment.
     if (*now < *start) {
         return false;
     }

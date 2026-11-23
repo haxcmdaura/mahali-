@@ -515,8 +515,8 @@ void PurchaseServiceTest::purchase_carries_active_occasion()
 
     core::Occasion occasion;
     occasion.name = QStringLiteral("موسم التمور");
-    occasion.startsAt = data::nowIso();
-    occasion.endsAt = data::nowIso();
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
     occasion.createdAt = data::nowIso();
     const int occasionId = occasions.insert(occasion);
     QVERIFY2(occasionId > 0, qPrintable(f.db.lastError()));
@@ -555,8 +555,8 @@ void PurchaseServiceTest::purchase_no_occasion_when_inactive()
 
     core::Occasion occasion;
     occasion.name = QStringLiteral("تخفيضات متوقفة");
-    occasion.startsAt = data::nowIso();
-    occasion.endsAt = data::nowIso();
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
     occasion.createdAt = data::nowIso();
     const int occasionId = occasions.insert(occasion);
     QVERIFY(occasionId > 0);
