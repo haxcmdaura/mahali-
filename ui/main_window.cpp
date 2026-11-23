@@ -52,6 +52,7 @@
 #include "login_dialog.h"
 #include "pos_page.h"
 #include "products_page.h"
+#include "purchases_page.h"
 #include "refunds_page.h"
 #include "reports_page.h"
 #include "sales_page.h"
@@ -228,12 +229,12 @@ MainWindow::MainWindow(app::data::Database& db, ServerController& controller, QW
          [](QWidget* w) { qobject_cast<AuditLogPage*>(w)->refresh(); }},
         {[this] { return static_cast<QWidget*>(new UsersPage(m_db)); },
          [](QWidget* w) { qobject_cast<UsersPage*>(w)->refresh(); }},
-        // Two placeholders so the navigation has somewhere to land for the pages
-        // that do not exist yet. They are real pages in the stack, so clicking the
-        // entry shows an honest "not built yet" instead of doing nothing. Both are
-        // four widgets, so they are built like the rest rather than kept eager.
-        {[this] { return makeStubPage(tr("Achats"), tr("Page en construction.")); },
-         nullptr},
+        {[this] { return static_cast<QWidget*>(new PurchasesPage(m_db)); },
+         [](QWidget* w) { qobject_cast<PurchasesPage*>(w)->refresh(); }},
+        // A placeholder so the navigation has somewhere to land for the page
+        // that does not exist yet. It is a real page in the stack, so clicking
+        // the entry shows an honest "not built yet" instead of doing nothing.
+        // Four widgets, so it is built like the rest rather than kept eager.
         {[this] { return makeStubPage(tr("Occasions"), tr("Page en construction.")); },
          nullptr},
         {[this] {

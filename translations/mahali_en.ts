@@ -3645,6 +3645,41 @@ Stock : %4</source>
     </message>
 </context>
 <context>
+    <name>app::ui::PurchasesPage</name>
+    <message>
+        <source>Achats</source>
+        <translation>Purchases</translation>
+    </message>
+    <message>
+        <source>Factures d&apos;achat enregistrées</source>
+        <translation>Recorded purchase invoices</translation>
+    </message>
+    <message>
+        <source>Nouvel Achat</source>
+        <translation>New Purchase</translation>
+    </message>
+    <message>
+        <source>Date</source>
+        <translation>Date</translation>
+    </message>
+    <message>
+        <source>Fournisseur</source>
+        <translation>Supplier</translation>
+    </message>
+    <message>
+        <source>N° facture</source>
+        <translation>Invoice No.</translation>
+    </message>
+    <message>
+        <source>Total</source>
+        <translation>Total</translation>
+    </message>
+    <message>
+        <source>Achats enregistrés</source>
+        <translation>Recorded purchases</translation>
+    </message>
+</context>
+<context>
     <name>app::ui::UsersPage</name>
     <message>
         <location filename="../ui/users_page.cpp" line="+35"/>

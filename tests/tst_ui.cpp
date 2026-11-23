@@ -76,6 +76,7 @@
 #include "ui/pos_page.h"
 #include "ui/printing/receipt.h"
 #include "ui/products_page.h"
+#include "ui/purchases_page.h"
 #include "ui/quick_items_bar.h"
 #include "ui/refunds_page.h"
 #include "ui/reports_page.h"
@@ -161,6 +162,7 @@ private slots:
     void scanning_a_c_suffix_on_a_weight_product_adds_a_piece();
     void stock_page_shows_grams_for_a_weight_product();
     void stock_page_valeur_column_divides_weight_products();
+    void purchases_page_formats_a_purchase_row();
     void receipt_uses_the_paper_from_settings();
     void barcode_dialog_does_not_close();
     void product_dialog_writes_package_fields_from_the_shared_widget();
@@ -4544,4 +4546,24 @@ void UiTest::stock_page_valeur_column_divides_weight_products()
              qPrintable(QStringLiteral("weight valeur was: %1").arg(weightValue)));
     QVERIFY2(pieceValue.contains(app::ui::formatMoney(30800)),
              qPrintable(QStringLiteral("piece valeur was: %1").arg(pieceValue)));
+}
+
+void UiTest::purchases_page_formats_a_purchase_row()
+{
+    core::Purchase purchase;
+    purchase.id = 3;
+    purchase.invoiceNumber = QStringLiteral("F-12");
+    purchase.purchasedAt = QStringLiteral("2026-11-23T10:15:00.000");
+    purchase.totalCents = 123456;
+
+    const QString previousSymbol = ui::liveCurrencySymbol();
+    ui::setCurrencySymbol(QStringLiteral("DA"));
+    const QStringList row = ui::formatPurchaseRow(purchase, QStringLiteral("محل النور"));
+    ui::setCurrencySymbol(previousSymbol);
+
+    QCOMPARE(row.size(), 4);
+    QCOMPARE(row.at(0), QStringLiteral("23/11/2026"));
+    QCOMPARE(row.at(1), QStringLiteral("محل النور"));
+    QCOMPARE(row.at(2), QStringLiteral("F-12"));
+    QCOMPARE(row.at(3), QStringLiteral("1234.56 DA"));
 }

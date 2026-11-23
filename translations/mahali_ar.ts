@@ -3555,6 +3555,41 @@ Stock : %4</translation>
     </message>
 </context>
 <context>
+    <name>app::ui::PurchasesPage</name>
+    <message>
+        <source>Achats</source>
+        <translation>المشتريات</translation>
+    </message>
+    <message>
+        <source>Factures d&apos;achat enregistrées</source>
+        <translation>فواتير المشتريات المسجلة</translation>
+    </message>
+    <message>
+        <source>Nouvel Achat</source>
+        <translation>إضافة شراء جديد</translation>
+    </message>
+    <message>
+        <source>Date</source>
+        <translation>التاريخ</translation>
+    </message>
+    <message>
+        <source>Fournisseur</source>
+        <translation>المورد</translation>
+    </message>
+    <message>
+        <source>N° facture</source>
+        <translation>رقم الفاتورة</translation>
+    </message>
+    <message>
+        <source>Total</source>
+        <translation>الإجمالي</translation>
+    </message>
+    <message>
+        <source>Achats enregistrés</source>
+        <translation>المشتريات المسجلة</translation>
+    </message>
+</context>
+<context>
     <name>app::ui::UsersPage</name>
     <message>
         <location filename="../ui/users_page.cpp" line="+35"/>

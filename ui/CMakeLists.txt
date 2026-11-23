@@ -73,6 +73,8 @@ target_sources(mahali-ui PRIVATE
     customers_page.h
     suppliers_page.cpp
     suppliers_page.h
+    purchases_page.cpp
+    purchases_page.h
     users_page.cpp
     users_page.h
     login_dialog.cpp
