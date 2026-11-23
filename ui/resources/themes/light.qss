@@ -831,7 +831,8 @@ QToolButton#navItem[active="true"][direction="ltr"] {
    height and a soft fill to separate it from the bar around it. */
 
 
-QLabel#occasionLabel {
+QLabel#occasionLabel,
+QLabel#occasionGreetingLabel {
     background: @ACCENT_SOFT@;
     color: #1d4ed8;
     border-radius: 7px;

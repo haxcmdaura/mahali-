@@ -140,6 +140,7 @@ int main(int argc, char* argv[])
     // them all at their minimum sizes first. showMaximized() also happens before
     // the first paint, so the window is never seen at the smaller size and grown.
     window.showMaximized();
+    window.maybeShowOccasionGreeting();
 
     if (!backupResult.ok) {
         auto* notice = new QMessageBox(

@@ -1060,7 +1060,8 @@ QStatusBar QPushButton:hover {
 /* The occasion badge sits in the top bar. It is a small chip rather than a
    paragraph of text, so it gets its own ground to carry the gold without
    competing with the controls beside it. */
-QLabel#occasionLabel {
+QLabel#occasionLabel,
+QLabel#occasionGreetingLabel {
     background: @ACCENT_SOFT@;
     color: @ACCENT@;
     border-radius: 7px;

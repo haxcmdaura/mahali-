@@ -145,6 +145,35 @@ void applyPalette(const QString& key, QApplication& app)
 }
 } // namespace
 
+QString occasionGreeting(const QString& themeKey, const QString& occasionName)
+{
+    const QString key = themeKey.trimmed().toLower();
+    if (key == QStringLiteral("ramadan")) {
+        return QStringLiteral("رمضان كريم");
+    }
+    if (key == QStringLiteral("fitr")) {
+        return QStringLiteral("عيد فطر مبارك");
+    }
+    if (key == QStringLiteral("adha")) {
+        return QStringLiteral("عيد أضحى مبارك");
+    }
+
+    QString name = occasionName;
+    name.replace(QChar(0x0622), QChar(0x0627));
+    name.replace(QChar(0x0623), QChar(0x0627));
+    name.replace(QChar(0x0625), QChar(0x0627));
+    if (name.contains(QStringLiteral("رمضان"))) {
+        return QStringLiteral("رمضان كريم");
+    }
+    if (name.contains(QStringLiteral("فطر"))) {
+        return QStringLiteral("عيد فطر مبارك");
+    }
+    if (name.contains(QStringLiteral("اضحى")) || name.contains(QStringLiteral("ضحى"))) {
+        return QStringLiteral("عيد أضحى مبارك");
+    }
+    return QString();
+}
+
 QString themesLightPath()
 {
     return QStringLiteral(":/mahali/themes/light.qss");

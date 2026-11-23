@@ -22,4 +22,6 @@ void applyTheme(const QString& key, QApplication& app);
 bool applyCustomTheme(const QString& themeKey, QApplication& app);
 bool applyCustomTheme(const QString& themeKey);
 
+QString occasionGreeting(const QString& themeKey, const QString& occasionName = QString());
+
 } // namespace app::ui

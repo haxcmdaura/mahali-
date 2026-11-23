@@ -1871,12 +1871,12 @@ Stock : %4</translation>
 <context>
     <name>app::ui::MainWindow</name>
     <message>
-        <location filename="../ui/main_window.cpp" line="+159"/>
+        <location filename="../ui/main_window.cpp" line="+160"/>
         <source>محلي — نظام نقاط البيع والمحاسبة</source>
         <translation>Mahali — point de vente et comptabilité</translation>
     </message>
     <message>
-        <location line="+653"/>
+        <location line="+656"/>
         <source>حول محلي…</source>
         <translation>À propos de Mahali…</translation>
     </message>
@@ -1896,7 +1896,7 @@ Stock : %4</translation>
         <translation>Achats</translation>
     </message>
     <message>
-        <location line="-370"/>
+        <location line="-373"/>
         <source>Mahali</source>
         <translation>Mahali</translation>
     </message>
@@ -1906,7 +1906,7 @@ Stock : %4</translation>
         <translation>Afficher/Masquer le menu</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+31"/>
         <source>Utilisateur</source>
         <translation>Utilisateur</translation>
     </message>
@@ -1946,7 +1946,7 @@ Stock : %4</translation>
         <translation>Rapports</translation>
     </message>
     <message>
-        <location line="+243"/>
+        <location line="+244"/>
         <source>نقطة البيع</source>
         <translation>Point de vente</translation>
     </message>
@@ -1981,7 +1981,7 @@ Stock : %4</translation>
         <translation>Système</translation>
     </message>
     <message>
-        <location line="+224"/>
+        <location line="+234"/>
         <source>Session ouverte #%1</source>
         <translation>Session ouverte #%1</translation>
     </message>
@@ -1991,7 +1991,12 @@ Stock : %4</translation>
         <translation>Aucune session ouverte</translation>
     </message>
     <message>
-        <location line="+82"/>
+        <location line="+29"/>
+        <source>تهنئة المناسبة</source>
+        <translation>Félicitations pour l'occasion</translation>
+    </message>
+    <message>
+        <location line="+78"/>
         <source>تحديث متاح: %1</source>
         <translation>Mise à jour disponible : %1</translation>
     </message>
@@ -2056,7 +2061,7 @@ Stock : %4</translation>
         <translation>Impossible de démarrer la mise à jour.</translation>
     </message>
     <message>
-        <location line="-456"/>
+        <location line="-491"/>
         <source>جلسة الصندوق</source>
         <translation>Session de caisse</translation>
     </message>
@@ -2096,12 +2101,12 @@ Stock : %4</translation>
         <translation>Journal d&apos;audit</translation>
     </message>
     <message>
-        <location line="-298"/>
+        <location line="-299"/>
         <source>الإعدادات</source>
         <translation>Paramètres</translation>
     </message>
     <message>
-        <location line="+304"/>
+        <location line="+305"/>
         <source>إدارة المستخدمين</source>
         <translation>Gestion des utilisateurs</translation>
     </message>
@@ -3784,7 +3789,7 @@ Stock : %4</translation>
 %1</translation>
     </message>
     <message>
-        <location line="+71"/>
+        <location line="+72"/>
         <source>محلي — النسخ الاحتياطي</source>
         <translation type="unfinished"></translation>
     </message>

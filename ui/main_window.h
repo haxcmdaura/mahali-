@@ -100,6 +100,7 @@ public:
     bool activateOccasion(int occasionId);
     void deactivateOccasion();
     QString occasionLabelText() const;
+    void maybeShowOccasionGreeting();
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
@@ -218,6 +219,7 @@ private:
     // Always present rather than created on demand, so activation and
     // deactivation only have to change its text.
     QLabel* m_occasionLabel = nullptr;
+    QLabel* m_greetingLabel = nullptr;
     // The app's mark. A pixmap, which a stylesheet cannot recolour, so it is
     // redrawn by refreshThemeIcons along with the buttons rather than styled.
     QLabel* m_brandIcon = nullptr;

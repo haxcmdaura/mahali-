@@ -193,6 +193,10 @@ private slots:
     void master_recovery_grants_access();
     void status_bar_shows_occasion_when_active();
     void occasion_theme_applies_and_reverts_to_stored_theme();
+    void occasion_theme_colors_pos_actions();
+    void occasion_greeting_label_follows_active_theme();
+    void occasion_greeting_helper_maps_theme_and_name();
+    void occasion_greeting_shown_once_on_startup();
     void pos_shows_active_occasion_offer();
     void occasions_page_lists_occasions();
     void occasions_page_create_dialog_populates_table();
@@ -3303,6 +3307,142 @@ void UiTest::occasion_theme_applies_and_reverts_to_stored_theme()
     }
 
     app::ui::applyTheme(previousTheme, *qApp);
+}
+
+void UiTest::occasion_theme_colors_pos_actions()
+{
+    const QString previousTheme = app::ui::activeTheme();
+    struct Expected {
+        QString key;
+        QString accent;
+        QString accentSoft;
+    };
+    const Expected expected[] = {
+        {QStringLiteral("ramadan"), QStringLiteral("#800080"), QStringLiteral("#f3e6ff")},
+        {QStringLiteral("adha"), QStringLiteral("#b22222"), QStringLiteral("#fce8e8")},
+        {QStringLiteral("fitr"), QStringLiteral("#00008b"), QStringLiteral("#e6f6ff")},
+    };
+
+    for (const Expected& item : expected) {
+        app::ui::applyTheme(item.key, *qApp);
+        const QString sheet = qApp->styleSheet();
+
+        const QRegularExpression posRule(
+            QStringLiteral("QFrame#invoiceBar QPushButton#posSaleButton\\s*\\{[^}]*background:\\s*%1")
+                .arg(QRegularExpression::escape(item.accent)));
+        QVERIFY2(posRule.match(sheet).hasMatch(),
+                 qPrintable(item.key + QStringLiteral(": POS action must use the occasion accent")));
+
+        const QRegularExpression creditRule(
+            QStringLiteral("QFrame#creditBar\\s*\\{[^}]*background:\\s*%1")
+                .arg(QRegularExpression::escape(item.accentSoft)));
+        QVERIFY2(creditRule.match(sheet).hasMatch(),
+                 qPrintable(item.key + QStringLiteral(": credit bar must use the occasion soft accent")));
+    }
+
+    app::ui::applyTheme(previousTheme, *qApp);
+}
+
+void UiTest::occasion_greeting_label_follows_active_theme()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasion_greeting_label.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+    ui::ServerController controller(db, m_key);
+
+    data::OccasionRepository occasions(db);
+    data::SettingRepository settings(db);
+    data::OccasionService service(db, occasions, settings);
+
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("رمضان");
+    occasion.themeKey = QStringLiteral("ramadan");
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
+    occasion.createdAt = data::nowIso();
+    const int occasionId = occasions.insert(occasion);
+    QVERIFY2(occasionId > 0, qPrintable(db.lastError()));
+    QVERIFY(service.activate(occasionId));
+
+    ui::MainWindow window(db, controller);
+    window.show();
+    QCoreApplication::processEvents();
+
+    QLabel* greeting = window.findChild<QLabel*>(QStringLiteral("occasionGreetingLabel"));
+    QVERIFY2(greeting != nullptr, "the top bar needs a greeting label");
+    QCOMPARE(greeting->text(), QStringLiteral("رمضان كريم"));
+
+    window.deactivateOccasion();
+    QVERIFY(occasions.setActive(occasionId, false));
+    window.deactivateOccasion();
+    QCoreApplication::processEvents();
+    QVERIFY(greeting->text().isEmpty());
+}
+
+void UiTest::occasion_greeting_helper_maps_theme_and_name()
+{
+    QCOMPARE(app::ui::occasionGreeting(QStringLiteral("ramadan")), QStringLiteral("رمضان كريم"));
+    QCOMPARE(app::ui::occasionGreeting(QStringLiteral("FITR")), QStringLiteral("عيد فطر مبارك"));
+    QCOMPARE(app::ui::occasionGreeting(QStringLiteral("adha")), QStringLiteral("عيد أضحى مبارك"));
+    QCOMPARE(app::ui::occasionGreeting(QString(), QStringLiteral("عيد الأضحى")),
+             QStringLiteral("عيد أضحى مبارك"));
+    QCOMPARE(app::ui::occasionGreeting(QString(), QStringLiteral("شهر رمضان")),
+             QStringLiteral("رمضان كريم"));
+    QVERIFY(app::ui::occasionGreeting(QStringLiteral("light"),
+                                      QStringLiteral("أسبوع التخفيضات")).isEmpty());
+}
+
+void UiTest::occasion_greeting_shown_once_on_startup()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasion_greeting_startup.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+    ui::ServerController controller(db, m_key);
+
+    data::OccasionRepository occasions(db);
+    data::SettingRepository settings(db);
+    data::OccasionService service(db, occasions, settings);
+
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("عيد الأضحى");
+    occasion.themeKey = QStringLiteral("adha");
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
+    occasion.createdAt = data::nowIso();
+    const int occasionId = occasions.insert(occasion);
+    QVERIFY2(occasionId > 0, qPrintable(db.lastError()));
+    QVERIFY(service.activate(occasionId));
+
+    const QString key = QStringLiteral("last_occasion_greeting_%1").arg(occasionId);
+    QVERIFY(!settings.value(key).has_value());
+
+    ui::MainWindow window(db, controller);
+    window.show();
+
+    bool dialogSeen = false;
+    QString shownText;
+    QTimer::singleShot(0, [&dialogSeen, &shownText]() {
+        if (auto* modal = qobject_cast<QMessageBox*>(QApplication::activeModalWidget())) {
+            dialogSeen = true;
+            shownText = modal->text();
+            modal->accept();
+        }
+    });
+    window.maybeShowOccasionGreeting();
+
+    QVERIFY(dialogSeen);
+    QCOMPARE(shownText, QStringLiteral("عيد أضحى مبارك"));
+    QVERIFY(settings.value(key).has_value());
+
+    dialogSeen = false;
+    QTimer::singleShot(0, [&dialogSeen]() {
+        if (auto* modal = qobject_cast<QMessageBox*>(QApplication::activeModalWidget())) {
+            dialogSeen = true;
+            modal->accept();
+        }
+    });
+    window.maybeShowOccasionGreeting();
+    QVERIFY(!dialogSeen);
 }
 
 void UiTest::pos_shows_active_occasion_offer()

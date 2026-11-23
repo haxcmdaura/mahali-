@@ -39,6 +39,7 @@
 #include "core/zakat_notifier.h"
 #include "dialogs/zakat_dialog.h"
 #include "data/cash_session_repository.h"
+#include "data/date_utils.h"
 #include "core/update_checker.h"
 #include "core/update_downloader.h"
 #include "core/update_installer.h"
@@ -594,6 +595,8 @@ QWidget* MainWindow::buildTopBar()
     // one page that must never be more than one click away.
     m_occasionLabel = new QLabel;
     m_occasionLabel->setObjectName(QStringLiteral("occasionLabel"));
+    m_greetingLabel = new QLabel;
+    m_greetingLabel->setObjectName(QStringLiteral("occasionGreetingLabel"));
     // Filled now so a shop that opens mid-occasion says so before the operator
     // has done anything. Refreshed again on activate/deactivate.
     refreshOccasionLabel();
@@ -713,6 +716,7 @@ QWidget* MainWindow::buildTopBar()
     layout->addWidget(quickNavGroup);
     layout->addWidget(m_sidebarToggle);
     layout->addWidget(m_occasionLabel);
+    layout->addWidget(m_greetingLabel);
     layout->addWidget(m_sessionLabel);
     layout->addStretch(1);
     layout->addWidget(m_userMenu);
@@ -1134,9 +1138,19 @@ void MainWindow::refreshOccasionLabel()
         text += occasion->name;
         m_occasionLabel->setText(text);
         m_occasionLabel->setVisible(true);
+
+        const QString greeting = occasionGreeting(occasion->themeKey, occasion->name);
+        if (m_greetingLabel) {
+            m_greetingLabel->setText(greeting);
+            m_greetingLabel->setVisible(!greeting.isEmpty());
+        }
     } else {
         m_occasionLabel->clear();
         m_occasionLabel->setVisible(false);
+        if (m_greetingLabel) {
+            m_greetingLabel->clear();
+            m_greetingLabel->setVisible(false);
+        }
     }
 }
 
@@ -1172,6 +1186,31 @@ void MainWindow::refreshSessionLabel()
 QString MainWindow::occasionLabelText() const
 {
     return m_occasionLabel ? m_occasionLabel->text() : QString();
+}
+
+void MainWindow::maybeShowOccasionGreeting()
+{
+    data::OccasionRepository occasions(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, occasions, settings);
+
+    const std::optional<core::Occasion> occasion = service.current();
+    if (!occasion) {
+        return;
+    }
+
+    const QString greeting = occasionGreeting(occasion->themeKey, occasion->name);
+    if (greeting.isEmpty()) {
+        return;
+    }
+
+    const QString key = QStringLiteral("last_occasion_greeting_%1").arg(occasion->id);
+    if (settings.value(key).has_value()) {
+        return;
+    }
+
+    QMessageBox::information(this, tr("تهنئة المناسبة"), greeting);
+    settings.set(key, data::nowIso());
 }
 
 bool MainWindow::activateOccasion(int occasionId)

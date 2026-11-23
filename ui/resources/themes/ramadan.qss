@@ -98,7 +98,8 @@ QLabel#infoBar {
     color: #800080;
 }
 
-QLabel#occasionLabel {
+QLabel#occasionLabel,
+QLabel#occasionGreetingLabel {
     background: #FFF4C2;
     color: #800080;
 }
@@ -160,4 +161,25 @@ QStatusBar QPushButton:hover {
 
 QTabBar::tab:selected {
     color: #800080;
+}
+
+QFrame#invoiceBar QPushButton#posSaleButton {
+    background: @ACCENT@;
+    color: #ffffff;
+    border-color: @ACCENT@;
+}
+
+QFrame#invoiceBar QPushButton#posSaleButton:hover {
+    background: @WARNING@;
+    border-color: @WARNING@;
+}
+
+QFrame#creditBar {
+    background: @ACCENT_SOFT@;
+    border: 1px solid @ACCENT@;
+}
+
+QLabel#creditLabel,
+QPushButton#creditCancel {
+    color: @ACCENT@;
 }
