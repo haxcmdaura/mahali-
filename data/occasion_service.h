@@ -10,29 +10,25 @@
 
 namespace app::data {
 
-// Which occasion is running. The date window decides the default; settings hold
-// a manual choice between occasions that are open today.
+// Which occasion is running. A mode setting selects automatic date windows, a
+// manually forced occasion, or no occasion at all.
 class OccasionService {
 public:
     OccasionService(Database& db,
                     OccasionRepository& occasions,
                     SettingRepository& settings);
 
-    // The occasion open today, preferring a manual choice that is also open today.
+    QString mode() const;
+
     std::optional<core::Occasion> current() const;
 
-    // Chooses an occasion manually, writing its id into settings. The occasion has
-    // to exist and be active: choosing a disabled one would stamp sales with an
-    // event the shop has turned off.
-    // Runs inside a transaction so the setting and the audit log commit together.
-    // Returns false if the occasion does not exist, is disabled, or the audit
-    // log write fails.
+    // Chooses an occasion manually and switches the mode to manual. The occasion
+    // has to exist and be active when it is chosen.
+    // Runs inside a transaction so the settings and the audit log commit together.
     bool activate(int occasionId);
 
-    // Clears the manual choice by dropping the setting. Runs inside a
-    // transaction so the setting and the audit log commit together. Returns false
-    // if the audit log write fails.
-    bool deactivate();
+    bool setAutoMode();
+    bool disable();
 
     // Whether the given date falls inside the occasion's inclusive calendar-date window.
     bool isWithinRange(const core::Occasion& o, const QString& nowIso) const;

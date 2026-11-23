@@ -198,6 +198,7 @@ private slots:
     void supplier_returns_schema_exists();
     void occasion_roundtrip();
     void occasion_service_activate_deactivate();
+    void occasion_mode_state_machine();
     void occasion_current_uses_system_date_and_latest_start();
     void occasion_offer_schema_v17_exists();
     void occasion_offer_price_overrides_sale_price();
@@ -5532,17 +5533,79 @@ void DataLayerTest::occasion_service_activate_deactivate()
     QCOMPARE(automatic->id, id);
 
     QVERIFY(service.activate(id));
+    QCOMPARE(service.mode(), QStringLiteral("manual"));
     const std::optional<core::Occasion> manual = service.current();
     QVERIFY(manual.has_value());
     QCOMPARE(manual->id, id);
     QCOMPARE(settings.value(QStringLiteral("active_occasion_id")).value_or(QString()),
              QString::number(id));
 
-    QVERIFY(service.deactivate());
+    QVERIFY(service.disable());
+    QCOMPARE(service.mode(), QStringLiteral("disabled"));
     QVERIFY(!settings.value(QStringLiteral("active_occasion_id")).has_value());
-    const std::optional<core::Occasion> afterDeactivate = service.current();
-    QVERIFY(afterDeactivate.has_value());
-    QCOMPARE(afterDeactivate->id, id);
+    QVERIFY(!service.current().has_value());
+
+    QVERIFY(service.setAutoMode());
+    QCOMPARE(service.mode(), QStringLiteral("auto"));
+    const std::optional<core::Occasion> backToAuto = service.current();
+    QVERIFY(backToAuto.has_value());
+    QCOMPARE(backToAuto->id, id);
+}
+
+void DataLayerTest::occasion_mode_state_machine()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    data::Database db(work.filePath(QStringLiteral("occasion-mode.sqlite")));
+
+    data::OccasionRepository occasions(db);
+    data::SettingRepository settings(db);
+    data::OccasionService service(db, occasions, settings);
+
+    const QDate today = QDate::currentDate();
+    const auto insertOccasion = [&occasions](const QString& name,
+                                             const QDate& start,
+                                             const QDate& end) {
+        core::Occasion o;
+        o.name = name;
+        o.startsAt = start.toString(Qt::ISODate) + QStringLiteral("T00:00:00.000");
+        o.endsAt = end.toString(Qt::ISODate) + QStringLiteral("T23:59:59.999");
+        o.createdAt = data::nowIso();
+        o.active = true;
+        return occasions.insert(o);
+    };
+
+    const int autoId = insertOccasion(QStringLiteral("تلقائي"), today.addDays(-1), today.addDays(1));
+    QVERIFY(autoId > 0);
+    settings.set(QStringLiteral("occasion_mode"), QStringLiteral("auto"));
+    const auto automatic = service.current();
+    QVERIFY2(automatic.has_value(), "auto mode must follow the date window");
+    QCOMPARE(automatic->id, autoId);
+
+    const int manualId = insertOccasion(QStringLiteral("يدوي"), today.addDays(-30), today.addDays(-20));
+    QVERIFY(manualId > 0);
+    settings.set(QStringLiteral("active_occasion_id"), QString::number(manualId));
+    settings.set(QStringLiteral("occasion_mode"), QStringLiteral("manual"));
+    const auto manual = service.current();
+    QVERIFY2(manual.has_value(), "manual mode must return the forced occasion");
+    QCOMPARE(manual->id, manualId);
+
+    settings.set(QStringLiteral("occasion_mode"), QStringLiteral("disabled"));
+    QVERIFY2(!service.current().has_value(), "disabled mode must return no occasion");
+
+    QVERIFY(service.setAutoMode());
+    QCOMPARE(service.mode(), QStringLiteral("auto"));
+    QVERIFY(service.current().has_value());
+    QCOMPARE(service.current()->id, autoId);
+
+    QVERIFY(service.activate(manualId));
+    QCOMPARE(service.mode(), QStringLiteral("manual"));
+    QVERIFY(service.current().has_value());
+    QCOMPARE(service.current()->id, manualId);
+
+    QVERIFY(service.disable());
+    QCOMPARE(service.mode(), QStringLiteral("disabled"));
+    QVERIFY(!service.current().has_value());
 }
 
 void DataLayerTest::occasion_current_uses_system_date_and_latest_start()
@@ -5598,15 +5661,18 @@ void DataLayerTest::occasion_current_uses_system_date_and_latest_start()
         QVERIFY(manual.has_value());
         QCOMPARE(manual->id, earlierId);
 
-        QVERIFY(service.deactivate());
-        const std::optional<core::Occasion> afterDeactivate = service.current();
-        QVERIFY(afterDeactivate.has_value());
-        QCOMPARE(afterDeactivate->id, laterId);
+        QVERIFY(service.disable());
+        QVERIFY(!service.current().has_value());
 
         QVERIFY(service.activate(pastId));
-        const std::optional<core::Occasion> staleManual = service.current();
-        QVERIFY(staleManual.has_value());
-        QCOMPARE(staleManual->id, laterId);
+        const std::optional<core::Occasion> forcedPast = service.current();
+        QVERIFY(forcedPast.has_value());
+        QCOMPARE(forcedPast->id, pastId);
+
+        QVERIFY(service.setAutoMode());
+        const std::optional<core::Occasion> backToAuto = service.current();
+        QVERIFY(backToAuto.has_value());
+        QCOMPARE(backToAuto->id, laterId);
     }
 }
 

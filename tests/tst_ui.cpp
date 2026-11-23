@@ -200,6 +200,7 @@ private slots:
     void pos_shows_active_occasion_offer();
     void occasions_page_lists_occasions();
     void occasions_page_create_dialog_populates_table();
+    void occasions_page_mode_controls();
 
 private:
     void seedSyncDatabase(const QString& path, int* productId, int* sessionId);
@@ -3193,7 +3194,9 @@ void UiTest::status_bar_shows_occasion_when_active()
 
         window.deactivateOccasion();
         QCoreApplication::processEvents();
-        QVERIFY(window.occasionLabelText().contains(occasion.name));
+        QVERIFY(window.occasionLabelText().isEmpty());
+
+        QVERIFY(service.setAutoMode());
     }
 
     {
@@ -3284,8 +3287,6 @@ void UiTest::occasion_theme_applies_and_reverts_to_stored_theme()
         QCOMPARE(app::ui::activeTheme(), QStringLiteral("ramadan"));
 
         window.deactivateOccasion();
-        QVERIFY(occasions.setActive(occasionId, false));
-        window.deactivateOccasion();
         QCOMPARE(app::ui::activeTheme(), QStringLiteral("dark"));
     }
 
@@ -3372,8 +3373,6 @@ void UiTest::occasion_greeting_label_follows_active_theme()
     QVERIFY2(greeting != nullptr, "the top bar needs a greeting label");
     QCOMPARE(greeting->text(), QStringLiteral("رمضان كريم"));
 
-    window.deactivateOccasion();
-    QVERIFY(occasions.setActive(occasionId, false));
     window.deactivateOccasion();
     QCoreApplication::processEvents();
     QVERIFY(greeting->text().isEmpty());
@@ -3614,6 +3613,50 @@ void UiTest::occasions_page_create_dialog_populates_table()
     QVERIFY(table->item(0, 1)->text().contains(QStringLiteral("عيدة")));
     QVERIFY2(table->item(0, 4) != nullptr, "the row must carry the theme key");
     QCOMPARE(table->item(0, 4)->text(), QStringLiteral("adha"));
+}
+
+void UiTest::occasions_page_mode_controls()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasions-mode-controls.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+
+    data::OccasionRepository occasions(db);
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("مناسبة قديمة");
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-30));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(-20));
+    occasion.createdAt = data::nowIso();
+    const int occasionId = occasions.insert(occasion);
+    QVERIFY2(occasionId > 0, qPrintable(db.lastError()));
+
+    ui::OccasionsPage page(db);
+    QVERIFY2(page.table()->rowCount() == 1, "the page must list the seeded occasion");
+    page.table()->selectRow(0);
+
+    data::SettingRepository settings(db);
+    QVERIFY2(page.manualButton() != nullptr, "the page needs a manual activation button");
+    page.manualButton()->click();
+    QCOMPARE(settings.value(QStringLiteral("occasion_mode")).value_or(QString()),
+             QStringLiteral("manual"));
+    QCOMPARE(settings.value(QStringLiteral("active_occasion_id")).value_or(QString()),
+             QString::number(occasionId));
+    QCOMPARE(page.modeLabel()->property("mode").toString(), QStringLiteral("manual"));
+    QVERIFY(!page.modeLabel()->text().isEmpty());
+
+    QVERIFY2(page.autoButton() != nullptr, "the page needs an automatic mode button");
+    page.autoButton()->click();
+    QCOMPARE(settings.value(QStringLiteral("occasion_mode")).value_or(QString()),
+             QStringLiteral("auto"));
+    QVERIFY(!settings.value(QStringLiteral("active_occasion_id")).has_value());
+    QCOMPARE(page.modeLabel()->property("mode").toString(), QStringLiteral("auto"));
+
+    QVERIFY2(page.disableButton() != nullptr, "the page needs a disable button");
+    page.disableButton()->click();
+    QCOMPARE(settings.value(QStringLiteral("occasion_mode")).value_or(QString()),
+             QStringLiteral("disabled"));
+    QCOMPARE(page.modeLabel()->property("mode").toString(), QStringLiteral("disabled"));
+    QVERIFY(!page.modeLabel()->text().isEmpty());
 }
 
 void UiTest::language_dialog_returns_the_chosen_code()

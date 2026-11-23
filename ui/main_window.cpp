@@ -1232,7 +1232,7 @@ void MainWindow::deactivateOccasion()
     data::SettingRepository settings(m_db);
     data::OccasionService service(m_db, occasions, settings);
 
-    service.deactivate();
+    service.disable();
     refreshOccasionLabel();
 }
 

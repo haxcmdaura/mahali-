@@ -706,7 +706,7 @@ Stock : %4</translation>
         <location line="+100"/>
         <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+11"/>
         <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+59"/>
-        <location filename="../ui/occasions_page.cpp" line="+108"/>
+        <location filename="../ui/occasions_page.cpp" line="+110"/>
         <source>Enregistrer</source>
         <translation>Enregistrer</translation>
     </message>
@@ -2137,7 +2137,22 @@ Stock : %4</translation>
         <translation>إضافة مناسبة</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+5"/>
+        <source>Activer manuellement</source>
+        <translation>تفعيل يدوي</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Mode automatique</source>
+        <translation>الوضع التلقائي</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Quitter le mode occasion</source>
+        <translation>خروج من وضع المناسبة</translation>
+    </message>
+    <message>
+        <location line="+23"/>
         <source>ID</source>
         <translation>المعرّف</translation>
     </message>
@@ -2172,15 +2187,63 @@ Stock : %4</translation>
         <translation>قائمة المناسبات</translation>
     </message>
     <message>
-        <location line="+27"/>
-        <location line="+34"/>
+        <location line="+33"/>
+        <location line="+41"/>
         <source>نعم</source>
         <translation>نعم</translation>
     </message>
     <message>
-        <location line="-34"/>
+        <location line="-41"/>
         <source>لا</source>
         <translation>لا</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>manuel</source>
+        <translation>يدوي</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>désactivé</source>
+        <translation>معطل</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>automatique</source>
+        <translation>تلقائي</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Mode: %1</source>
+        <translation>الوضع: %1</translation>
+    </message>
+    <message>
+        <location line="+64"/>
+        <location line="+8"/>
+        <location line="+12"/>
+        <location line="+12"/>
+        <source>Erreur</source>
+        <translation type="unfinished">Erreur</translation>
+    </message>
+    <message>
+        <location line="-32"/>
+        <source>Sélectionnez une occasion</source>
+        <translation>اختر مناسبة</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Impossible d&apos;activer l&apos;occasion</source>
+        <translation>تعذّر تفعيل المناسبة</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Impossible de passer en mode automatique</source>
+        <translation>تعذّر التبديل إلى الوضع التلقائي</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Impossible de quitter le mode occasion</source>
+        <translation>تعذّر الخروج من وضع المناسبة</translation>
     </message>
 </context>
 <context>

@@ -23,6 +23,8 @@
 
 #include "data/date_utils.h"
 #include "data/occasion_repository.h"
+#include "data/occasion_service.h"
+#include "data/setting_repository.h"
 #include "scan_safe_dialog.h"
 #include "widgets/app_icon.h"
 #include "widgets/page_header.h"
@@ -158,7 +160,24 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
     m_newButton->setIcon(appIcon(Icon::Plus, QColor(QStringLiteral("#ffffff")), 18));
     m_newButton->setCursor(Qt::PointingHandCursor);
 
+    m_manualButton = new QPushButton(tr("Activer manuellement"));
+    m_manualButton->setObjectName(QStringLiteral("occasionManualButton"));
+    m_manualButton->setCursor(Qt::PointingHandCursor);
+    m_autoButton = new QPushButton(tr("Mode automatique"));
+    m_autoButton->setObjectName(QStringLiteral("occasionAutoButton"));
+    m_autoButton->setCursor(Qt::PointingHandCursor);
+    m_disableButton = new QPushButton(tr("Quitter le mode occasion"));
+    m_disableButton->setObjectName(QStringLiteral("occasionDisableButton"));
+    m_disableButton->setCursor(Qt::PointingHandCursor);
+
+    m_modeLabel = new QLabel;
+    m_modeLabel->setObjectName(QStringLiteral("occasionModeLabel"));
+
     auto* toolbar = new QHBoxLayout;
+    toolbar->addWidget(m_modeLabel);
+    toolbar->addWidget(m_manualButton);
+    toolbar->addWidget(m_autoButton);
+    toolbar->addWidget(m_disableButton);
     toolbar->addStretch(1);
     toolbar->addWidget(m_newButton);
 
@@ -194,6 +213,9 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
     root->addWidget(gridCard, 1);
 
     connect(m_newButton, &QPushButton::clicked, this, &OccasionsPage::onAddClicked);
+    connect(m_manualButton, &QPushButton::clicked, this, &OccasionsPage::onManualClicked);
+    connect(m_autoButton, &QPushButton::clicked, this, &OccasionsPage::onAutoClicked);
+    connect(m_disableButton, &QPushButton::clicked, this, &OccasionsPage::onDisableClicked);
     connect(m_table, &QTableWidget::cellDoubleClicked, this, &OccasionsPage::onRowActivated);
     refresh();
 }
@@ -201,6 +223,9 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
 void OccasionsPage::refresh()
 {
     data::OccasionRepository repo(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, repo, settings);
+    const QString mode = service.mode();
     const QVector<core::Occasion> occasions = repo.findAll();
     m_table->setRowCount(occasions.size());
 
@@ -220,6 +245,13 @@ void OccasionsPage::refresh()
             m_table->setItem(row, column, new QTableWidgetItem(cells.at(column)));
         }
     }
+
+    const QString modeText = mode == QStringLiteral("manual")
+                                 ? tr("manuel")
+                                 : mode == QStringLiteral("disabled") ? tr("désactivé")
+                                                                      : tr("automatique");
+    m_modeLabel->setText(tr("Mode: %1").arg(modeText));
+    m_modeLabel->setProperty("mode", mode);
 }
 
 int OccasionsPage::rowCount() const
@@ -275,6 +307,48 @@ void OccasionsPage::onRowActivated(int row, int column)
         return;
     }
     repo.update(*edited);
+    refresh();
+}
+
+void OccasionsPage::onManualClicked()
+{
+    const int row = m_table->currentRow();
+    if (row < 0) {
+        QMessageBox::warning(this, tr("Erreur"), tr("Sélectionnez une occasion"));
+        return;
+    }
+
+    data::OccasionRepository repo(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, repo, settings);
+    if (!service.activate(occasionIdAt(row))) {
+        QMessageBox::warning(this, tr("Erreur"), tr("Impossible d'activer l'occasion"));
+        return;
+    }
+    refresh();
+}
+
+void OccasionsPage::onAutoClicked()
+{
+    data::OccasionRepository repo(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, repo, settings);
+    if (!service.setAutoMode()) {
+        QMessageBox::warning(this, tr("Erreur"), tr("Impossible de passer en mode automatique"));
+        return;
+    }
+    refresh();
+}
+
+void OccasionsPage::onDisableClicked()
+{
+    data::OccasionRepository repo(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, repo, settings);
+    if (!service.disable()) {
+        QMessageBox::warning(this, tr("Erreur"), tr("Impossible de quitter le mode occasion"));
+        return;
+    }
     refresh();
 }
 
