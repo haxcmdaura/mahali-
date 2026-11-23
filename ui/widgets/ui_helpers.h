@@ -7,6 +7,8 @@
 #include <QLineEdit>
 #include <QWidget>
 
+#include "core/sale_item.h"
+
 class QFrame;
 class QDialog;
 class QHBoxLayout;
@@ -38,5 +40,12 @@ void padCardLayout(QLayout* layout);
 
 // Clamp a modal dialog to the screen's usable work area.
 void constrainDialogToAvailableGeometry(QDialog* dialog);
+
+struct SaleDetailsLine {
+    QString quantityText;
+    long long totalCents = 0;
+};
+
+SaleDetailsLine saleDetailsLine(const core::SaleItem& item);
 
 } // namespace app::ui

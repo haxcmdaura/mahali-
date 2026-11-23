@@ -292,12 +292,13 @@ void SalesPage::showDetails()
     for (const core::SaleItem& item : saleItems.findBySaleId(saleId)) {
         const auto product = products.findById(item.productId);
         const QString name = product ? product->name : QStringLiteral("(#%1)").arg(item.productId);
+        const SaleDetailsLine display = saleDetailsLine(item);
         const int r = items->rowCount();
         items->insertRow(r);
         items->setItem(r, 0, new QTableWidgetItem(name));
-        items->setItem(r, 1, new QTableWidgetItem(QString::number(item.quantity)));
+        items->setItem(r, 1, new QTableWidgetItem(display.quantityText));
         items->setItem(r, 2, new QTableWidgetItem(formatMoney(item.unitPriceCents)));
-        items->setItem(r, 3, new QTableWidgetItem(formatMoney(item.unitPriceCents * item.quantity)));
+        items->setItem(r, 3, new QTableWidgetItem(formatMoney(display.totalCents)));
     }
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close);

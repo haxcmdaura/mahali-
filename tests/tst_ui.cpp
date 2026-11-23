@@ -38,6 +38,7 @@
 #include "ui/login_dialog.h"
 #include "ui/users_page.h"
 #include "ui/widgets/app_icon.h"
+#include "ui/widgets/ui_helpers.h"
 
 #include "core/session.h"
 #include "core/sync_operation.h"
@@ -130,6 +131,7 @@ private slots:
     void profit_cents_survives_translation();
     void sales_page_print_button_enables_on_selection();
     void sales_page_details_shows_the_receipt_number();
+    void sale_details_line_formats_weight_and_piece_items();
     void sales_page_prints_the_selected_sale_as_pdf();
     void receipt_print_and_save_writes_pdf_and_returns_path();
     void receipt_is_a_single_page_on_thermal_paper();
@@ -1655,6 +1657,30 @@ void UiTest::sales_page_details_shows_the_receipt_number()
     QTest::mousePress(table->viewport(), Qt::LeftButton, Qt::NoModifier, cellCenter);
     QTest::mouseDClick(table->viewport(), Qt::LeftButton, Qt::NoModifier, cellCenter);
     QVERIFY2(found, "the details dialog did not show the sale's receipt number");
+}
+
+void UiTest::sale_details_line_formats_weight_and_piece_items()
+{
+    const QLocale previousLocale = QLocale();
+    QLocale::setDefault(QLocale::c());
+
+    core::SaleItem weight;
+    weight.quantity = 9000;
+    weight.unitPriceCents = 4100;
+    weight.unitKind = QStringLiteral("weight");
+    const ui::SaleDetailsLine weightLine = ui::saleDetailsLine(weight);
+    QCOMPARE(weightLine.quantityText, QStringLiteral("9.00 kg"));
+    QCOMPARE(weightLine.totalCents, 36900LL);
+
+    core::SaleItem piece;
+    piece.quantity = 9;
+    piece.unitPriceCents = 4100;
+    piece.unitKind = QStringLiteral("piece");
+    const ui::SaleDetailsLine pieceLine = ui::saleDetailsLine(piece);
+    QCOMPARE(pieceLine.quantityText, QStringLiteral("9"));
+    QCOMPARE(pieceLine.totalCents, 36900LL);
+
+    QLocale::setDefault(previousLocale);
 }
 
 void UiTest::sales_page_prints_the_selected_sale_as_pdf()

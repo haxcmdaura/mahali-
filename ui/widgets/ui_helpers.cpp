@@ -88,4 +88,33 @@ void constrainDialogToAvailableGeometry(QDialog* dialog)
     dialog->resize(dialog->size().boundedTo(available));
 }
 
+namespace {
+
+QString kilogramsText(long long grams)
+{
+    const bool negative = grams < 0;
+    const unsigned long long magnitude = negative
+        ? static_cast<unsigned long long>(-(grams + 1)) + 1ULL
+        : static_cast<unsigned long long>(grams);
+    const unsigned long long hundredths = (magnitude + 5ULL) / 10ULL;
+    const unsigned long long whole = hundredths / 100ULL;
+    const unsigned long long fraction = hundredths % 100ULL;
+    return QStringLiteral("%1%2.%3 kg")
+        .arg(negative ? QStringLiteral("-") : QString())
+        .arg(whole)
+        .arg(static_cast<int>(fraction), 2, 10, QLatin1Char('0'));
+}
+
+} // namespace
+
+SaleDetailsLine saleDetailsLine(const core::SaleItem& item)
+{
+    if (item.unitKind == QStringLiteral("weight")) {
+        long long total = item.unitPriceCents * item.quantity;
+        total /= 1000;
+        return {kilogramsText(item.quantity), total};
+    }
+    return {QString::number(item.quantity), item.unitPriceCents * item.quantity};
+}
+
 } // namespace app::ui
