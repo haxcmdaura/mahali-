@@ -2342,6 +2342,12 @@ Stock : %4</translation>
         <translation>Reçu enregistré dans %1</translation>
     </message>
     <message>
+        <location filename="../ui/pos_page.cpp" line="1431"/>
+        <location line="+1"/>
+        <source>الوزن (غرام)</source>
+        <translation>Poids (g)</translation>
+    </message>
+    <message>
         <location line="+28"/>
         <source>%1 / كغ</source>
         <translation>%1 / kg</translation>

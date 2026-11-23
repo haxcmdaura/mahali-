@@ -2387,6 +2387,12 @@ Stock : %4</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../ui/pos_page.cpp" line="1431"/>
+        <location line="+1"/>
+        <source>الوزن (غرام)</source>
+        <translation>Weight (g)</translation>
+    </message>
+    <message>
         <location line="+28"/>
         <source>%1 / كغ</source>
         <translation type="unfinished"></translation>

@@ -6,6 +6,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QIntValidator>
 #include <QInputDialog>
 #include <QKeyEvent>
 #include <QLabel>
@@ -30,7 +31,6 @@
 #include "core/product_name_matcher.h"
 #include "core/sale_item.h"
 #include "core/session.h"
-#include "core/weight_parser.h"
 #include "data/cash_session_repository.h"
 #include "data/customer_repository.h"
 #include "data/setting_repository.h"
@@ -353,6 +353,7 @@ PosPage::PosPage(app::data::Database& db, QWidget* parent)
     connect(m_adjustment, &QLineEdit::textChanged, this, &PosPage::onAdjustmentChanged);
     m_weightInput = new QLineEdit;
     m_weightInput->setObjectName(QStringLiteral("posWeightField"));
+    m_weightInput->setValidator(new QIntValidator(1, 100000, m_weightInput));
     connect(m_weightInput, &QLineEdit::textChanged,
             this, &PosPage::onWeightChanged);
     connect(m_weightInput, &QLineEdit::returnPressed,
@@ -1426,6 +1427,9 @@ void PosPage::startWeightEntry(const core::Product& product)
 
     auto* gramsField = new QLineEdit;
     gramsField->setObjectName(QStringLiteral("posWeightField"));
+    gramsField->setValidator(new QIntValidator(1, 100000, gramsField));
+    gramsField->setPlaceholderText(tr("الوزن (غرام)"));
+    gramsField->setToolTip(tr("الوزن (غرام)"));
     gramsField->setText(m_lastWeightText);
     connect(gramsField, &QLineEdit::textChanged,
             this, &PosPage::onWeightChanged);
@@ -1452,8 +1456,9 @@ void PosPage::onWeightChanged(const QString& text)
 {
     if (!m_hasWeightProduct || m_weightInput == nullptr) { return; }
     m_lastWeightText = text;
-    const std::optional<long long> grams = core::parseWeightGrams(text);
-    const long long total = grams ? m_weightProduct.salePriceCents * *grams / 1000 : 0;
+    bool ok = false;
+    const long long grams = text.trimmed().toLongLong(&ok);
+    const long long total = (ok && grams > 0) ? m_weightProduct.salePriceCents * grams / 1000 : 0;
     if (auto* item = m_emptyTable->item(0, 3)) {
         item->setText(formatMoney(total));
     }
@@ -1462,21 +1467,22 @@ void PosPage::onWeightChanged(const QString& text)
 void PosPage::onWeightSubmitted()
 {
     if (!m_hasWeightProduct || m_weightInput == nullptr) { return; }
-    const std::optional<long long> grams = core::parseWeightGrams(m_weightInput->text());
-    if (!grams) {
+    bool ok = false;
+    const long long grams = m_weightInput->text().trimmed().toLongLong(&ok);
+    if (!ok || grams <= 0) {
         setNotice(tr("وزن غير صالح"), false);
         return;
     }
 
-    if (*grams > 2000) {
+    if (grams > 2000) {
         const auto answer = QMessageBox::question(
             this, tr("تأكيد الوزن"),
-            tr("هل الوزن %1 غرام صحيح ؟").arg(*grams),
+            tr("هل الوزن %1 غرام صحيح ؟").arg(grams),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
         if (answer != QMessageBox::Yes) { return; }
     }
 
-    addProductToCart(m_weightProduct, *grams, QStringLiteral("weight"));
+    addProductToCart(m_weightProduct, grams, QStringLiteral("weight"));
 
     m_emptyTable->clearContents();
     m_emptyTable->setRowCount(0);

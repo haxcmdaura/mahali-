@@ -152,7 +152,7 @@ private slots:
     void receipt_renders_a_weight_line_with_grams();
     void pos_weight_product_opens_the_entry_panel();
     void pos_weight_submission_adds_a_weight_line();
-    void pos_weight_entry_accepts_decimal_kg();
+    void pos_weight_entry_accepts_grams();
     void pos_weight_entry_reports_invalid_weight();
     void pos_weight_over_two_kilos_asks_confirmation();
     void pos_two_weight_products_in_a_row();
@@ -4118,7 +4118,7 @@ void UiTest::pos_weight_submission_adds_a_weight_line()
         w = cell->findChild<QLineEdit*>();
     }
     QVERIFY(w != nullptr);
-    w->setText("0.250");
+    w->setText("250");
     QMetaObject::invokeMethod(w, "returnPressed");
 
     QVERIFY(page.lineCount() == 1);
@@ -4129,9 +4129,9 @@ void UiTest::pos_weight_submission_adds_a_weight_line()
     QCoreApplication::processEvents();
 }
 
-void UiTest::pos_weight_entry_accepts_decimal_kg()
+void UiTest::pos_weight_entry_accepts_grams()
 {
-    const QString path = m_dir.filePath(QStringLiteral("pos_w_decimal.sqlite"));
+    const QString path = m_dir.filePath(QStringLiteral("pos_w_grams.sqlite"));
     data::Database db(path);
 
     data::ProductRepository products(db);
@@ -4151,13 +4151,19 @@ void UiTest::pos_weight_entry_accepts_decimal_kg()
     QVERIFY(empty != nullptr);
     auto* w = qobject_cast<QLineEdit*>(empty->cellWidget(0, 1));
     QVERIFY(w != nullptr);
+    QVERIFY2(w->placeholderText().contains(QStringLiteral("غرام")),
+             "the weight field must say it takes grams");
+    QVERIFY2(empty->horizontalHeaderItem(1) != nullptr &&
+                 (empty->horizontalHeaderItem(1)->text().contains(QStringLiteral("(g)")) ||
+                  empty->horizontalHeaderItem(1)->text().contains(QStringLiteral("غرام"))),
+             "the weight column must say it takes grams");
 
-    QTest::keyClicks(w, QStringLiteral("1.5"));
+    QTest::keyClicks(w, QStringLiteral("1000"));
     QMetaObject::invokeMethod(w, "returnPressed");
 
     QCOMPARE(page.lineCount(), 1);
-    QCOMPARE(page.lineQuantityAt(0), 1500LL);
-    QCOMPARE(page.totalCents(), 180000LL);
+    QCOMPARE(page.lineQuantityAt(0), 1000LL);
+    QCOMPARE(page.totalCents(), 120000LL);
     QVERIFY(empty->rowCount() == 0);
 }
 
@@ -4184,7 +4190,7 @@ void UiTest::pos_weight_entry_reports_invalid_weight()
     auto* w = qobject_cast<QLineEdit*>(empty->cellWidget(0, 1));
     QVERIFY(w != nullptr);
 
-    w->setText(QStringLiteral("abc"));
+    w->setText(QStringLiteral("2.5"));
     QMetaObject::invokeMethod(w, "returnPressed");
 
     QCOMPARE(page.lineCount(), 0);
@@ -4216,7 +4222,7 @@ void UiTest::pos_weight_over_two_kilos_asks_confirmation()
     QLineEdit* w = qobject_cast<QLineEdit*>(cell);
     if (!w) w = cell->findChild<QLineEdit*>();
     QVERIFY(w != nullptr);
-    w->setText("2.5");
+    w->setText("2500");
     // Simulate No on confirmation
     QTimer::singleShot(0, [&] {
         QList<QWidget*> widgets = QApplication::topLevelWidgets();
@@ -4231,7 +4237,7 @@ void UiTest::pos_weight_over_two_kilos_asks_confirmation()
 
     QVERIFY(page.lineCount() == 0);
     QVERIFY(empty->rowCount() == 1);
-    QVERIFY(w->text() == QStringLiteral("2.5"));
+    QVERIFY(w->text() == QStringLiteral("2500"));
     QCoreApplication::processEvents();
 }
 
@@ -4267,7 +4273,7 @@ void UiTest::pos_two_weight_products_in_a_row()
     QLineEdit* w = qobject_cast<QLineEdit*>(cell);
     if (!w) w = cell->findChild<QLineEdit*>();
     QVERIFY(w != nullptr);
-    w->setText("0.250");
+    w->setText("250");
     QMetaObject::invokeMethod(w, "returnPressed");
 
     // second weight
@@ -4279,7 +4285,7 @@ void UiTest::pos_two_weight_products_in_a_row()
     w = qobject_cast<QLineEdit*>(cell);
     if (!w) w = cell->findChild<QLineEdit*>();
     QVERIFY(w != nullptr);
-    w->setText("0.100");
+    w->setText("100");
     QMetaObject::invokeMethod(w, "returnPressed");
 
     QCOMPARE(page.lineCount(), 2);
@@ -4315,7 +4321,7 @@ void UiTest::pos_weight_line_keeps_its_unit_after_a_carton_toggle_attempt()
     QLineEdit* w = qobject_cast<QLineEdit*>(cell);
     if (!w) w = cell->findChild<QLineEdit*>();
     QVERIFY(w != nullptr);
-    w->setText("0.030");
+    w->setText("30");
     QMetaObject::invokeMethod(w, "returnPressed");
 
     QCOMPARE(page.lineCount(), 1);
@@ -4374,7 +4380,7 @@ void UiTest::scanning_a_c_suffix_on_a_weight_product_adds_a_piece()
     QLineEdit* w = qobject_cast<QLineEdit*>(cell);
     if (!w) w = cell->findChild<QLineEdit*>();
     QVERIFY(w != nullptr);
-    w->setText(QStringLiteral("0.250"));
+    w->setText(QStringLiteral("250"));
     QMetaObject::invokeMethod(w, "returnPressed");
 
     QCOMPARE(page.lineCount(), 1);

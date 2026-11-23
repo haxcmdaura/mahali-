@@ -2185,7 +2185,7 @@ Stock : %4</translation>
     <message>
         <location line="-29"/>
         <source>Poids (g)</source>
-        <translation>Poids (g)</translation>
+        <translation>الوزن (غرام)</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -2340,6 +2340,12 @@ Stock : %4</translation>
         <location line="+4"/>
         <source>تم حفظ الإيصال في %1</source>
         <translation>تم حفظ الإيصال في %1</translation>
+    </message>
+    <message>
+        <location filename="../ui/pos_page.cpp" line="1431"/>
+        <location line="+1"/>
+        <source>الوزن (غرام)</source>
+        <translation>الوزن (غرام)</translation>
     </message>
     <message>
         <location line="+28"/>
