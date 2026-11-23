@@ -147,7 +147,7 @@ private slots:
     void product_dialog_saves_the_weight_flag();
     void product_dialog_hides_package_fields_for_a_weight_product();
     void products_page_marks_weight_products();
-    void products_page_shows_kilograms_for_a_weight_product();
+    void products_page_shows_grams_for_a_weight_product();
     void products_page_quantity_edit_accepts_grams_for_a_weight_product();
     void receipt_renders_a_weight_line_with_grams();
     void pos_weight_product_opens_the_entry_panel();
@@ -158,7 +158,7 @@ private slots:
     void pos_two_weight_products_in_a_row();
     void pos_weight_line_keeps_its_unit_after_a_carton_toggle_attempt();
     void scanning_a_c_suffix_on_a_weight_product_adds_a_piece();
-    void stock_page_shows_kilograms_for_a_weight_product();
+    void stock_page_shows_grams_for_a_weight_product();
     void stock_page_valeur_column_divides_weight_products();
     void receipt_uses_the_paper_from_settings();
     void barcode_dialog_does_not_close();
@@ -3885,7 +3885,7 @@ void UiTest::product_dialog_hides_package_fields_for_a_weight_product()
     QVERIFY2(modalOpened, "the add-product button did not open the product dialog");
 }
 
-void UiTest::products_page_shows_kilograms_for_a_weight_product()
+void UiTest::products_page_shows_grams_for_a_weight_product()
 {
     const QString path = m_dir.filePath(QStringLiteral("products-kg.sqlite"));
     QFile::remove(path);
@@ -3899,7 +3899,16 @@ void UiTest::products_page_shows_kilograms_for_a_weight_product()
     weight.soldByWeight = true;
     const int weightId = repo.save(weight);
     QVERIFY(weightId > 0);
-    repo.adjustStock(weightId, 10000, QStringLiteral("opening"));
+    repo.adjustStock(weightId, 1500, QStringLiteral("opening"));
+
+    core::Product oneGram;
+    oneGram.barcode = QStringLiteral("6");
+    oneGram.name = QStringLiteral("سكر");
+    oneGram.salePriceCents = 120000;
+    oneGram.soldByWeight = true;
+    const int oneGramId = repo.save(oneGram);
+    QVERIFY(oneGramId > 0);
+    repo.adjustStock(oneGramId, 1, QStringLiteral("opening"));
 
     core::Product piece;
     piece.barcode = QStringLiteral("1");
@@ -3919,25 +3928,30 @@ void UiTest::products_page_shows_kilograms_for_a_weight_product()
     QVERIFY(table != nullptr);
 
     QString weightQty;
+    QString oneGramQty;
     QString pieceQty;
     bool sawWeight = false;
+    bool sawOneGram = false;
     bool sawPiece = false;
     for (int row = 0; row < table->rowCount(); ++row) {
         const int id = table->item(row, 1) ? table->item(row, 1)->data(Qt::UserRole).toInt() : 0;
         if (id == weightId) {
             weightQty = table->item(row, 5) ? table->item(row, 5)->text() : QString();
             sawWeight = true;
+        } else if (id == oneGramId) {
+            oneGramQty = table->item(row, 5) ? table->item(row, 5)->text() : QString();
+            sawOneGram = true;
         } else if (id == pieceId) {
             pieceQty = table->item(row, 5) ? table->item(row, 5)->text() : QString();
             sawPiece = true;
         }
     }
     QVERIFY(sawWeight);
+    QVERIFY(sawOneGram);
     QVERIFY(sawPiece);
-    QVERIFY2(weightQty.contains(QStringLiteral("10")) && weightQty.contains(QStringLiteral("كغ")),
-             qPrintable(QStringLiteral("weight qty was: %1").arg(weightQty)));
+    QCOMPARE(weightQty, QStringLiteral("1500 g"));
+    QCOMPARE(oneGramQty, QStringLiteral("1 g"));
     QCOMPARE(pieceQty, QStringLiteral("22"));
-    QVERIFY(!pieceQty.contains(QStringLiteral("كغ")));
 }
 
 void UiTest::products_page_quantity_edit_accepts_grams_for_a_weight_product()
@@ -3946,12 +3960,6 @@ void UiTest::products_page_quantity_edit_accepts_grams_for_a_weight_product()
     QFile::remove(path);
     data::Database db(path);
     data::ProductRepository repo(db);
-
-    // The page formats the count with QLocale, so the decimal separator follows
-    // the machine (ar_DZ here uses a comma). Pinned to C for the length of the
-    // test so the expected text is the same everywhere.
-    const QLocale previousLocale = QLocale();
-    QLocale::setDefault(QLocale::c());
 
     core::Product weight;
     weight.barcode = QStringLiteral("5");
@@ -3990,7 +3998,7 @@ void UiTest::products_page_quantity_edit_accepts_grams_for_a_weight_product()
     QVERIFY2(row >= 0, "the weight product was not on the page");
 
     // Opened the way a double click opens it: the handler swaps the cell to the
-    // raw gram figure so the editor does not load "10.00 كغ".
+    // raw gram figure so the editor does not load "10000 g".
     QVERIFY(QMetaObject::invokeMethod(&page, "onNameActivated", Q_ARG(int, row),
                                       Q_ARG(int, 5)));
     QCOMPARE(table->item(row, 5)->text(), QStringLiteral("10000"));
@@ -4002,9 +4010,7 @@ void UiTest::products_page_quantity_edit_accepts_grams_for_a_weight_product()
     const auto stored = repo.findById(weightId);
     QVERIFY(stored.has_value());
     QCOMPARE(stored->quantity, 15000LL);
-    QCOMPARE(table->item(row, 5)->text(), QStringLiteral("15.00 كغ"));
-
-    QLocale::setDefault(previousLocale);
+    QCOMPARE(table->item(row, 5)->text(), QStringLiteral("15000 g"));
 }
 
 QTEST_MAIN(UiTest)
@@ -4419,7 +4425,7 @@ void UiTest::scanning_a_c_suffix_on_a_weight_product_adds_a_piece()
     QCoreApplication::processEvents();
 }
 
-void UiTest::stock_page_shows_kilograms_for_a_weight_product()
+void UiTest::stock_page_shows_grams_for_a_weight_product()
 {
     const QString path = m_dir.filePath(QStringLiteral("stock_kg_weight.sqlite"));
     data::Database db(path);
@@ -4432,7 +4438,16 @@ void UiTest::stock_page_shows_kilograms_for_a_weight_product()
     weight.soldByWeight = true;
     const int weightId = products.save(weight);
     QVERIFY(weightId > 0);
-    products.adjustStock(weightId, +10000, QStringLiteral("opening"));
+    products.adjustStock(weightId, +1500, QStringLiteral("opening"));
+
+    core::Product oneGram;
+    oneGram.barcode = QStringLiteral("6");
+    oneGram.name = QStringLiteral("سكر");
+    oneGram.salePriceCents = 120000;
+    oneGram.soldByWeight = true;
+    const int oneGramId = products.save(oneGram);
+    QVERIFY(oneGramId > 0);
+    products.adjustStock(oneGramId, +1, QStringLiteral("opening"));
 
     core::Product piece;
     piece.barcode = QStringLiteral("1");
@@ -4450,21 +4465,22 @@ void UiTest::stock_page_shows_kilograms_for_a_weight_product()
     QVERIFY(table != nullptr);
 
     QString weightQty;
+    QString oneGramQty;
     QString pieceQty;
     for (int row = 0; row < table->rowCount(); ++row) {
         const QString name = table->item(row, 1) ? table->item(row, 1)->text() : QString();
         if (name == QStringLiteral("لوز")) {
             weightQty = table->item(row, 0) ? table->item(row, 0)->text() : QString();
+        } else if (name == QStringLiteral("سكر")) {
+            oneGramQty = table->item(row, 0) ? table->item(row, 0)->text() : QString();
         } else if (name == QStringLiteral("عسل")) {
             pieceQty = table->item(row, 0) ? table->item(row, 0)->text() : QString();
         }
     }
 
-    const QString kg = QStringLiteral("كغ");
-    QVERIFY2(weightQty.contains(QStringLiteral("10")) && weightQty.contains(kg),
-             qPrintable(QStringLiteral("weight qty was: %1").arg(weightQty)));
-    QVERIFY2(pieceQty.contains(QStringLiteral("7")) && !pieceQty.contains(kg),
-             qPrintable(QStringLiteral("piece qty was: %1").arg(pieceQty)));
+    QCOMPARE(weightQty, QStringLiteral("1500 g"));
+    QCOMPARE(oneGramQty, QStringLiteral("1 g"));
+    QCOMPARE(pieceQty, QStringLiteral("7"));
 }
 
 void UiTest::stock_page_valeur_column_divides_weight_products()

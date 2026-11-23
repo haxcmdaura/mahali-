@@ -8,7 +8,6 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
-#include <QLocale>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalBlocker>
@@ -249,13 +248,7 @@ void ProductsPage::refresh()
         put(kColSale, formatMoney(product.salePriceCents), true);
         QString quantityText;
         if (product.soldByWeight) {
-            // The cell reads in kilograms, the ledger counts grams. The edit
-            // handler swaps to the raw figure while the cell is open, so the
-            // shopkeeper never types "10.00 كغ" into a field that expects an
-            // integer.
-            quantityText = QStringLiteral("%1 %2")
-                               .arg(QLocale().toString(product.quantity / 1000.0, 'f', 2))
-                               .arg(tr("كغ"));
+            quantityText = QStringLiteral("%1 g").arg(product.quantity);
         } else {
             quantityText = QString::number(product.quantity);
         }
@@ -482,9 +475,7 @@ void ProductsPage::restoreCell(int row, int column)
         canonical = formatMoney(product->salePriceCents);
     } else if (column == kColQuantity) {
         if (product->soldByWeight) {
-            canonical = QStringLiteral("%1 %2")
-                            .arg(QLocale().toString(product->quantity / 1000.0, 'f', 2))
-                            .arg(tr("كغ"));
+            canonical = QStringLiteral("%1 g").arg(product->quantity);
         } else {
             canonical = QString::number(product->quantity);
         }
@@ -518,16 +509,12 @@ void ProductsPage::onItemChanged(QTableWidgetItem* item)
             return;
         }
         if (applyQuantityEdit(productId, product->quantity, item->text())) {
-            // The edit arrived in grams; the cell goes back to its kilogram
-            // shape now that the movement has landed.
             if (product->soldByWeight) {
                 const std::optional<core::Product> fresh =
                     data::ProductRepository(m_db).findById(productId);
                 const long long grams = fresh ? fresh->quantity : product->quantity;
                 const QSignalBlocker blocker(m_table);
-                item->setText(QStringLiteral("%1 %2")
-                                  .arg(QLocale().toString(grams / 1000.0, 'f', 2))
-                                  .arg(tr("كغ")));
+                item->setText(QStringLiteral("%1 g").arg(grams));
             }
             return;
         }

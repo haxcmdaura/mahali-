@@ -3452,8 +3452,8 @@ Stock : %4</translation>
     </message>
     <message>
         <location line="+0"/>
-        <source>Qté (كغ للميزان)</source>
-        <translation>Qté (kg si pesé)</translation>
+        <source>Qté (g)</source>
+        <translation>Qté (g)</translation>
     </message>
     <message>
         <location line="+1"/>
