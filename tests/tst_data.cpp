@@ -14,6 +14,7 @@
 #include <QMap>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QVariant>
 #include <QMessageLogContext>
 #include <QRegularExpression>
 #include <QTime>
@@ -199,6 +200,9 @@ private slots:
     void occasion_service_activate_deactivate();
     void occasion_current_uses_system_date_and_latest_start();
     void occasion_offer_schema_v17_exists();
+    void occasion_offer_price_overrides_sale_price();
+    void occasion_offer_discount_percent_applies_to_sale_price();
+    void occasion_offer_bonus_pieces_increase_pieces_consumed();
     void findBetween_includes_boundary_days();
     void receipt_number_migration_adds_columns_and_backfills();
     void receipt_number_mints_sequentially_within_a_year();
@@ -5647,6 +5651,173 @@ void DataLayerTest::occasion_offer_schema_v17_exists()
     QCOMPARE(types.value(QStringLiteral("bonus_pieces")), QLatin1StringView("INTEGER"));
     QCOMPARE(notNull.value(QStringLiteral("bonus_pieces")), 0);
     QCOMPARE(data::readSchemaVersion(m_db->handle()), data::kSchemaVersion);
+}
+
+void DataLayerTest::occasion_offer_price_overrides_sale_price()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    data::Database db(work.filePath(QStringLiteral("occasion-offer-price.sqlite")));
+
+    data::ProductRepository products(db);
+    core::Product product;
+    product.barcode = QStringLiteral("611000000001");
+    product.name = QStringLiteral("حليب");
+    product.salePriceCents = 10000;
+    product.costPriceCents = 6000;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 20, QStringLiteral("purchase"));
+
+    data::OccasionRepository occasions(db);
+    const int occasionId = occasions.insert(occasionFixture(QStringLiteral("عرض السعر")));
+    QVERIFY(occasionId > 0);
+
+    QSqlQuery offer(db.handle());
+    QVERIFY(offer.prepare(QStringLiteral(
+        "INSERT INTO occasion_offers (occasion_id, product_id, offer_price_cents, discount_percent, "
+        "bonus_pieces) VALUES (?, ?, ?, ?, ?)")));
+    offer.addBindValue(occasionId);
+    offer.addBindValue(productId);
+    offer.addBindValue(7000);
+    offer.addBindValue(QVariant());
+    offer.addBindValue(QVariant());
+    QVERIFY2(offer.exec(), qPrintable(db.lastError()));
+    offer.finish();
+
+    data::CashSessionRepository sessions(db);
+    const int sessionId = sessions.open(5000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    item.unitPriceCents = 10000;
+    item.unitKind = QStringLiteral("piece");
+
+    data::SaleService service(db);
+    const data::SaleRecordResult result = service.recordSale({item}, sessionId, QStringLiteral("TEST"),
+                                                             /*allowOversold=*/false);
+    QVERIFY2(result.ok, qPrintable(result.error));
+    QCOMPARE(result.totalCents, 7000LL);
+
+    QSqlQuery row(db.handle());
+    QVERIFY(row.exec(QStringLiteral("SELECT unit_price_cents FROM sale_items")));
+    QVERIFY(row.next());
+    QCOMPARE(row.value(0).toLongLong(), 7000LL);
+    row.finish();
+}
+
+void DataLayerTest::occasion_offer_discount_percent_applies_to_sale_price()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    data::Database db(work.filePath(QStringLiteral("occasion-offer-discount.sqlite")));
+
+    data::ProductRepository products(db);
+    core::Product product;
+    product.barcode = QStringLiteral("611000000002");
+    product.name = QStringLiteral("زيت");
+    product.salePriceCents = 10000;
+    product.costPriceCents = 6000;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 20, QStringLiteral("purchase"));
+
+    data::OccasionRepository occasions(db);
+    const int occasionId = occasions.insert(occasionFixture(QStringLiteral("خصم 25")));
+    QVERIFY(occasionId > 0);
+
+    QSqlQuery offer(db.handle());
+    QVERIFY(offer.prepare(QStringLiteral(
+        "INSERT INTO occasion_offers (occasion_id, product_id, offer_price_cents, discount_percent, "
+        "bonus_pieces) VALUES (?, ?, ?, ?, ?)")));
+    offer.addBindValue(occasionId);
+    offer.addBindValue(productId);
+    offer.addBindValue(QVariant());
+    offer.addBindValue(25);
+    offer.addBindValue(QVariant());
+    QVERIFY2(offer.exec(), qPrintable(db.lastError()));
+    offer.finish();
+
+    data::CashSessionRepository sessions(db);
+    const int sessionId = sessions.open(5000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    item.unitPriceCents = 10000;
+    item.unitKind = QStringLiteral("piece");
+
+    data::SaleService service(db);
+    const data::SaleRecordResult result = service.recordSale({item}, sessionId, QStringLiteral("TEST"),
+                                                             /*allowOversold=*/false);
+    QVERIFY2(result.ok, qPrintable(result.error));
+    QCOMPARE(result.totalCents, 7500LL);
+
+    QSqlQuery row(db.handle());
+    QVERIFY(row.exec(QStringLiteral("SELECT unit_price_cents FROM sale_items")));
+    QVERIFY(row.next());
+    QCOMPARE(row.value(0).toLongLong(), 7500LL);
+    row.finish();
+}
+
+void DataLayerTest::occasion_offer_bonus_pieces_increase_pieces_consumed()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    data::Database db(work.filePath(QStringLiteral("occasion-offer-bonus.sqlite")));
+
+    data::ProductRepository products(db);
+    core::Product product;
+    product.barcode = QStringLiteral("611000000003");
+    product.name = QStringLiteral("شاي");
+    product.salePriceCents = 10000;
+    product.costPriceCents = 6000;
+    product.piecesPerPackage = 12;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 40, QStringLiteral("purchase"));
+
+    data::OccasionRepository occasions(db);
+    const int occasionId = occasions.insert(occasionFixture(QStringLiteral("عرض الهدية")));
+    QVERIFY(occasionId > 0);
+
+    QSqlQuery offer(db.handle());
+    QVERIFY(offer.prepare(QStringLiteral(
+        "INSERT INTO occasion_offers (occasion_id, product_id, offer_price_cents, discount_percent, "
+        "bonus_pieces) VALUES (?, ?, ?, ?, ?)")));
+    offer.addBindValue(occasionId);
+    offer.addBindValue(productId);
+    offer.addBindValue(QVariant());
+    offer.addBindValue(QVariant());
+    offer.addBindValue(2);
+    QVERIFY2(offer.exec(), qPrintable(db.lastError()));
+    offer.finish();
+
+    data::CashSessionRepository sessions(db);
+    const int sessionId = sessions.open(5000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    item.unitPriceCents = 120000;
+    item.unitKind = QStringLiteral("package");
+
+    data::SaleService service(db);
+    const data::SaleRecordResult result = service.recordSale({item}, sessionId, QStringLiteral("TEST"),
+                                                             /*allowOversold=*/false);
+    QVERIFY2(result.ok, qPrintable(result.error));
+    QCOMPARE(result.totalCents, 120000LL);
+
+    QSqlQuery row(db.handle());
+    QVERIFY(row.exec(QStringLiteral("SELECT quantity, pieces_consumed FROM sale_items")));
+    QVERIFY(row.next());
+    QCOMPARE(row.value(0).toLongLong(), 1LL);
+    QCOMPARE(row.value(1).toLongLong(), 14LL);
+    row.finish();
 }
 
 void DataLayerTest::findBetween_includes_boundary_days()

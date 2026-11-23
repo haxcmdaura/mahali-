@@ -8,6 +8,7 @@
 #include "customer_transaction_item_repository.h"
 #include "customer_transaction_repository.h"
 #include "occasion_repository.h"
+#include "occasion_offer_repository.h"
 #include "occasion_service.h"
 #include "sale_item_repository.h"
 #include "cash_movement_repository.h"
@@ -116,6 +117,7 @@ private:
     // read-only context for a sale, so there is nothing to configure and no
     // call site to update, and SaleService already owns its other repositories.
     OccasionRepository m_occasions;
+    OccasionOfferRepository m_occasionOffers;
     SettingRepository m_settings;
     OccasionService m_occasionService;
 };

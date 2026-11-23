@@ -68,6 +68,8 @@ target_sources(mahali-data PRIVATE
     supplier_return_service.cpp
     supplier_payment_service.cpp
     occasion_repository.cpp
+    occasion_offer_repository.cpp
+    occasion_offer_repository.h
     occasion_service.cpp
     supplier_report_service.cpp
     daily_report_service.cpp

@@ -33,6 +33,9 @@
 #include "core/session.h"
 #include "data/cash_session_repository.h"
 #include "data/customer_repository.h"
+#include "data/occasion_offer_repository.h"
+#include "data/occasion_repository.h"
+#include "data/occasion_service.h"
 #include "data/setting_repository.h"
 #include "printing/receipt.h"
 #include "printing/receipt_printer.h"
@@ -76,6 +79,10 @@ QString displayPackageName(const QString& stored)
 PosPage::PosPage(app::data::Database& db, QWidget* parent)
     : QWidget(parent)
     , m_db(db)
+    , m_occasions(db)
+    , m_occasionOffers(db)
+    , m_settings(db)
+    , m_occasionService(db, m_occasions, m_settings)
 {
     auto* root = new QVBoxLayout(this);
     padPageLayout(root);
@@ -138,7 +145,7 @@ PosPage::PosPage(app::data::Database& db, QWidget* parent)
     m_table->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_table->setColumnCount(ColumnCount);
     m_table->setHorizontalHeaderLabels(
-        {tr("Produit"), tr("Code-barres"), tr("الوحدة"), tr("Qté"), tr("Prix")});
+        {tr("Produit"), tr("Code-barres"), tr("الوحدة"), tr("Qté"), tr("Prix"), tr("Offre")});
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     // Only the quantity takes a typed edit, and only from the keyboard: F2 or
@@ -155,6 +162,7 @@ PosPage::PosPage(app::data::Database& db, QWidget* parent)
     m_table->horizontalHeader()->setSectionResizeMode(UnitColumn, QHeaderView::Fixed);
     m_table->horizontalHeader()->setSectionResizeMode(QuantityColumn, QHeaderView::Fixed);
     m_table->horizontalHeader()->setSectionResizeMode(PriceColumn, QHeaderView::Fixed);
+    m_table->horizontalHeader()->setSectionResizeMode(OfferColumn, QHeaderView::Fixed);
     m_table->verticalHeader()->setDefaultSectionSize(44);
     m_table->horizontalHeader()->setFixedHeight(34);
     m_table->verticalHeader()->hide();
@@ -162,6 +170,7 @@ PosPage::PosPage(app::data::Database& db, QWidget* parent)
     m_table->setColumnWidth(UnitColumn, 80);
     m_table->setColumnWidth(QuantityColumn, 64);
     m_table->setColumnWidth(PriceColumn, 80);
+    m_table->setColumnWidth(OfferColumn, 160);
     // The typography the wide table already had, kept so the grid reads as the
     // same size it read as when it was the catalogue: 14pt for a tablet, with a
     // heavier 12pt header row above it.
@@ -659,9 +668,10 @@ bool PosPage::repriceLine(PosLine& line, QString* error) const
     item.unitKind = line.unitKind;
     item.unitPriceCents = 0;
     data::ProductRepository products(m_db);
+    const std::optional<core::Occasion> occasion = m_occasionService.current();
     QString resolveError;
-    const QVector<core::SaleItem> resolved =
-        data::resolveSaleItems(products, {item}, /*allowOversold=*/true, &resolveError);
+    const QVector<core::SaleItem> resolved = data::resolveSaleItems(
+        products, {item}, /*allowOversold=*/true, &resolveError, &m_occasionOffers, occasion);
     if (resolved.size() != 1) {
         if (error) {
             *error = resolveError.isEmpty() ? tr("Impossible de chiffrer « %1 »").arg(line.name)
@@ -674,6 +684,12 @@ bool PosPage::repriceLine(PosLine& line, QString* error) const
     // says carton must stay a carton.
     line.unitPriceCents = resolved.first().unitPriceCents;
     line.piecesConsumed = resolved.first().piecesConsumed;
+    line.bonusPieces = resolved.first().bonusPieces;
+    line.originalPriceCents = resolved.first().originalPriceCents;
+    line.hasOffer = resolved.first().hasOffer;
+    if (line.hasOffer) {
+        line.basePriceCents = line.unitPriceCents;
+    }
     return true;
 }
 
@@ -996,8 +1012,13 @@ void PosPage::refreshPriceCell(int row)
     }
     const PosLine& line = m_lines[row];
     priceItem->setText(formatMoney(line.unitPriceCents));
-    priceItem->setForeground(line.unitPriceCents != line.basePriceCents ? QBrush(Qt::red)
-                                                                        : QBrush());
+    if (line.unitPriceCents != line.basePriceCents) {
+        priceItem->setForeground(QBrush(Qt::red));
+    } else if (line.hasOffer) {
+        priceItem->setForeground(QBrush(Qt::darkGreen));
+    } else {
+        priceItem->setForeground(QBrush());
+    }
 }
 
 void PosPage::onCellChanged(int row, int column)
@@ -1167,9 +1188,24 @@ void PosPage::rebuildTable()
         // noticed at a glance, since it ends up in the audit log.
         if (line.unitPriceCents != line.basePriceCents) {
             priceItem->setForeground(QBrush(Qt::red));
+        } else if (line.hasOffer) {
+            priceItem->setForeground(QBrush(Qt::darkGreen));
         }
         readOnly(priceItem);
         m_table->setItem(row, PriceColumn, priceItem);
+
+        if (line.hasOffer) {
+            const QString oldPrice = formatMoney(line.originalPriceCents);
+            const QString newPrice = formatMoney(line.unitPriceCents);
+            auto* offerItem = new QTableWidgetItem(tr("Offre: %1 → %2").arg(oldPrice, newPrice));
+            offerItem->setToolTip(QStringLiteral("<s>%1</s> → %2").arg(oldPrice, newPrice));
+            readOnly(offerItem);
+            m_table->setItem(row, OfferColumn, offerItem);
+            auto* offerLabel = new QLabel(QStringLiteral("<s>%1</s> → %2").arg(oldPrice, newPrice));
+            offerLabel->setObjectName(QStringLiteral("posOfferIndicator"));
+            offerLabel->setTextFormat(Qt::RichText);
+            m_table->setCellWidget(row, OfferColumn, offerLabel);
+        }
     }
 
     // The adjustment, as a line of the invoice. It is a row rather than a line:
@@ -1313,6 +1349,7 @@ void PosPage::completeSale()
         // derived from this one string and from the same product row the screen
         // read.
         item.unitKind = line.unitKind;
+        item.priceOverridden = line.unitPriceCents != line.basePriceCents;
         items.append(item);
 
         // What the cashier edited, handed to the service rather than written here:

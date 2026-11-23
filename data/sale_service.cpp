@@ -70,6 +70,7 @@ SaleService::SaleService(Database& db)
     , m_cashMovements(db)
     , m_appliedOps(db)
     , m_occasions(db)
+    , m_occasionOffers(db)
     , m_settings(db)
     , m_occasionService(db, m_occasions, m_settings)
 {
@@ -130,8 +131,10 @@ SaleRecordResult SaleService::recordCustomerDebt(int customerId, const QVector<c
         return result;
     }
 
+    const std::optional<core::Occasion> occasion = m_occasionService.current();
     QString error;
-    const QVector<core::SaleItem> resolved = resolveSaleItems(m_products, items, allowOversold, &error);
+    const QVector<core::SaleItem> resolved =
+        resolveSaleItems(m_products, items, allowOversold, &error, &m_occasionOffers, occasion);
     if (resolved.isEmpty()) {
         m_db.rollback();
         result.error = error;
@@ -289,8 +292,10 @@ SaleRecordResult SaleService::recordSale(const QVector<core::SaleItem>& items, i
         return result;
     }
 
+    const std::optional<core::Occasion> occasion = m_occasionService.current();
     QString error;
-    const QVector<core::SaleItem> resolved = resolveSaleItems(m_products, items, allowOversold, &error);
+    const QVector<core::SaleItem> resolved =
+        resolveSaleItems(m_products, items, allowOversold, &error, &m_occasionOffers, occasion);
     if (resolved.isEmpty()) {
         m_db.rollback();
         result.error = error;
@@ -334,7 +339,7 @@ SaleRecordResult SaleService::recordSale(const QVector<core::SaleItem>& items, i
     // reports can split a day's takings by event. Read after the transaction
     // opens: the setting is a single row, and reading it here keeps the sale and
     // the occasion it was attributed to inside one snapshot.
-    if (const std::optional<core::Occasion> occasion = m_occasionService.current()) {
+    if (occasion) {
         sale.occasionId = occasion->id;
     }
     const QString receiptNumber = mintReceiptNumber(m_db);

@@ -9,6 +9,10 @@
 
 #include "core/product.h"
 #include "data/database.h"
+#include "data/occasion_offer_repository.h"
+#include "data/occasion_repository.h"
+#include "data/occasion_service.h"
+#include "data/setting_repository.h"
 
 class QEvent;
 class QFrame;
@@ -43,6 +47,9 @@ struct PosLine {
     // repriceLine(). The recorded sale re-derives it from the unit, so this is the
     // page's view of the line rather than the authority on it.
     long long piecesConsumed = 0;
+    long long bonusPieces = 0;
+    long long originalPriceCents = 0;
+    bool hasOffer = false;
 };
 
 // Fast keyboard-driven register (نقطة بيع): scan a barcode and press Enter to
@@ -126,6 +133,7 @@ private:
         UnitColumn,
         QuantityColumn,
         PriceColumn,
+        OfferColumn,
         ColumnCount,
     };
 
@@ -169,6 +177,10 @@ private:
     void onPrintLastSale();
 
     app::data::Database& m_db;
+    app::data::OccasionRepository m_occasions;
+    app::data::OccasionOfferRepository m_occasionOffers;
+    app::data::SettingRepository m_settings;
+    app::data::OccasionService m_occasionService;
     QVector<PosLine> m_lines;
     QSplitter* m_workspace = nullptr;
     QStackedWidget* m_cartStack = nullptr;

@@ -7,7 +7,9 @@
 #include <QDebug>
 
 #include "core/line_total.h"
+#include "core/occasion.h"
 #include "core/sale_item.h"
+#include "occasion_offer_repository.h"
 #include "product_repository.h"
 #include "stock_movement_repository.h"
 
@@ -31,8 +33,10 @@ using core::detail::sumFits;
 // diverges between the two machines.
 
 inline QVector<core::SaleItem> resolveSaleItems(ProductRepository& products,
-                                                const QVector<core::SaleItem>& items, bool allowOversold,
-                                                QString* error)
+                                                 const QVector<core::SaleItem>& items, bool allowOversold,
+                                                 QString* error,
+                                                 const OccasionOfferRepository* offers = nullptr,
+                                                 const std::optional<core::Occasion>& occasion = std::nullopt)
 {
     QVector<core::SaleItem> resolved = items;
     // A product can sit on more than one line: six pieces and a carton of six
@@ -143,6 +147,42 @@ inline QVector<core::SaleItem> resolveSaleItems(ProductRepository& products,
             item.unitPriceCents = product->salePriceCents;
         }
         item.unitCostCents = product->costPriceCents;
+        item.originalPriceCents = item.unitPriceCents;
+
+        if (offers && occasion) {
+            const std::optional<core::OccasionOffer> offer =
+                offers->findByOccasionAndProduct(occasion->id, item.productId);
+            if (offer) {
+                item.hasOffer = true;
+                item.bonusPieces = offer->bonusPieces;
+                if (!item.priceOverridden) {
+                    if (offer->offerPriceCents && *offer->offerPriceCents >= 0) {
+                        item.unitPriceCents = *offer->offerPriceCents;
+                    } else if (offer->discountPercent && *offer->discountPercent > 0) {
+                        const long long percent = qBound(0LL, *offer->discountPercent, 100LL);
+                        if (!detail::productFits(item.originalPriceCents, percent)) {
+                            if (error) {
+                                *error = QStringLiteral("offer discount overflows for product %1")
+                                             .arg(product->name);
+                            }
+                            return {};
+                        }
+                        item.unitPriceCents =
+                            item.originalPriceCents - (item.originalPriceCents * percent / 100);
+                    }
+                }
+                if (item.bonusPieces > 0) {
+                    if (!detail::sumFits(item.piecesConsumed, item.bonusPieces)) {
+                        if (error) {
+                            *error = QStringLiteral("offer bonus pieces overflow for product %1")
+                                         .arg(product->name);
+                        }
+                        return {};
+                    }
+                    item.piecesConsumed += item.bonusPieces;
+                }
+            }
+        }
 
         if (!allowOversold) {
             // The shelf is counted in pieces. For a package line that is the

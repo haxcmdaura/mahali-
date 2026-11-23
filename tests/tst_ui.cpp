@@ -6,6 +6,7 @@
 #include <QSpinBox>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QVariant>
 #include <QTemporaryDir>
 #include <QTime>
 #include <QComboBox>
@@ -28,6 +29,7 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QCheckBox>
+#include <QColor>
 #include <QTimer>
 #include <QPushButton>
 #include <QLabel>
@@ -189,6 +191,7 @@ private slots:
     void master_recovery_grants_access();
     void status_bar_shows_occasion_when_active();
     void occasion_theme_applies_and_reverts_to_stored_theme();
+    void pos_shows_active_occasion_offer();
 
 private:
     void seedSyncDatabase(const QString& path, int* productId, int* sessionId);
@@ -548,13 +551,14 @@ void UiTest::pos_cart_grid_is_the_wide_table_and_the_narrow_one_is_empty()
     // fields and not the stock on the shelf.
     QTableWidget* grid = page.table();
     QVERIFY(grid);
-    QCOMPARE(grid->columnCount(), 5);
+    QCOMPARE(grid->columnCount(), 6);
     QCOMPARE(grid->rowCount(), 0);
     QCOMPARE(grid->horizontalHeaderItem(0)->text(), QStringLiteral("Produit"));
     QCOMPARE(grid->horizontalHeaderItem(1)->text(), QStringLiteral("Code-barres"));
     QCOMPARE(grid->horizontalHeaderItem(2)->text(), QStringLiteral("الوحدة"));
     QCOMPARE(grid->horizontalHeaderItem(3)->text(), QStringLiteral("Qté"));
     QCOMPARE(grid->horizontalHeaderItem(4)->text(), QStringLiteral("Prix"));
+    QCOMPARE(grid->horizontalHeaderItem(5)->text(), QStringLiteral("Offre"));
 
     // The catalogue it used to be is gone with its two filters, and nothing on
     // the page builds a +/- button any more.
@@ -3295,6 +3299,62 @@ void UiTest::occasion_theme_applies_and_reverts_to_stored_theme()
     }
 
     app::ui::applyTheme(previousTheme, *qApp);
+}
+
+void UiTest::pos_shows_active_occasion_offer()
+{
+    const QString path = m_dir.filePath(QStringLiteral("pos-occasion-offer.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+
+    data::ProductRepository products(db);
+    core::Product product;
+    product.barcode = QStringLiteral("611000000101");
+    product.name = QStringLiteral("حليب");
+    product.salePriceCents = 10000;
+    product.costPriceCents = 6000;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 20, QStringLiteral("purchase"));
+
+    data::OccasionRepository occasions(db);
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("عرض الصيف");
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
+    occasion.createdAt = data::nowIso();
+    const int occasionId = occasions.insert(occasion);
+    QVERIFY2(occasionId > 0, qPrintable(db.lastError()));
+
+    QSqlQuery offer(db.handle());
+    QVERIFY(offer.prepare(QStringLiteral(
+        "INSERT INTO occasion_offers (occasion_id, product_id, offer_price_cents, discount_percent, "
+        "bonus_pieces) VALUES (?, ?, ?, ?, ?)")));
+    offer.addBindValue(occasionId);
+    offer.addBindValue(productId);
+    offer.addBindValue(7000);
+    offer.addBindValue(QVariant());
+    offer.addBindValue(QVariant());
+    QVERIFY2(offer.exec(), qPrintable(db.lastError()));
+    offer.finish();
+
+    ui::PosPage page(db);
+    page.setEntryText(product.barcode);
+    page.addEntry();
+
+    QCOMPARE(page.lineCount(), 1);
+    QCOMPARE(page.linePriceAt(0), 7000LL);
+    QTableWidget* grid = page.table();
+    QVERIFY(grid->item(0, 4));
+    QCOMPARE(grid->item(0, 4)->text(), ui::formatMoney(7000));
+    QCOMPARE(grid->item(0, 4)->foreground().color(), QColor(Qt::darkGreen));
+
+    QVERIFY(grid->item(0, 5));
+    QVERIFY(grid->item(0, 5)->text().contains(ui::formatMoney(10000)));
+    QVERIFY(grid->item(0, 5)->text().contains(ui::formatMoney(7000)));
+    auto* indicator = qobject_cast<QLabel*>(grid->cellWidget(0, 5));
+    QVERIFY(indicator);
+    QVERIFY(indicator->text().contains(QStringLiteral("<s>")));
 }
 
 void UiTest::language_dialog_returns_the_chosen_code()
