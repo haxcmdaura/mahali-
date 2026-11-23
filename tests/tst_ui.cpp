@@ -1,6 +1,7 @@
  #include <QtTest/QtTest>
 
 #include <QDate>
+#include <QDateEdit>
 #include <QDir>
 #include <QSignalSpy>
 #include <QSpinBox>
@@ -74,6 +75,7 @@
 #include "ui/cash_session_page.h"
 #include "ui/customers_page.h"
 #include "ui/expenses_page.h"
+#include "ui/occasions_page.h"
 #include "core/format_utils.h"
 #include "ui/pos_page.h"
 #include "ui/printing/receipt.h"
@@ -192,6 +194,8 @@ private slots:
     void status_bar_shows_occasion_when_active();
     void occasion_theme_applies_and_reverts_to_stored_theme();
     void pos_shows_active_occasion_offer();
+    void occasions_page_lists_occasions();
+    void occasions_page_create_dialog_populates_table();
 
 private:
     void seedSyncDatabase(const QString& path, int* productId, int* sessionId);
@@ -3355,6 +3359,121 @@ void UiTest::pos_shows_active_occasion_offer()
     auto* indicator = qobject_cast<QLabel*>(grid->cellWidget(0, 5));
     QVERIFY(indicator);
     QVERIFY(indicator->text().contains(QStringLiteral("<s>")));
+}
+
+void UiTest::occasions_page_lists_occasions()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasions-page.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+
+    data::OccasionRepository occasions(db);
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("رمضان 1447");
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(10));
+    occasion.createdAt = data::nowIso();
+    occasion.themeKey = QStringLiteral("ramadan");
+    QVERIFY2(occasions.insert(occasion) > 0, qPrintable(db.lastError()));
+
+    ui::ServerController controller(db, m_key);
+    ui::MainWindow window(db, controller);
+    window.show();
+
+    QWidget* page = window.occasionsPage();
+    QVERIFY2(page != nullptr, "the main window must expose the occasions page");
+
+    QTableWidget* table = page->findChild<QTableWidget*>(QStringLiteral("occasionTable"));
+    QVERIFY2(table != nullptr, "the occasions page must show a table, not a stub label");
+    QCOMPARE(table->columnCount(), 6);
+    QCOMPARE(table->rowCount(), 1);
+    QVERIFY2(table->item(0, 1) != nullptr, "the row must carry the occasion name");
+    QVERIFY(table->item(0, 1)->text().contains(occasion.name));
+    QVERIFY2(table->item(0, 4) != nullptr, "the row must carry the theme key");
+    QCOMPARE(table->item(0, 4)->text(), occasion.themeKey);
+}
+
+void UiTest::occasions_page_create_dialog_populates_table()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasions-create.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+
+    ui::ServerController controller(db, m_key);
+    ui::MainWindow window(db, controller);
+    window.show();
+
+    QWidget* page = window.occasionsPage();
+    QVERIFY2(page != nullptr, "the main window must expose the occasions page");
+
+    QPushButton* add = nullptr;
+    for (QPushButton* button : page->findChildren<QPushButton*>()) {
+        if (button->text().contains(QStringLiteral("Nouvelle Occasion")) ||
+            button->objectName() == QStringLiteral("newOccasionButton")) {
+            add = button;
+            break;
+        }
+    }
+    QVERIFY2(add != nullptr, "the occasions page must offer a new-occasion button");
+
+    bool typedOk = false;
+    bool watchdogFired = false;
+    QTimer::singleShot(0, [&]() {
+        auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        if (!modal) {
+            return;
+        }
+        auto* name = modal->findChild<QLineEdit*>(QStringLiteral("occasionNameField"));
+        auto* start = modal->findChild<QDateEdit*>(QStringLiteral("occasionStartField"));
+        auto* end = modal->findChild<QDateEdit*>(QStringLiteral("occasionEndField"));
+        auto* theme = modal->findChild<QComboBox*>(QStringLiteral("occasionThemeCombo"));
+        if (!name || !start || !end || !theme) {
+            return;
+        }
+        name->setText(QStringLiteral("عيدة"));
+        start->setDate(QDate::currentDate().addDays(1));
+        end->setDate(QDate::currentDate().addDays(5));
+        const int themeIndex = theme->findData(QStringLiteral("adha"));
+        if (themeIndex >= 0) {
+            theme->setCurrentIndex(themeIndex);
+        } else {
+            theme->setCurrentText(QStringLiteral("adha"));
+        }
+        typedOk = true;
+        if (auto* box = modal->findChild<QDialogButtonBox*>()) {
+            if (QPushButton* save = box->button(QDialogButtonBox::Save)) {
+                save->click();
+            } else if (QPushButton* ok = box->button(QDialogButtonBox::Ok)) {
+                ok->click();
+            }
+        }
+    });
+
+    QTimer watchdog;
+    watchdog.setSingleShot(true);
+    QObject::connect(&watchdog, &QTimer::timeout, [&]() {
+        watchdogFired = true;
+        if (auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget())) {
+            modal->reject();
+        }
+    });
+    watchdog.start(3000);
+
+    add->click();
+
+    QVERIFY2(!watchdogFired, "the occasion dialog stayed open until the watchdog fired");
+    QVERIFY2(typedOk, "the occasion dialog was missing a field the test fills");
+
+    data::OccasionRepository occasions(db);
+    QCOMPARE(occasions.findAll().size(), 1);
+
+    QTableWidget* table = page->findChild<QTableWidget*>(QStringLiteral("occasionTable"));
+    QVERIFY2(table != nullptr, "the occasions page must show a table, not a stub label");
+    QCOMPARE(table->rowCount(), 1);
+    QVERIFY2(table->item(0, 1) != nullptr, "the new occasion must appear in the table");
+    QVERIFY(table->item(0, 1)->text().contains(QStringLiteral("عيدة")));
+    QVERIFY2(table->item(0, 4) != nullptr, "the row must carry the theme key");
+    QCOMPARE(table->item(0, 4)->text(), QStringLiteral("adha"));
 }
 
 void UiTest::language_dialog_returns_the_chosen_code()

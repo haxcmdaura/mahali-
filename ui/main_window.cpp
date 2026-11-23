@@ -50,6 +50,7 @@
 #include "data/setting_repository.h"
 #include "expenses_page.h"
 #include "login_dialog.h"
+#include "occasions_page.h"
 #include "pos_page.h"
 #include "products_page.h"
 #include "purchases_page.h"
@@ -92,29 +93,6 @@ constexpr int Settings = 13;
 // every button built after it at the wrong page.
 constexpr int Stock = 14;
 } // namespace page
-
-// A page that is on the roadmap but not written yet. It exists so its sidebar
-// entry leads somewhere and says so, rather than to a button that does nothing
-// when clicked.
-QWidget* makeStubPage(const QString& title, const QString& body)
-{
-    auto* page = new QWidget;
-    auto* layout = new QVBoxLayout(page);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(8);
-    layout->addStretch(1);
-
-    auto* heading = new QLabel(title);
-    heading->setObjectName(QStringLiteral("pageHeaderTitle"));
-    heading->setAlignment(Qt::AlignCenter);
-    auto* note = new QLabel(body);
-    note->setObjectName(QStringLiteral("hint"));
-    note->setAlignment(Qt::AlignCenter);
-    layout->addWidget(heading);
-    layout->addWidget(note);
-    layout->addStretch(1);
-    return page;
-}
 
 // One of the quick square buttons in the top bar: one letter, nothing else.
 //
@@ -231,12 +209,8 @@ MainWindow::MainWindow(app::data::Database& db, ServerController& controller, QW
          [](QWidget* w) { qobject_cast<UsersPage*>(w)->refresh(); }},
         {[this] { return static_cast<QWidget*>(new PurchasesPage(m_db)); },
          [](QWidget* w) { qobject_cast<PurchasesPage*>(w)->refresh(); }},
-        // A placeholder so the navigation has somewhere to land for the page
-        // that does not exist yet. It is a real page in the stack, so clicking
-        // the entry shows an honest "not built yet" instead of doing nothing.
-        // Four widgets, so it is built like the rest rather than kept eager.
-        {[this] { return makeStubPage(tr("Occasions"), tr("Page en construction.")); },
-         nullptr},
+        {[this] { return static_cast<QWidget*>(new OccasionsPage(m_db)); },
+         [](QWidget* w) { qobject_cast<OccasionsPage*>(w)->refresh(); }},
         {[this] {
              auto* page = new SettingsPage(m_db);
              // The settings page can change the theme without going through the
@@ -429,6 +403,11 @@ SalesPage* MainWindow::salesPage()
 ExpensesPage* MainWindow::expensesPage()
 {
     return qobject_cast<ExpensesPage*>(ensurePage(page::Expenses));
+}
+
+OccasionsPage* MainWindow::occasionsPage()
+{
+    return qobject_cast<OccasionsPage*>(ensurePage(page::Occasions));
 }
 
 ReportsPage* MainWindow::reportsPage()

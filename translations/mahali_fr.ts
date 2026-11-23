@@ -706,6 +706,7 @@ Stock : %4</translation>
         <location line="+100"/>
         <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+11"/>
         <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+59"/>
+        <location filename="../ui/occasions_page.cpp" line="+108"/>
         <source>Enregistrer</source>
         <translation>Enregistrer</translation>
     </message>
@@ -717,6 +718,7 @@ Stock : %4</translation>
         <location line="+163"/>
         <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+2"/>
         <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+2"/>
+        <location filename="../ui/occasions_page.cpp" line="+1"/>
         <source>Annuler</source>
         <translation>Annuler</translation>
     </message>
@@ -737,6 +739,8 @@ Stock : %4</translation>
         <location line="+14"/>
         <location line="+13"/>
         <location line="+21"/>
+        <location filename="../ui/occasions_page.cpp" line="+18"/>
+        <location line="+4"/>
         <source>Erreur</source>
         <translation>Erreur</translation>
     </message>
@@ -806,6 +810,7 @@ Stock : %4</translation>
         <location filename="../ui/dialogs/select_product_dialog.cpp" line="-12"/>
         <location filename="../ui/dialogs/supplier_dialog.cpp" line="-396"/>
         <location line="+109"/>
+        <location filename="../ui/occasions_page.cpp" line="-31"/>
         <source>Nom</source>
         <translation>Nom</translation>
     </message>
@@ -1205,6 +1210,41 @@ Stock : %4</translation>
         <location line="+0"/>
         <source>Stock</source>
         <translation type="unfinished">Stock</translation>
+    </message>
+    <message>
+        <location filename="../ui/occasions_page.cpp" line="-24"/>
+        <source>Nouvelle occasion</source>
+        <translation>Nouvelle occasion</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Modifier l&apos;occasion</source>
+        <translation>Modifier l&apos;occasion</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Date de début</source>
+        <translation>Date de début</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Date de fin</source>
+        <translation>Date de fin</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Clé de thème</source>
+        <translation>Clé de thème</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>Le nom est requis</source>
+        <translation>Le nom est requis</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>La date de fin doit suivre la date de début</source>
+        <translation>La date de fin doit suivre la date de début</translation>
     </message>
 </context>
 <context>
@@ -1831,12 +1871,12 @@ Stock : %4</translation>
 <context>
     <name>app::ui::MainWindow</name>
     <message>
-        <location filename="../ui/main_window.cpp" line="+181"/>
+        <location filename="../ui/main_window.cpp" line="+159"/>
         <source>محلي — نظام نقاط البيع والمحاسبة</source>
         <translation>Mahali — point de vente et comptabilité</translation>
     </message>
     <message>
-        <location line="+652"/>
+        <location line="+653"/>
         <source>حول محلي…</source>
         <translation>À propos de Mahali…</translation>
     </message>
@@ -1856,17 +1896,7 @@ Stock : %4</translation>
         <translation>Achats</translation>
     </message>
     <message>
-        <location line="-708"/>
-        <source>Page en construction.</source>
-        <translation>Page en construction.</translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Occasions</source>
-        <translation>Occasions</translation>
-    </message>
-    <message>
-        <location line="+338"/>
+        <location line="-370"/>
         <source>Mahali</source>
         <translation>Mahali</translation>
     </message>
@@ -2082,6 +2112,70 @@ Stock : %4</translation>
         <location filename="../ui/widgets/mini_bar_chart.cpp" line="+19"/>
         <source>لا بيانات</source>
         <translation>Aucune donnée</translation>
+    </message>
+</context>
+<context>
+    <name>app::ui::OccasionsPage</name>
+    <message>
+        <location filename="../ui/occasions_page.cpp" line="+22"/>
+        <source>المناسبات</source>
+        <translation>Occasions</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>إدارة المناسبات والثيمات</source>
+        <translation>Gestion des occasions et des thèmes</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Nouvelle Occasion</source>
+        <translation>Nouvelle occasion</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>ID</source>
+        <translation>ID</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Nom</source>
+        <translation>Nom</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Date de début</source>
+        <translation>Date de début</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Date de fin</source>
+        <translation>Date de fin</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Thème</source>
+        <translation>Thème</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Actif</source>
+        <translation>Actif</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Liste des occasions</source>
+        <translation>Liste des occasions</translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <location line="+34"/>
+        <source>نعم</source>
+        <translation>Oui</translation>
+    </message>
+    <message>
+        <location line="-34"/>
+        <source>لا</source>
+        <translation>Non</translation>
     </message>
 </context>
 <context>

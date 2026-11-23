@@ -33,6 +33,7 @@ class AuditLogPage;
 class CashSessionPage;
 class CustomersPage;
 class ExpensesPage;
+class OccasionsPage;
 class PosPage;
 class ProductsPage;
 class RefundsPage;
@@ -87,6 +88,7 @@ public:
     CashSessionPage* cashSessionPage();
     SalesPage* salesPage();
     ExpensesPage* expensesPage();
+    OccasionsPage* occasionsPage();
     ReportsPage* reportsPage();
     SettingsPage* settingsPage();
     RefundsPage* refundsPage();

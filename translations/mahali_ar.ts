@@ -706,6 +706,7 @@ Stock : %4</translation>
         <location line="+100"/>
         <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+11"/>
         <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+59"/>
+        <location filename="../ui/occasions_page.cpp" line="+108"/>
         <source>Enregistrer</source>
         <translation>Enregistrer</translation>
     </message>
@@ -717,6 +718,7 @@ Stock : %4</translation>
         <location line="+163"/>
         <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+2"/>
         <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+2"/>
+        <location filename="../ui/occasions_page.cpp" line="+1"/>
         <source>Annuler</source>
         <translation>Annuler</translation>
     </message>
@@ -737,6 +739,8 @@ Stock : %4</translation>
         <location line="+14"/>
         <location line="+13"/>
         <location line="+21"/>
+        <location filename="../ui/occasions_page.cpp" line="+18"/>
+        <location line="+4"/>
         <source>Erreur</source>
         <translation>Erreur</translation>
     </message>
@@ -806,6 +810,7 @@ Stock : %4</translation>
         <location filename="../ui/dialogs/select_product_dialog.cpp" line="-12"/>
         <location filename="../ui/dialogs/supplier_dialog.cpp" line="-396"/>
         <location line="+109"/>
+        <location filename="../ui/occasions_page.cpp" line="-31"/>
         <source>Nom</source>
         <translation>Nom</translation>
     </message>
@@ -1205,6 +1210,41 @@ Stock : %4</translation>
         <location line="+0"/>
         <source>Stock</source>
         <translation type="unfinished">Stock</translation>
+    </message>
+    <message>
+        <location filename="../ui/occasions_page.cpp" line="-24"/>
+        <source>Nouvelle occasion</source>
+        <translation>مناسبة جديدة</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Modifier l&apos;occasion</source>
+        <translation>تعديل المناسبة</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Date de début</source>
+        <translation>تاريخ البداية</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Date de fin</source>
+        <translation>تاريخ النهاية</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Clé de thème</source>
+        <translation>مفتاح الثيم</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>Le nom est requis</source>
+        <translation>الاسم مطلوب</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>La date de fin doit suivre la date de début</source>
+        <translation>يجب أن يكون تاريخ النهاية بعد تاريخ البداية</translation>
     </message>
 </context>
 <context>
@@ -1831,12 +1871,12 @@ Stock : %4</translation>
 <context>
     <name>app::ui::MainWindow</name>
     <message>
-        <location filename="../ui/main_window.cpp" line="+181"/>
+        <location filename="../ui/main_window.cpp" line="+159"/>
         <source>محلي — نظام نقاط البيع والمحاسبة</source>
         <translation>محلي — نظام نقاط البيع والمحاسبة</translation>
     </message>
     <message>
-        <location line="+652"/>
+        <location line="+653"/>
         <source>حول محلي…</source>
         <translation>حول محلي…</translation>
     </message>
@@ -1856,17 +1896,7 @@ Stock : %4</translation>
         <translation>Achats</translation>
     </message>
     <message>
-        <location line="-708"/>
-        <source>Page en construction.</source>
-        <translation>Page en construction.</translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Occasions</source>
-        <translation>Occasions</translation>
-    </message>
-    <message>
-        <location line="+338"/>
+        <location line="-370"/>
         <source>Mahali</source>
         <translation>Mahali</translation>
     </message>
@@ -2082,6 +2112,70 @@ Stock : %4</translation>
         <location filename="../ui/widgets/mini_bar_chart.cpp" line="+19"/>
         <source>لا بيانات</source>
         <translation>لا بيانات</translation>
+    </message>
+</context>
+<context>
+    <name>app::ui::OccasionsPage</name>
+    <message>
+        <location filename="../ui/occasions_page.cpp" line="+22"/>
+        <source>المناسبات</source>
+        <translation>المناسبات</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>إدارة المناسبات والثيمات</source>
+        <translation>إدارة المناسبات والثيمات</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Nouvelle Occasion</source>
+        <translation>إضافة مناسبة</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>ID</source>
+        <translation>المعرّف</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Nom</source>
+        <translation>الاسم</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Date de début</source>
+        <translation>تاريخ البداية</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Date de fin</source>
+        <translation>تاريخ النهاية</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Thème</source>
+        <translation>الثيم</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Actif</source>
+        <translation>نشط</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Liste des occasions</source>
+        <translation>قائمة المناسبات</translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <location line="+34"/>
+        <source>نعم</source>
+        <translation>نعم</translation>
+    </message>
+    <message>
+        <location line="-34"/>
+        <source>لا</source>
+        <translation>لا</translation>
     </message>
 </context>
 <context>

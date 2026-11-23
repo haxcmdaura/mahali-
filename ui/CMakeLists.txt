@@ -57,6 +57,8 @@ target_sources(mahali-ui PRIVATE
     sales_page.h
     expenses_page.cpp
     expenses_page.h
+    occasions_page.cpp
+    occasions_page.h
     reports_page.cpp
     reports_page.h
     settings_page.cpp
