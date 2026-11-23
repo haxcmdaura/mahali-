@@ -5,12 +5,16 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QFile>
+#include <QHash>
 #include <QPalette>
 #include <QStyleFactory>
 
-#include <array>
-
 #include "theme_tokens.h"
+
+static void initMahaliResources()
+{
+    Q_INIT_RESOURCE(app);
+}
 
 namespace app::ui {
 
@@ -18,6 +22,40 @@ namespace {
 QString g_activeTheme = QStringLiteral("light");
 bool g_fontsLoaded = false;
 bool g_fusionSelected = false;
+
+bool isKnownThemeKey(const QString& key)
+{
+    return key == QStringLiteral("light") || key == QStringLiteral("dark")
+        || isCustomThemeKey(key);
+}
+
+QString stylesheetPath(const QString& key)
+{
+    if (key == QStringLiteral("dark")) {
+        return themesDarkPath();
+    }
+    if (isCustomThemeKey(key)) {
+        return QStringLiteral(":/mahali/themes/%1.qss").arg(key);
+    }
+    return themesLightPath();
+}
+
+const themeTokens::ThemeColors& colorsFor(const QString& key)
+{
+    if (key == QStringLiteral("dark")) {
+        return themeTokens::darkColors;
+    }
+    if (key == QStringLiteral("ramadan")) {
+        return themeTokens::ramadanColors;
+    }
+    if (key == QStringLiteral("adha")) {
+        return themeTokens::adhaColors;
+    }
+    if (key == QStringLiteral("fitr")) {
+        return themeTokens::fitrColors;
+    }
+    return themeTokens::lightColors;
+}
 
 QString loadThemeStylesheet(const QString& path, const themeTokens::ThemeColors& colors)
 {
@@ -46,13 +84,24 @@ QString loadThemeStylesheet(const QString& path, const themeTokens::ThemeColors&
     return stylesheet;
 }
 
-const QString& cachedThemeStylesheet(bool dark)
+const QString& cachedThemeStylesheet(const QString& key)
 {
-    static const std::array<QString, 2> stylesheets = {
-        loadThemeStylesheet(themesLightPath(), themeTokens::lightColors),
-        loadThemeStylesheet(themesDarkPath(), themeTokens::darkColors),
-    };
-    return stylesheets[dark ? 1 : 0];
+    static QHash<QString, QString> cache;
+    const auto found = cache.constFind(key);
+    if (found != cache.constEnd()) {
+        return found.value();
+    }
+
+    QString stylesheet;
+    if (isCustomThemeKey(key)) {
+        stylesheet = loadThemeStylesheet(themesLightPath(), colorsFor(key));
+        stylesheet += QStringLiteral("\n");
+        stylesheet += loadThemeStylesheet(stylesheetPath(key), colorsFor(key));
+    } else {
+        stylesheet = loadThemeStylesheet(stylesheetPath(key), colorsFor(key));
+    }
+    cache.insert(key, stylesheet);
+    return cache[key];
 }
 
 void loadApplicationFont(QApplication& app)
@@ -77,9 +126,7 @@ void loadApplicationFont(QApplication& app)
 
 void applyPalette(const QString& key, QApplication& app)
 {
-    const themeTokens::ThemeColors& colors = key == QStringLiteral("dark")
-        ? themeTokens::darkColors
-        : themeTokens::lightColors;
+    const themeTokens::ThemeColors& colors = colorsFor(key);
     const auto color = [](quint32 rgba) { return QColor::fromRgba(rgba); };
 
     QPalette palette = app.palette();
@@ -108,6 +155,17 @@ QString themesDarkPath()
     return QStringLiteral(":/mahali/themes/dark.qss");
 }
 
+QString themePath(const QString& key)
+{
+    return stylesheetPath(isKnownThemeKey(key) ? key : QStringLiteral("light"));
+}
+
+bool isCustomThemeKey(const QString& key)
+{
+    return key == QStringLiteral("ramadan") || key == QStringLiteral("adha")
+        || key == QStringLiteral("fitr");
+}
+
 QString activeTheme()
 {
     return g_activeTheme;
@@ -115,15 +173,33 @@ QString activeTheme()
 
 void applyTheme(const QString& key, QApplication& app)
 {
-    const bool dark = key == QStringLiteral("dark");
-    g_activeTheme = dark ? QStringLiteral("dark") : QStringLiteral("light");
+    initMahaliResources();
+    const QString selected = isKnownThemeKey(key) ? key : QStringLiteral("light");
+    g_activeTheme = selected;
     if (!g_fusionSelected) {
         app.setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
         g_fusionSelected = true;
     }
     loadApplicationFont(app);
-    applyPalette(g_activeTheme, app);
-    app.setStyleSheet(cachedThemeStylesheet(dark));
+    applyPalette(selected, app);
+    app.setStyleSheet(cachedThemeStylesheet(selected));
+}
+
+bool applyCustomTheme(const QString& themeKey, QApplication& app)
+{
+    if (!isCustomThemeKey(themeKey)) {
+        return false;
+    }
+    applyTheme(themeKey, app);
+    return true;
+}
+
+bool applyCustomTheme(const QString& themeKey)
+{
+    if (QApplication* app = qobject_cast<QApplication*>(QApplication::instance())) {
+        return applyCustomTheme(themeKey, *app);
+    }
+    return false;
 }
 
 } // namespace app::ui

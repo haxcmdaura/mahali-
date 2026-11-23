@@ -243,7 +243,8 @@ MainWindow::MainWindow(app::data::Database& db, ServerController& controller, QW
              // toggle, so the icons have to be told about that route too. Wired
              // here rather than in the constructor because the page does not
              // exist until it is opened.
-             connect(page, &SettingsPage::themeChanged, this, &MainWindow::refreshThemeIcons);
+             connect(page, &SettingsPage::themeChanged, this,
+                     [this]() { refreshOccasionTheme(true); });
              return static_cast<QWidget*>(page);
          },
          [](QWidget* w) { qobject_cast<SettingsPage*>(w)->refresh(); }},
@@ -1075,16 +1076,17 @@ void MainWindow::refreshThemeIcons()
 
 void MainWindow::onThemeToggleClicked()
 {
-    const QString next = activeTheme() == QStringLiteral("dark") ? QStringLiteral("light")
-                                                                : QStringLiteral("dark");
-    applyTheme(next, *qApp);
+    data::SettingRepository settings(m_db);
+    const QString current =
+        settings.value(QStringLiteral("theme")).value_or(QStringLiteral("light"));
+    const QString next = current == QStringLiteral("dark") ? QStringLiteral("light")
+                                                           : QStringLiteral("dark");
     // Stored so the choice survives a restart; the settings page's own selector
     // reads the same key, so the two cannot disagree.
-    data::SettingRepository settings(m_db);
     settings.set(QStringLiteral("theme"), next);
-    // The stylesheet has already been swapped; this redraws the pixmaps, which
-    // the new stylesheet could not have reached on its own.
-    refreshThemeIcons();
+    // A running occasion owns the visible theme; the preference above is what
+    // comes back when the occasion ends.
+    refreshOccasionTheme();
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event)
@@ -1136,6 +1138,8 @@ void MainWindow::rebuildNav()
 // disagree with the setting.
 void MainWindow::refreshOccasionLabel()
 {
+    refreshOccasionTheme();
+
     if (!m_occasionLabel) {
         return;
     }
@@ -1155,6 +1159,24 @@ void MainWindow::refreshOccasionLabel()
         m_occasionLabel->clear();
         m_occasionLabel->setVisible(false);
     }
+}
+
+void MainWindow::refreshOccasionTheme(bool preserveManualPreview)
+{
+    data::OccasionRepository occasions(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, occasions, settings);
+
+    const std::optional<core::Occasion> occasion = service.current();
+    const QString candidate = occasion.has_value() ? occasion->themeKey : QString();
+    const bool known = isCustomThemeKey(candidate) || candidate == QStringLiteral("light")
+        || candidate == QStringLiteral("dark");
+    if (known) {
+        applyTheme(candidate, *qApp);
+    } else if (!preserveManualPreview) {
+        applyTheme(settings.value(QStringLiteral("theme")).value_or(QStringLiteral("light")), *qApp);
+    }
+    refreshThemeIcons();
 }
 
 void MainWindow::refreshSessionLabel()

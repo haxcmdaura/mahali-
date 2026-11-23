@@ -132,6 +132,7 @@ private slots:
 
 private:
     void refreshOccasionLabel();
+    void refreshOccasionTheme(bool preserveManualPreview = false);
     void refreshSessionLabel();
     void buildNavForRole(const QString& role);
     void showUpdateBar(const QString& tag);

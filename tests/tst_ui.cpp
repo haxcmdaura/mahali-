@@ -78,6 +78,7 @@
 #include "ui/products_page.h"
 #include "ui/purchases_page.h"
 #include "ui/quick_items_bar.h"
+#include "ui/theme.h"
 #include "ui/refunds_page.h"
 #include "ui/reports_page.h"
 #include "ui/sales_page.h"
@@ -187,6 +188,7 @@ private slots:
     void user_edit_pin_persists();
     void master_recovery_grants_access();
     void status_bar_shows_occasion_when_active();
+    void occasion_theme_applies_and_reverts_to_stored_theme();
 
 private:
     void seedSyncDatabase(const QString& path, int* productId, int* sessionId);
@@ -3202,6 +3204,97 @@ void UiTest::status_bar_shows_occasion_when_active()
         QVERIFY(!window.activateOccasion(occasionId + 999));
         QVERIFY(window.occasionLabelText().contains(occasion.name));
     }
+}
+
+void UiTest::occasion_theme_applies_and_reverts_to_stored_theme()
+{
+    const QString previousTheme = app::ui::activeTheme();
+
+    QVERIFY(QFile::exists(QStringLiteral(":/mahali/themes/ramadan.qss")));
+    QVERIFY(QFile::exists(QStringLiteral(":/mahali/themes/adha.qss")));
+    QVERIFY(QFile::exists(QStringLiteral(":/mahali/themes/fitr.qss")));
+
+    app::ui::applyTheme(QStringLiteral("ramadan"), *qApp);
+    QCOMPARE(app::ui::activeTheme(), QStringLiteral("ramadan"));
+    QVERIFY2(qApp->styleSheet().contains(QStringLiteral("#800080")),
+             qPrintable(qApp->styleSheet().left(200)));
+    QVERIFY2(qApp->styleSheet().contains(QStringLiteral("#FFD700")),
+             qPrintable(qApp->styleSheet().left(200)));
+
+    app::ui::applyTheme(QStringLiteral("adha"), *qApp);
+    QCOMPARE(app::ui::activeTheme(), QStringLiteral("adha"));
+    QVERIFY2(qApp->styleSheet().contains(QStringLiteral("#B22222")),
+             qPrintable(qApp->styleSheet().left(200)));
+
+    app::ui::applyTheme(QStringLiteral("fitr"), *qApp);
+    QCOMPARE(app::ui::activeTheme(), QStringLiteral("fitr"));
+    QVERIFY2(qApp->styleSheet().contains(QStringLiteral("#87CEEB")),
+             qPrintable(qApp->styleSheet().left(200)));
+    QVERIFY2(qApp->styleSheet().contains(QStringLiteral("#00008B")),
+             qPrintable(qApp->styleSheet().left(200)));
+
+    app::ui::applyTheme(previousTheme, *qApp);
+
+    const QString path = m_dir.filePath(QStringLiteral("occasion_theme.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+    ui::ServerController controller(db, m_key);
+
+    data::OccasionRepository occasions(db);
+    data::SettingRepository settings(db);
+    data::OccasionService service(db, occasions, settings);
+
+    settings.set(QStringLiteral("theme"), QStringLiteral("dark"));
+    app::ui::applyTheme(QStringLiteral("dark"), *qApp);
+
+    app::ui::applyTheme(QStringLiteral("ramadan"), *qApp);
+    {
+        ui::MainWindow window(db, controller);
+        window.show();
+        QCoreApplication::processEvents();
+        QCOMPARE(app::ui::activeTheme(), QStringLiteral("dark"));
+    }
+
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("رمضان");
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
+    occasion.createdAt = data::nowIso();
+    occasion.themeKey = QStringLiteral("ramadan");
+    const int occasionId = occasions.insert(occasion);
+    QVERIFY2(occasionId > 0, qPrintable(db.lastError()));
+    QVERIFY(service.activate(occasionId));
+
+    {
+        ui::MainWindow window(db, controller);
+        window.show();
+        QCoreApplication::processEvents();
+        QCOMPARE(app::ui::activeTheme(), QStringLiteral("ramadan"));
+
+        window.deactivateOccasion();
+        QVERIFY(occasions.setActive(occasionId, false));
+        window.deactivateOccasion();
+        QCOMPARE(app::ui::activeTheme(), QStringLiteral("dark"));
+    }
+
+    core::Occasion unknownTheme;
+    unknownTheme.name = QStringLiteral("مناسبة بسمة مجهولة");
+    unknownTheme.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    unknownTheme.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
+    unknownTheme.createdAt = data::nowIso();
+    unknownTheme.themeKey = QStringLiteral("not-a-theme");
+    const int unknownId = occasions.insert(unknownTheme);
+    QVERIFY2(unknownId > 0, qPrintable(db.lastError()));
+    QVERIFY(service.activate(unknownId));
+
+    {
+        ui::MainWindow window(db, controller);
+        window.show();
+        QCoreApplication::processEvents();
+        QCOMPARE(app::ui::activeTheme(), QStringLiteral("dark"));
+    }
+
+    app::ui::applyTheme(previousTheme, *qApp);
 }
 
 void UiTest::language_dialog_returns_the_chosen_code()

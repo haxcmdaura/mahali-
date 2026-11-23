@@ -89,6 +89,9 @@ target_sources(mahali-ui PRIVATE
     widgets/stat_card.h
     widgets/mini_bar_chart.cpp
     widgets/mini_bar_chart.h
+    resources/themes/ramadan.qss
+    resources/themes/adha.qss
+    resources/themes/fitr.qss
     resources/app.qrc)
 
 set_target_properties(mahali-ui PROPERTIES
