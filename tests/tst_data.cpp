@@ -56,6 +56,7 @@
 #include "zakat_history_repository.h"
 #include "occasion_repository.h"
 #include "occasion_service.h"
+#include "core/hijri_utils.h"
 #include "core/i18n.h"
 #include "core/zakat_notifier.h"
 #include "sync_outbox_repository.h"
@@ -200,6 +201,8 @@ private slots:
     void occasion_service_activate_deactivate();
     void occasion_mode_state_machine();
     void occasion_current_uses_system_date_and_latest_start();
+    void hijri_calendar_known_dates_and_ranges();
+    void occasion_service_auto_uses_hijri_calendar();
     void occasion_offer_schema_v17_exists();
     void occasion_offer_price_overrides_sale_price();
     void occasion_offer_discount_percent_applies_to_sale_price();
@@ -5673,6 +5676,80 @@ void DataLayerTest::occasion_current_uses_system_date_and_latest_start()
         const std::optional<core::Occasion> backToAuto = service.current();
         QVERIFY(backToAuto.has_value());
         QCOMPARE(backToAuto->id, laterId);
+    }
+}
+
+void DataLayerTest::hijri_calendar_known_dates_and_ranges()
+{
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 3, 10)), QString());
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 3, 11)), QStringLiteral("ramadan"));
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 4, 9)), QStringLiteral("ramadan"));
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 4, 10)), QStringLiteral("fitr"));
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 4, 11)), QString());
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 6, 16)), QString());
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 6, 17)), QStringLiteral("adha"));
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 6, 20)), QStringLiteral("adha"));
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 6, 21)), QString());
+
+    QCOMPARE(core::hijriOccasionStart(1445, QStringLiteral("ramadan")).value_or(QDate()),
+             QDate(2024, 3, 11));
+    QCOMPARE(core::hijriOccasionEnd(1445, QStringLiteral("ramadan")).value_or(QDate()),
+             QDate(2024, 4, 9));
+    QCOMPARE(core::hijriOccasionStart(1445, QStringLiteral("fitr")).value_or(QDate()),
+             QDate(2024, 4, 10));
+    QCOMPARE(core::hijriOccasionEnd(1445, QStringLiteral("fitr")).value_or(QDate()),
+             QDate(2024, 4, 10));
+    QCOMPARE(core::hijriOccasionStart(1445, QStringLiteral("adha")).value_or(QDate()),
+             QDate(2024, 6, 17));
+    QCOMPARE(core::hijriOccasionEnd(1445, QStringLiteral("adha")).value_or(QDate()),
+             QDate(2024, 6, 20));
+    QVERIFY(!core::hijriOccasionStart(1445, QStringLiteral("unknown")).has_value());
+    QVERIFY(!core::hijriOccasionEnd(1445, QStringLiteral("unknown")).has_value());
+}
+
+void DataLayerTest::occasion_service_auto_uses_hijri_calendar()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    {
+        data::Database db(work.filePath(QStringLiteral("occasion-hijri.sqlite")));
+        data::OccasionRepository occasions(db);
+        data::SettingRepository settings(db);
+        data::OccasionService service(db, occasions, settings);
+        settings.set(QStringLiteral("occasion_mode"), QStringLiteral("auto"));
+
+        const auto insertThemed = [&occasions](const QString& key) {
+            core::Occasion o;
+            o.name = key;
+            o.startsAt = QStringLiteral("2020-01-01T00:00:00.000");
+            o.endsAt = QStringLiteral("2020-01-31T23:59:59.999");
+            o.active = true;
+            o.createdAt = data::nowIso();
+            o.themeKey = key;
+            return occasions.insert(o);
+        };
+
+        const int ramadanId = insertThemed(QStringLiteral("ramadan"));
+        const int fitrId = insertThemed(QStringLiteral("fitr"));
+        const int adhaId = insertThemed(QStringLiteral("adha"));
+        QVERIFY(ramadanId > 0);
+        QVERIFY(fitrId > 0);
+        QVERIFY(adhaId > 0);
+
+        QCOMPARE(service.mode(), QStringLiteral("auto"));
+        const std::optional<core::Occasion> onRamadan = service.current(QDate(2024, 3, 11));
+        QVERIFY2(onRamadan.has_value(), "auto mode must follow the Hijri calendar");
+        QCOMPARE(onRamadan->id, ramadanId);
+
+        const std::optional<core::Occasion> onFitr = service.current(QDate(2024, 4, 10));
+        QVERIFY2(onFitr.has_value(), "auto mode must find Eid al-Fitr");
+        QCOMPARE(onFitr->id, fitrId);
+
+        const std::optional<core::Occasion> onAdha = service.current(QDate(2024, 6, 17));
+        QVERIFY2(onAdha.has_value(), "auto mode must find Eid al-Adha");
+        QCOMPARE(onAdha->id, adhaId);
+
+        QVERIFY(!service.current(QDate(2024, 4, 11)).has_value());
     }
 }
 

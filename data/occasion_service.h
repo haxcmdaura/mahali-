@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QDate>
+
 #include <optional>
 
 #include "core/occasion.h"
@@ -21,6 +23,7 @@ public:
     QString mode() const;
 
     std::optional<core::Occasion> current() const;
+    std::optional<core::Occasion> current(const QDate& date) const;
 
     // Chooses an occasion manually and switches the mode to manual. The occasion
     // has to exist and be active when it is chosen.

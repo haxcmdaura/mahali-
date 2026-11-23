@@ -33,6 +33,8 @@ target_sources(mahali-core PRIVATE
     customer.h
     customer_transaction.h
     format_utils.h
+    hijri_utils.cpp
+    hijri_utils.h
     customer_transaction_item.h
     device.h
     expense.h

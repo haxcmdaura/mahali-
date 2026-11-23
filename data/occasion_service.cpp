@@ -1,6 +1,7 @@
 #include "occasion_service.h"
 
 #include "audit_log_repository.h"
+#include "core/hijri_utils.h"
 
 #include <QDate>
 
@@ -23,6 +24,11 @@ std::optional<QDate> datePart(const QString& value)
         return std::nullopt;
     }
     return date;
+}
+
+bool sameThemeKey(const QString& left, const QString& right)
+{
+    return left.trimmed().toLower() == right.trimmed().toLower();
 }
 } // namespace
 
@@ -49,6 +55,11 @@ QString OccasionService::mode() const
 
 std::optional<core::Occasion> OccasionService::current() const
 {
+    return current(QDate::currentDate());
+}
+
+std::optional<core::Occasion> OccasionService::current(const QDate& date) const
+{
     const QString currentMode = mode();
     if (currentMode == QString::fromLatin1(kDisabledMode)) {
         return std::nullopt;
@@ -67,7 +78,16 @@ std::optional<core::Occasion> OccasionService::current() const
         return m_occasions.findById(id);
     }
 
-    const QString today = QDate::currentDate().toString(Qt::ISODate);
+    const QString hijriKey = core::getCurrentHijriOccasion(date);
+    if (!hijriKey.isEmpty()) {
+        for (const core::Occasion& occasion : m_occasions.findActive()) {
+            if (sameThemeKey(occasion.themeKey, hijriKey)) {
+                return occasion;
+            }
+        }
+    }
+
+    const QString today = date.toString(Qt::ISODate);
     const QVector<core::Occasion> open = m_occasions.findCurrent(today);
     for (const core::Occasion& occasion : open) {
         if (isWithinRange(occasion, today)) {
