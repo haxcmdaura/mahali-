@@ -2204,12 +2204,12 @@ Stock : %4</source>
     </message>
     <message>
         <location line="+36"/>
-        <location line="+928"/>
+        <location line="+927"/>
         <source>Scannez un produit ou choisissez-en un dans la liste</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-902"/>
+        <location line="-901"/>
         <location line="+29"/>
         <source>Total</source>
         <translation type="unfinished">Total</translation>
@@ -2248,12 +2248,12 @@ Stock : %4</source>
     </message>
     <message>
         <location line="+37"/>
-        <location line="+936"/>
+        <location line="+935"/>
         <source>Ajustement</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-931"/>
+        <location line="-930"/>
         <source>Somme à ajouter (+) ou à retirer (-) sur la facture entière</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2265,18 +2265,18 @@ Stock : %4</source>
     <message>
         <location line="+4"/>
         <location line="+1"/>
-        <location line="+817"/>
+        <location line="+816"/>
         <location line="+157"/>
         <source>Valider la vente (Entrée)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-925"/>
+        <location line="-924"/>
         <source>طبع الإيصال</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+329"/>
+        <location line="+328"/>
         <location line="+45"/>
         <source>Impossible de chiffrer « %1 »</source>
         <translation type="unfinished"></translation>
@@ -2387,12 +2387,17 @@ Stock : %4</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+28"/>
         <source>%1 / كغ</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+28"/>
+        <source>وزن غير صالح</source>
+        <translation>Invalid weight</translation>
+    </message>
+    <message>
+        <location line="+6"/>
         <source>تأكيد الوزن</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2406,7 +2411,7 @@ Stock : %4</source>
         <translation type="vanished">No items to sell</translation>
     </message>
     <message>
-        <location line="-198"/>
+        <location line="-200"/>
         <source>الكمية أو السعر غير صالح في أحد الأسطر</source>
         <translation>Invalid quantity or price in one of the lines</translation>
     </message>
@@ -3163,7 +3168,7 @@ Stock : %4</source>
         <translation type="unfinished">Unit price</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+19"/>
         <source>Fermer</source>
         <translation type="unfinished"></translation>
     </message>

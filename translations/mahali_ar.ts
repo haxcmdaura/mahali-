@@ -2172,12 +2172,12 @@ Stock : %4</translation>
     </message>
     <message>
         <location line="+36"/>
-        <location line="+928"/>
+        <location line="+927"/>
         <source>Scannez un produit ou choisissez-en un dans la liste</source>
         <translation>Scannez un produit ou choisissez-en un dans la liste</translation>
     </message>
     <message>
-        <location line="-902"/>
+        <location line="-901"/>
         <location line="+29"/>
         <source>Total</source>
         <translation>الإجمالي</translation>
@@ -2216,12 +2216,12 @@ Stock : %4</translation>
     </message>
     <message>
         <location line="+37"/>
-        <location line="+936"/>
+        <location line="+935"/>
         <source>Ajustement</source>
         <translation>Ajustement</translation>
     </message>
     <message>
-        <location line="-931"/>
+        <location line="-930"/>
         <source>Somme à ajouter (+) ou à retirer (-) sur la facture entière</source>
         <translation>Somme à ajouter (+) ou à retirer (-) sur la facture entière</translation>
     </message>
@@ -2233,18 +2233,18 @@ Stock : %4</translation>
     <message>
         <location line="+4"/>
         <location line="+1"/>
-        <location line="+817"/>
+        <location line="+816"/>
         <location line="+157"/>
         <source>Valider la vente (Entrée)</source>
         <translation>Valider la vente (Entrée)</translation>
     </message>
     <message>
-        <location line="-925"/>
+        <location line="-924"/>
         <source>طبع الإيصال</source>
         <translation>طبع الإيصال</translation>
     </message>
     <message>
-        <location line="+329"/>
+        <location line="+328"/>
         <location line="+45"/>
         <source>Impossible de chiffrer « %1 »</source>
         <translation>تعذّر تحويل « %1 » إلى رقم</translation>
@@ -2342,12 +2342,17 @@ Stock : %4</translation>
         <translation>تم حفظ الإيصال في %1</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+28"/>
         <source>%1 / كغ</source>
         <translation>%1 / كغ</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+28"/>
+        <source>وزن غير صالح</source>
+        <translation>وزن غير صالح</translation>
+    </message>
+    <message>
+        <location line="+6"/>
         <source>تأكيد الوزن</source>
         <translation>تأكيد الوزن</translation>
     </message>
@@ -2357,7 +2362,7 @@ Stock : %4</translation>
         <translation>هل الوزن %1 غرام صحيح ؟</translation>
     </message>
     <message>
-        <location line="-381"/>
+        <location line="-383"/>
         <location line="+52"/>
         <location filename="../ui/printing/receipt.cpp" line="+45"/>
         <location line="+182"/>
@@ -2365,13 +2370,13 @@ Stock : %4</translation>
         <translation>قطعة</translation>
     </message>
     <message>
-        <location line="-1075"/>
+        <location line="-1074"/>
         <location filename="../ui/printing/receipt.cpp" line="-195"/>
         <source>كرتونة</source>
         <translation>كرتونة</translation>
     </message>
     <message>
-        <location line="+1180"/>
+        <location line="+1179"/>
         <source>À CRÉDIT : %1 · Solde : %2</source>
         <translation>À CRÉDIT : %1 · Solde : %2</translation>
     </message>
@@ -3089,7 +3094,7 @@ Stock : %4</translation>
         <translation>سعر الوحدة</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+19"/>
         <source>Fermer</source>
         <translation>Fermer</translation>
     </message>
