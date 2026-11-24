@@ -3505,12 +3505,14 @@ void UiTest::pos_shows_active_occasion_offer()
     QCOMPARE(grid->item(0, 4)->text(), ui::formatMoney(7000));
     QCOMPARE(grid->item(0, 4)->foreground().color(), QColor(Qt::darkGreen));
 
-    QVERIFY(grid->item(0, 5));
-    QVERIFY(grid->item(0, 5)->text().contains(ui::formatMoney(10000)));
-    QVERIFY(grid->item(0, 5)->text().contains(ui::formatMoney(7000)));
+    QVERIFY2(grid->item(0, 5) == nullptr,
+             "the offer cell must not paint an item underneath its rich-text label");
     auto* indicator = qobject_cast<QLabel*>(grid->cellWidget(0, 5));
     QVERIFY(indicator);
+    QCOMPARE(indicator->textFormat(), Qt::RichText);
     QVERIFY(indicator->text().contains(QStringLiteral("<s>")));
+    QVERIFY(indicator->text().contains(ui::formatMoney(10000)));
+    QVERIFY(indicator->text().contains(ui::formatMoney(7000)));
 }
 
 void UiTest::occasions_page_lists_occasions()

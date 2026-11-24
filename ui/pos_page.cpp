@@ -1197,13 +1197,11 @@ void PosPage::rebuildTable()
         if (line.hasOffer) {
             const QString oldPrice = formatMoney(line.originalPriceCents);
             const QString newPrice = formatMoney(line.unitPriceCents);
-            auto* offerItem = new QTableWidgetItem(tr("Offre: %1 → %2").arg(oldPrice, newPrice));
-            offerItem->setToolTip(QStringLiteral("<s>%1</s> → %2").arg(oldPrice, newPrice));
-            readOnly(offerItem);
-            m_table->setItem(row, OfferColumn, offerItem);
-            auto* offerLabel = new QLabel(QStringLiteral("<s>%1</s> → %2").arg(oldPrice, newPrice));
+            auto* offerLabel = new QLabel(QStringLiteral("<s>%1</s> %2").arg(oldPrice, newPrice));
             offerLabel->setObjectName(QStringLiteral("posOfferIndicator"));
             offerLabel->setTextFormat(Qt::RichText);
+            offerLabel->setAlignment(Qt::AlignCenter);
+            offerLabel->setToolTip(tr("Offre : %1 → %2").arg(oldPrice, newPrice));
             m_table->setCellWidget(row, OfferColumn, offerLabel);
         }
     }
