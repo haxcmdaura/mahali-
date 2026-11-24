@@ -26,7 +26,7 @@ public:
     std::optional<core::Occasion> current(const QDate& date) const;
 
     // Chooses an occasion manually and switches the mode to manual. The occasion
-    // has to exist and be active when it is chosen.
+    // has to exist; an inactive occasion is reactivated as part of the choice.
     // Runs inside a transaction so the settings and the audit log commit together.
     bool activate(int occasionId);
 

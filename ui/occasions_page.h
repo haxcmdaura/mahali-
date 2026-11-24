@@ -49,6 +49,7 @@ private slots:
     void onAutoClicked();
     void onDisableClicked();
     void deactivateOccasionId(int occasionId);
+    void activateOccasionId(int occasionId);
     void editOccasionId(int occasionId);
     void onEditDatesClicked();
 

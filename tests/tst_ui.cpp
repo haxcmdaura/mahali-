@@ -204,6 +204,7 @@ private slots:
     void occasions_page_create_dialog_populates_table();
     void occasions_page_mode_controls();
     void occasions_page_row_actions_deactivate_and_edit();
+    void occasions_page_row_action_activates_inactive_occasion();
     void occasions_page_shows_hijri_agenda_and_auto_reason();
     void occasions_page_edit_dates_button_opens_prefilled_dialog();
 
@@ -3755,6 +3756,51 @@ void UiTest::occasions_page_row_actions_deactivate_and_edit()
     QVERIFY2(!watchdogFired, "the edit dialog stayed open until the watchdog fired");
     QVERIFY2(editHandled, "the edit button must open the dialog for this row");
     QCOMPARE(occasions.findById(occasionId)->name, QStringLiteral("رمضان معدل"));
+}
+
+void UiTest::occasions_page_row_action_activates_inactive_occasion()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasion-row-activate.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+
+    data::OccasionRepository occasions(db);
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("مناسبة معطلة");
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
+    occasion.createdAt = data::nowIso();
+    occasion.active = false;
+    const int occasionId = occasions.insert(occasion);
+    QVERIFY2(occasionId > 0, qPrintable(db.lastError()));
+
+    ui::OccasionsPage page(db);
+    QTableWidget* table = page.table();
+    QVERIFY(table->rowCount() == 1);
+    QWidget* actionCell = table->cellWidget(0, 6);
+    QVERIFY2(actionCell != nullptr, "each row needs its own action buttons");
+
+    const auto buttons = actionCell->findChildren<QPushButton*>();
+    QVERIFY2(buttons.size() >= 2, "the row needs a toggle button and an edit button");
+    QPushButton* toggle = buttons.first();
+    QCOMPARE(toggle->text(), QStringLiteral("تفعيل"));
+
+    toggle->click();
+
+    data::SettingRepository settings(db);
+    QCOMPARE(settings.value(QStringLiteral("occasion_mode")).value_or(QString()),
+             QStringLiteral("manual"));
+    QCOMPARE(settings.value(QStringLiteral("active_occasion_id")).value_or(QString()),
+             QString::number(occasionId));
+    QVERIFY2(occasions.findById(occasionId)->active,
+             "the row action must mark the inactive occasion active");
+    QVERIFY(page.activeAt(0));
+
+    QWidget* refreshedCell = page.table()->cellWidget(0, 6);
+    QVERIFY2(refreshedCell != nullptr, "the row must keep its action buttons after refresh");
+    const auto refreshedButtons = refreshedCell->findChildren<QPushButton*>();
+    QVERIFY2(refreshedButtons.size() >= 2, "the row needs a toggle button and an edit button");
+    QCOMPARE(refreshedButtons.first()->text(), QStringLiteral("تعطيل"));
 }
 
 void UiTest::occasions_page_shows_hijri_agenda_and_auto_reason()

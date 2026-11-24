@@ -309,22 +309,27 @@ void OccasionsPage::refresh(const QDate& today)
         auto* actionLayout = new QHBoxLayout(actionCell);
         actionLayout->setContentsMargins(4, 0, 4, 0);
         actionLayout->setSpacing(4);
-        auto* deactivate = new QPushButton(tr("تعطيل"));
-        deactivate->setObjectName(QStringLiteral("occasionDeactivateButton"));
-        deactivate->setCursor(Qt::PointingHandCursor);
-        deactivate->setEnabled(occasion.active);
-        compactActionButton(deactivate);
+        auto* toggle = new QPushButton(occasion.active ? tr("تعطيل") : tr("تفعيل"));
+        toggle->setObjectName(occasion.active ? QStringLiteral("occasionDeactivateButton")
+                                              : QStringLiteral("occasionActivateButton"));
+        toggle->setCursor(Qt::PointingHandCursor);
+        compactActionButton(toggle);
         auto* edit = new QPushButton(tr("تعديل"));
         edit->setObjectName(QStringLiteral("occasionEditButton"));
         edit->setCursor(Qt::PointingHandCursor);
         compactActionButton(edit);
-        actionLayout->addWidget(deactivate);
+        actionLayout->addWidget(toggle);
         actionLayout->addWidget(edit);
         m_table->setCellWidget(row, 6, actionCell);
 
         const int occasionId = occasion.id;
-        connect(deactivate, &QPushButton::clicked, this,
-                [this, occasionId]() { deactivateOccasionId(occasionId); });
+        if (occasion.active) {
+            connect(toggle, &QPushButton::clicked, this,
+                    [this, occasionId]() { deactivateOccasionId(occasionId); });
+        } else {
+            connect(toggle, &QPushButton::clicked, this,
+                    [this, occasionId]() { activateOccasionId(occasionId); });
+        }
         connect(edit, &QPushButton::clicked, this,
                 [this, occasionId]() { editOccasionId(occasionId); });
     }
@@ -439,6 +444,18 @@ void OccasionsPage::deactivateOccasionId(int occasionId)
     refresh();
 }
 
+void OccasionsPage::activateOccasionId(int occasionId)
+{
+    data::OccasionRepository repo(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, repo, settings);
+    if (!service.activate(occasionId)) {
+        QMessageBox::warning(this, tr("Erreur"), tr("Impossible d'activer l'occasion"));
+        return;
+    }
+    refresh();
+}
+
 void OccasionsPage::editOccasionId(int occasionId)
 {
     data::OccasionRepository repo(m_db);
@@ -486,14 +503,7 @@ void OccasionsPage::onManualClicked()
         return;
     }
 
-    data::OccasionRepository repo(m_db);
-    data::SettingRepository settings(m_db);
-    data::OccasionService service(m_db, repo, settings);
-    if (!service.activate(occasionIdAt(row))) {
-        QMessageBox::warning(this, tr("Erreur"), tr("Impossible d'activer l'occasion"));
-        return;
-    }
-    refresh();
+    activateOccasionId(occasionIdAt(row));
 }
 
 void OccasionsPage::onAutoClicked()

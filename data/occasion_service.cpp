@@ -103,11 +103,13 @@ bool OccasionService::activate(int occasionId)
     if (!occasion.has_value()) {
         return false;
     }
-    if (!occasion->active) {
+
+    if (!m_db.beginWriteTransaction()) {
         return false;
     }
 
-    if (!m_db.beginWriteTransaction()) {
+    if (!occasion->active && !m_occasions.setActive(occasionId, true)) {
+        m_db.rollback();
         return false;
     }
 

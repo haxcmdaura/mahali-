@@ -199,6 +199,7 @@ private slots:
     void supplier_returns_schema_exists();
     void occasion_roundtrip();
     void occasion_service_activate_deactivate();
+    void occasion_service_activate_reactivates_inactive();
     void occasion_mode_state_machine();
     void occasion_current_uses_system_date_and_latest_start();
     void hijri_calendar_known_dates_and_ranges();
@@ -5553,6 +5554,25 @@ void DataLayerTest::occasion_service_activate_deactivate()
     const std::optional<core::Occasion> backToAuto = service.current();
     QVERIFY(backToAuto.has_value());
     QCOMPARE(backToAuto->id, id);
+}
+
+void DataLayerTest::occasion_service_activate_reactivates_inactive()
+{
+    data::OccasionRepository occasions(*m_db);
+    data::SettingRepository settings(*m_db);
+    data::OccasionService service(*m_db, occasions, settings);
+
+    const int id = occasions.insert(occasionFixture(QStringLiteral("مناسبة معطلة")));
+    QVERIFY(id > 0);
+    QVERIFY(occasions.setActive(id, false));
+    QVERIFY(!occasions.findById(id)->active);
+
+    QVERIFY2(service.activate(id),
+             "activating an occasion that exists but is inactive must succeed");
+    QCOMPARE(service.mode(), QStringLiteral("manual"));
+    QVERIFY2(occasions.findById(id)->active, "activation must mark the occasion active");
+    QCOMPARE(settings.value(QStringLiteral("active_occasion_id")).value_or(QString()),
+             QString::number(id));
 }
 
 void DataLayerTest::occasion_mode_state_machine()
