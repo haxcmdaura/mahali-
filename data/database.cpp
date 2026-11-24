@@ -638,6 +638,16 @@ void Database::createSchema()
             "bonus_pieces INTEGER);"),
 
         QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS service_invoices ("
+            "id INTEGER PRIMARY KEY,"
+            "type TEXT NOT NULL,"
+            "invoice_date TEXT NOT NULL,"
+            "amount_cents INTEGER NOT NULL,"
+            "due_date TEXT,"
+            "status TEXT NOT NULL DEFAULT 'unpaid',"
+            "notes TEXT);"),
+
+        QStringLiteral(
             "CREATE TABLE IF NOT EXISTS sale_items ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "sale_id INTEGER NOT NULL REFERENCES sales(id),"

@@ -54,6 +54,7 @@
 #include "daily_report_service.h"
 #include "setting_repository.h"
 #include "zakat_history_repository.h"
+#include "service_invoice_repository.h"
 #include "occasion_repository.h"
 #include "occasion_service.h"
 #include "occasion_offer_repository.h"
@@ -168,6 +169,7 @@ private slots:
     void report_leaves_cogs_overflow_flag_false_on_clean_input();
     void should_notify_does_not_claim_year();
     void zakat_history_roundtrip();
+    void service_invoice_roundtrip();
     void appendOnlyGuard();
     void journalModeMatchesDatabaseRole();
     void pruneOnlyExpiredAcknowledgedOutboxRows();
@@ -1855,7 +1857,7 @@ void DataLayerTest::product_packages_migration_adds_columns_to_a_legacy_ledger()
         // assertion true whatever the stamp was and stop it testing anything. The
         // figure moves with every new migration, which is the whole point: a bump
         // that forgot to actually stamp this database would leave it one short.
-        QCOMPARE(data::readSchemaVersion(migratedDb), 19);
+        QCOMPARE(data::readSchemaVersion(migratedDb), 20);
         migratedDb.close();
     }
     QSqlDatabase::removeDatabase(connectionName);
@@ -1924,7 +1926,7 @@ void DataLayerTest::migration_14_backfills_pieces_per_package_from_package_size(
 
         // Pinned to the literal for the same reason as the package migration test:
         // it must move with each new migration, or it stops testing the stamp.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 19);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 20);
 
         // A second run changes nothing. The first run moved row 1's new column off
         // the default, so the guard's WHERE clause no longer matches it, and the two
@@ -1941,7 +1943,7 @@ void DataLayerTest::migration_14_backfills_pieces_per_package_from_package_size(
         }
         QVERIFY(!again.next());
         // Still stamped after the second, idempotent run.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 19);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 20);
 
         legacyDb.close();
     }
@@ -2020,7 +2022,7 @@ void DataLayerTest::weight_products_migration_drops_the_package_fields()
 
         // Pinned to the literal for the same reason as the other migration tests:
         // it must move with each new migration, or it stops testing the stamp.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 19);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 20);
 
         // A second run changes nothing. Row 1 no longer matches the guard because
         // its values are already the defaults, and the rows it does not match were
@@ -2036,7 +2038,7 @@ void DataLayerTest::weight_products_migration_drops_the_package_fields()
         QCOMPARE(again.value(1).toString(), QString());
         QCOMPARE(again.value(2).toInt(), 1);
         QCOMPARE(again.value(3).toInt(), 0);
-        QCOMPARE(data::readSchemaVersion(legacyDb), 19);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 20);
 
         legacyDb.close();
     }
@@ -4104,6 +4106,51 @@ void DataLayerTest::should_notify_does_not_claim_year()
     settings.remove(QStringLiteral("zakat_date"));
     settings.remove(QStringLiteral("zakat_notified_year"));
     QVERIFY(!core::shouldNotifyZakat(*m_db));
+}
+
+void DataLayerTest::service_invoice_roundtrip()
+{
+    const QString path = m_dir.filePath(QStringLiteral("service_invoices.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ServiceInvoiceRepository repo(db);
+
+    core::ServiceInvoice invoice;
+    invoice.type = QStringLiteral("electricity");
+    invoice.invoiceDate = QStringLiteral("2026-11-01");
+    invoice.amountCents = 123456;
+    invoice.dueDate = QStringLiteral("2026-11-15");
+    invoice.status = QStringLiteral("unpaid");
+    invoice.notes = QStringLiteral("فاتورة الكهرباء");
+    const int invoiceId = repo.save(invoice);
+    QVERIFY2(invoiceId > 0, qPrintable(db.lastError()));
+
+    const auto stored = repo.findById(invoiceId);
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->type, QStringLiteral("electricity"));
+    QCOMPARE(stored->invoiceDate, QStringLiteral("2026-11-01"));
+    QCOMPARE(stored->amountCents, 123456LL);
+    QCOMPARE(stored->dueDate, QStringLiteral("2026-11-15"));
+    QCOMPARE(stored->status, QStringLiteral("unpaid"));
+    QCOMPARE(stored->notes, QStringLiteral("فاتورة الكهرباء"));
+
+    core::ServiceInvoice edited = *stored;
+    edited.status = QStringLiteral("paid");
+    edited.notes.clear();
+    QCOMPARE(repo.save(edited), invoiceId);
+
+    const auto afterUpdate = repo.findById(invoiceId);
+    QVERIFY(afterUpdate.has_value());
+    QCOMPARE(afterUpdate->status, QStringLiteral("paid"));
+    QVERIFY(afterUpdate->notes.isEmpty());
+
+    const auto all = repo.findAll();
+    QCOMPARE(all.size(), std::size_t(1));
+    QCOMPARE(all.front().id, invoiceId);
+
+    QVERIFY(repo.remove(invoiceId));
+    QVERIFY(!repo.findById(invoiceId).has_value());
+    QVERIFY(repo.findAll().empty());
 }
 
 void DataLayerTest::zakat_history_roundtrip()

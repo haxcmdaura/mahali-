@@ -867,6 +867,25 @@ void migrateProductLastRestockedAt(const QSqlDatabase& db)
         QStringLiteral("add products.last_restocked_at"));
 }
 
+// 20 — utility service invoices
+//
+// Electricity, gas, and water bills have a due date and a paid/unpaid state but
+// no supplier purchase behind them. They get their own table rather than being
+// squeezed into purchases, where they would distort stock and supplier balances.
+void migrateServiceInvoices(const QSqlDatabase& db)
+{
+    run(db,
+        QStringLiteral("CREATE TABLE IF NOT EXISTS service_invoices ("
+                       "id INTEGER PRIMARY KEY,"
+                       "type TEXT NOT NULL,"
+                       "invoice_date TEXT NOT NULL,"
+                       "amount_cents INTEGER NOT NULL,"
+                       "due_date TEXT,"
+                       "status TEXT NOT NULL DEFAULT 'unpaid',"
+                       "notes TEXT)"),
+        QStringLiteral("create service_invoices table"));
+}
+
 void migrateOccasionOffers(const QSqlDatabase& db)
 {
     const QStringList occasions = tableColumns(db, QStringLiteral("occasions"));
@@ -961,6 +980,7 @@ const Migration kMigrations[] = {
     {17, "occasion offers", migrateOccasionOffers},
     {18, "product quick items", migrateProductQuickItem},
     {19, "product last restocked at", migrateProductLastRestockedAt},
+    {20, "service invoices", migrateServiceInvoices},
 };
 
 } // namespace
