@@ -45,6 +45,7 @@ inline QVector<core::SaleItem> resolveSaleItems(ProductRepository& products,
     QHash<int, long long> requiredPieces;
     QHash<int, long long> shelfPieces;
     QHash<int, QString> productNames;
+    QHash<int, QString> productBarcodes;
     for (core::SaleItem& item : resolved) {
         const auto product = products.findById(item.productId);
         if (!product.has_value()) {
@@ -192,6 +193,7 @@ inline QVector<core::SaleItem> resolveSaleItems(ProductRepository& products,
                 requiredPieces.insert(item.productId, item.piecesConsumed);
                 shelfPieces.insert(item.productId, product->quantity);
                 productNames.insert(item.productId, product->name);
+                productBarcodes.insert(item.productId, product->barcode);
             } else {
                 if (!detail::sumFits(*previous, item.piecesConsumed)) {
                     if (error) {
@@ -208,6 +210,9 @@ inline QVector<core::SaleItem> resolveSaleItems(ProductRepository& products,
 
     if (!allowOversold) {
         for (auto required = requiredPieces.cbegin(); required != requiredPieces.cend(); ++required) {
+            if (productBarcodes.value(required.key()).trimmed().isEmpty()) {
+                continue;
+            }
             if (shelfPieces.value(required.key()) < required.value()) {
                 if (error) {
                     *error = QStringLiteral("insufficient stock for product %1")

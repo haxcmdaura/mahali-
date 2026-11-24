@@ -695,7 +695,20 @@ bool PosPage::repriceLine(PosLine& line, QString* error) const
 
 void PosPage::addProductToCart(const core::Product& product, long long quantity, const QString& unitKind)
 {
-    for (PosLine& line : m_lines) {
+    const bool quickItem = product.barcode.trimmed().isEmpty();
+    const auto focusQuantityCell = [this](int row) {
+        QTableWidgetItem* item = m_table->item(row, QuantityColumn);
+        if (!item) {
+            m_entry->setFocus();
+            return;
+        }
+        m_table->setCurrentCell(row, QuantityColumn);
+        m_table->scrollToItem(item);
+        m_table->editItem(item);
+    };
+
+    for (int index = 0; index < m_lines.size(); ++index) {
+        PosLine& line = m_lines[index];
         // Product AND unit. The same product twice is one line only when both are
         // the same: a piece and a carton of one product are two lines, because a
         // single quantity and a single price cannot mean both. Merging them would
@@ -707,7 +720,11 @@ void PosPage::addProductToCart(const core::Product& product, long long quantity,
                           .arg(line.name, formatMoney(line.unitPriceCents)),
                       true);
             rebuildTable();
-            m_entry->setFocus();
+            if (quickItem) {
+                focusQuantityCell(index);
+            } else {
+                m_entry->setFocus();
+            }
             return;
         }
     }
@@ -732,7 +749,11 @@ void PosPage::addProductToCart(const core::Product& product, long long quantity,
     m_lines.append(line);
     setNotice(tr("Ajouté : %1").arg(line.name), true);
     rebuildTable();
-    m_entry->setFocus();
+    if (quickItem) {
+        focusQuantityCell(m_lines.size() - 1);
+    } else {
+        m_entry->setFocus();
+    }
 }
 
 void PosPage::addEntry()

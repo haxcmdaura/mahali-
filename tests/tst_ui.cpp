@@ -176,6 +176,7 @@ private slots:
     void barcode_dialog_does_not_close();
     void product_dialog_writes_package_fields_from_the_shared_widget();
     void quick_items_bar_lists_products();
+    void pos_quick_item_focuses_quantity_cell();
     void customerCreditAndPayment();
     void expensesAndDrawings();
     void reportBuilds();
@@ -2179,6 +2180,37 @@ void UiTest::quick_items_bar_lists_products()
     bar.refresh();
     QCOMPARE(bar.cardCount(), 1);
     QCOMPARE(bar.findChildren<app::ui::QuickItemCard*>().value(0)->productId(), breadId);
+}
+
+void UiTest::pos_quick_item_focuses_quantity_cell()
+{
+    const QString path = m_dir.filePath(QStringLiteral("quick-item-focus.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+
+    data::ProductRepository products(db);
+    core::Product bread;
+    bread.barcode = QString();
+    bread.name = QStringLiteral("خبز");
+    bread.salePriceCents = 2500;
+    QVERIFY(products.save(bread) > 0);
+
+    ui::PosPage page(db);
+    app::ui::QuickItemsBar* bar = page.quickItemsBar();
+    QVERIFY(bar != nullptr);
+    QCOMPARE(bar->cardCount(), 1);
+
+    app::ui::QuickItemCard* card = bar->findChildren<app::ui::QuickItemCard*>().value(0);
+    QVERIFY(card != nullptr);
+    QMouseEvent press(QEvent::MouseButtonPress, QPointF(5, 5), QPointF(5, 5),
+                      Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(card, &press);
+
+    QCOMPARE(page.lineCount(), 1);
+    QTableWidget* grid = page.table();
+    QCOMPARE(grid->currentRow(), 0);
+    QCOMPARE(grid->currentColumn(), 3);
+    QVERIFY2(grid->item(0, 3) != nullptr, "the quantity cell must exist for the new row");
 }
 
 void UiTest::customerCreditAndPayment()

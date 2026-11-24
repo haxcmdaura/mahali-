@@ -236,6 +236,7 @@ private slots:
     void resolve_sale_items_rejects_stock_shared_by_duplicate_lines();
     void resolve_sale_items_accepts_duplicate_lines_that_fit_together();
     void resolve_sale_items_allow_oversold_ignores_aggregate_stock();
+    void resolve_sale_items_skips_stock_check_for_no_barcode();
     void resolve_sale_items_sums_pieces_across_mixed_units();
     void record_customer_debt_rejects_piece_for_weight_product();
     void record_customer_debt_rejects_duplicate_lines_over_stock();
@@ -1428,6 +1429,7 @@ void DataLayerTest::customer_debt_refuses_insufficient_stock_without_writing_any
     data::ProductRepository products(db);
 
     core::Product product;
+    product.barcode = QStringLiteral("6130000000663");
     product.name = QStringLiteral("سكر");
     product.salePriceCents = 1200;
     product.costPriceCents = 1000;
@@ -6828,6 +6830,7 @@ void DataLayerTest::resolve_sale_items_rejects_stock_shared_by_duplicate_lines()
     data::ProductRepository products(db);
 
     core::Product product;
+    product.barcode = QStringLiteral("6130000000666");
     product.name = QStringLiteral("سكر");
     product.salePriceCents = 100;
     const int productId = products.save(product);
@@ -6906,6 +6909,54 @@ void DataLayerTest::resolve_sale_items_allow_oversold_ignores_aggregate_stock()
     QCOMPARE(resolved.size(), 2);
 }
 
+void DataLayerTest::resolve_sale_items_skips_stock_check_for_no_barcode()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_no_barcode_stock.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product quick;
+    quick.barcode = QString();
+    quick.name = QStringLiteral("خبز");
+    quick.salePriceCents = 100;
+    const int quickId = products.save(quick);
+    QVERIFY(quickId > 0);
+
+    core::Product scanned;
+    scanned.barcode = QStringLiteral("6130000000777");
+    scanned.name = QStringLiteral("حليب");
+    scanned.salePriceCents = 100;
+    const int scannedId = products.save(scanned);
+    QVERIFY(scannedId > 0);
+
+    core::SaleItem quickItem;
+    quickItem.productId = quickId;
+    quickItem.quantity = 2;
+    quickItem.unitKind = QStringLiteral("piece");
+    quickItem.unitPriceCents = 100;
+
+    QString quickError;
+    const QVector<core::SaleItem> quickResolved =
+        data::resolveSaleItems(products, {quickItem}, /*allowOversold=*/false, &quickError);
+    QVERIFY2(!quickResolved.isEmpty(), qPrintable(quickError));
+    QCOMPARE(quickResolved.size(), 1);
+    QCOMPARE(quickResolved.first().piecesConsumed, 2LL);
+
+    core::SaleItem barcodeItem;
+    barcodeItem.productId = scannedId;
+    barcodeItem.quantity = 1;
+    barcodeItem.unitKind = QStringLiteral("piece");
+    barcodeItem.unitPriceCents = 100;
+
+    QString barcodeError;
+    const QVector<core::SaleItem> barcodeResolved =
+        data::resolveSaleItems(products, {barcodeItem}, /*allowOversold=*/false, &barcodeError);
+    QVERIFY(barcodeResolved.isEmpty());
+    QVERIFY2(barcodeError.contains(QStringLiteral("insufficient stock")),
+             qPrintable(barcodeError));
+}
+
 void DataLayerTest::resolve_sale_items_sums_pieces_across_mixed_units()
 {
     const QString path = m_dir.filePath(QStringLiteral("resolve_duplicate_mixed.sqlite"));
@@ -6914,6 +6965,7 @@ void DataLayerTest::resolve_sale_items_sums_pieces_across_mixed_units()
     data::ProductRepository products(db);
 
     core::Product product;
+    product.barcode = QStringLiteral("6130000000665");
     product.name = QStringLiteral("بسكويت");
     product.salePriceCents = 60;
     product.piecesPerPackage = 6;
@@ -7338,6 +7390,12 @@ void DataLayerTest::record_customer_debt_rejects_piece_for_weight_product()
 void DataLayerTest::record_customer_debt_rejects_duplicate_lines_over_stock()
 {
     AdjustmentFixture f(m_dir.filePath(QStringLiteral("debt_dup_over_stock.sqlite")));
+    data::ProductRepository products(f.db);
+    auto product = products.findById(f.productId);
+    QVERIFY(product.has_value());
+    product->barcode = QStringLiteral("6130000000664");
+    QCOMPARE(products.save(*product), f.productId);
+
     core::Customer customer;
     customer.name = QStringLiteral("زبون-ر");
     data::CustomerRepository customers(f.db);
