@@ -56,6 +56,7 @@
 #include "zakat_history_repository.h"
 #include "occasion_repository.h"
 #include "occasion_service.h"
+#include "occasion_offer_repository.h"
 #include "core/hijri_utils.h"
 #include "core/i18n.h"
 #include "core/zakat_notifier.h"
@@ -205,6 +206,7 @@ private slots:
     void hijri_calendar_known_dates_and_ranges();
     void occasion_service_auto_uses_hijri_calendar();
     void occasion_offer_schema_v17_exists();
+    void occasion_offer_repository_roundtrip();
     void occasion_offer_price_overrides_sale_price();
     void occasion_offer_discount_percent_applies_to_sale_price();
     void occasion_offer_bonus_pieces_increase_pieces_consumed();
@@ -5814,6 +5816,46 @@ void DataLayerTest::occasion_offer_schema_v17_exists()
     QCOMPARE(types.value(QStringLiteral("bonus_pieces")), QLatin1StringView("INTEGER"));
     QCOMPARE(notNull.value(QStringLiteral("bonus_pieces")), 0);
     QCOMPARE(data::readSchemaVersion(m_db->handle()), data::kSchemaVersion);
+}
+
+void DataLayerTest::occasion_offer_repository_roundtrip()
+{
+    data::OccasionRepository occasions(*m_db);
+    data::ProductRepository products(*m_db);
+    data::OccasionOfferRepository offers(*m_db);
+
+    const int occasionId = occasions.insert(occasionFixture(QStringLiteral("عرض المتجر")));
+    QVERIFY(occasionId > 0);
+
+    core::Product product;
+    product.barcode = QStringLiteral("6130000000999");
+    product.name = QStringLiteral("منتج العرض");
+    product.costPriceCents = 500;
+    product.salePriceCents = 1200;
+    const int productId = products.save(product);
+    QVERIFY2(productId > 0, qPrintable(m_db->lastError()));
+
+    core::OccasionOffer offer;
+    offer.occasionId = occasionId;
+    offer.productId = productId;
+    offer.offerPriceCents = 900;
+    offer.discountPercent = 25;
+    offer.bonusPieces = 2;
+    const int offerId = offers.insert(offer);
+    QVERIFY2(offerId > 0, qPrintable(m_db->lastError()));
+
+    const QVector<core::OccasionOffer> stored = offers.findByOccasionId(occasionId);
+    QCOMPARE(stored.size(), 1);
+    const core::OccasionOffer& read = stored.first();
+    QCOMPARE(read.id, offerId);
+    QCOMPARE(read.occasionId, occasionId);
+    QCOMPARE(read.productId, productId);
+    QCOMPARE(read.offerPriceCents.value_or(0), 900LL);
+    QCOMPARE(read.discountPercent.value_or(0), 25LL);
+    QCOMPARE(read.bonusPieces, 2LL);
+
+    QVERIFY(offers.remove(offerId));
+    QVERIFY(offers.findByOccasionId(occasionId).isEmpty());
 }
 
 void DataLayerTest::occasion_offer_price_overrides_sale_price()

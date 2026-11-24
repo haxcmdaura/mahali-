@@ -27,6 +27,7 @@
 #include "data/occasion_repository.h"
 #include "data/occasion_service.h"
 #include "data/setting_repository.h"
+#include "dialogs/occasion_offer_dialog.h"
 #include "scan_safe_dialog.h"
 #include "widgets/app_icon.h"
 #include "widgets/page_header.h"
@@ -187,6 +188,11 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
     m_newButton->setIcon(appIcon(Icon::Plus, QColor(QStringLiteral("#ffffff")), 18));
     m_newButton->setCursor(Qt::PointingHandCursor);
 
+    m_manageOffersButton = new QPushButton(tr("إدارة العروض"));
+    m_manageOffersButton->setObjectName(QStringLiteral("occasionManageOffersButton"));
+    m_manageOffersButton->setCursor(Qt::PointingHandCursor);
+    m_manageOffersButton->setEnabled(false);
+
     m_manualButton = new QPushButton(tr("Activer manuellement"));
     m_manualButton->setObjectName(QStringLiteral("occasionManualButton"));
     m_manualButton->setCursor(Qt::PointingHandCursor);
@@ -227,6 +233,7 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
     toolbar->addWidget(m_manualButton);
     toolbar->addWidget(m_autoButton);
     toolbar->addWidget(m_disableButton);
+    toolbar->addWidget(m_manageOffersButton);
     toolbar->addStretch(1);
     toolbar->addWidget(m_newButton);
 
@@ -269,7 +276,12 @@ OccasionsPage::OccasionsPage(app::data::Database& db, QWidget* parent)
     connect(m_manualButton, &QPushButton::clicked, this, &OccasionsPage::onManualClicked);
     connect(m_autoButton, &QPushButton::clicked, this, &OccasionsPage::onAutoClicked);
     connect(m_disableButton, &QPushButton::clicked, this, &OccasionsPage::onDisableClicked);
+    connect(m_manageOffersButton, &QPushButton::clicked, this,
+            &OccasionsPage::onManageOffersClicked);
     connect(m_editDatesButton, &QPushButton::clicked, this, &OccasionsPage::onEditDatesClicked);
+    connect(m_table, &QTableWidget::itemSelectionChanged, this, [this]() {
+        m_manageOffersButton->setEnabled(m_table->currentRow() >= 0);
+    });
     connect(m_table, &QTableWidget::cellDoubleClicked, this, &OccasionsPage::onRowActivated);
     refresh();
 }
@@ -333,6 +345,8 @@ void OccasionsPage::refresh(const QDate& today)
         connect(edit, &QPushButton::clicked, this,
                 [this, occasionId]() { editOccasionId(occasionId); });
     }
+
+    m_manageOffersButton->setEnabled(m_table->currentRow() >= 0);
 
     const QString modeText = mode == QStringLiteral("manual")
                                  ? tr("manuel")
@@ -469,6 +483,15 @@ void OccasionsPage::editOccasionId(int occasionId)
     }
     repo.update(*edited);
     refresh();
+}
+
+void OccasionsPage::onManageOffersClicked()
+{
+    const int row = m_table->currentRow();
+    if (row < 0) {
+        return;
+    }
+    showOccasionOfferDialog(this, m_db, occasionIdAt(row));
 }
 
 void OccasionsPage::onEditDatesClicked()

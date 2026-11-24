@@ -34,6 +34,7 @@ public:
 
     QTableWidget* table() const { return m_table; }
     QPushButton* newButton() const { return m_newButton; }
+    QPushButton* manageOffersButton() const { return m_manageOffersButton; }
     QPushButton* manualButton() const { return m_manualButton; }
     QPushButton* autoButton() const { return m_autoButton; }
     QPushButton* disableButton() const { return m_disableButton; }
@@ -51,6 +52,7 @@ private slots:
     void deactivateOccasionId(int occasionId);
     void activateOccasionId(int occasionId);
     void editOccasionId(int occasionId);
+    void onManageOffersClicked();
     void onEditDatesClicked();
 
 private:
@@ -58,6 +60,7 @@ private:
     QDate m_today;
     QTableWidget* m_table;
     QPushButton* m_newButton;
+    QPushButton* m_manageOffersButton;
     QPushButton* m_manualButton;
     QPushButton* m_autoButton;
     QPushButton* m_disableButton;

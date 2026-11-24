@@ -39,6 +39,8 @@ target_sources(mahali-ui PRIVATE
     dialogs/select_customer_dialog.h
     dialogs/select_product_dialog.cpp
     dialogs/select_product_dialog.h
+    dialogs/occasion_offer_dialog.cpp
+    dialogs/occasion_offer_dialog.h
     dialogs/supplier_dialog.cpp
     dialogs/supplier_dialog.h
     dialogs/purchase_dialog.cpp

@@ -14,7 +14,9 @@ public:
     explicit OccasionOfferRepository(Database& db);
 
     std::optional<core::OccasionOffer> findByOccasionAndProduct(int occasionId, int productId) const;
-    QVector<core::OccasionOffer> findByOccasion(int occasionId) const;
+    QVector<core::OccasionOffer> findByOccasionId(int occasionId) const;
+    int insert(const core::OccasionOffer& offer);
+    bool remove(int id);
 
 private:
     Database& m_db;

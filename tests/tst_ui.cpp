@@ -61,6 +61,7 @@
 #include "data/owner_drawing_repository.h"
 #include "data/occasion_repository.h"
 #include "data/occasion_service.h"
+#include "data/occasion_offer_repository.h"
 #include "data/payment_repository.h"
 #include "data/payment_service.h"
 #include "data/product_repository.h"
@@ -78,6 +79,7 @@
 #include "ui/customers_page.h"
 #include "ui/expenses_page.h"
 #include "ui/occasions_page.h"
+#include "ui/dialogs/occasion_offer_dialog.h"
 #include "core/format_utils.h"
 #include "ui/pos_page.h"
 #include "ui/printing/receipt.h"
@@ -207,6 +209,8 @@ private slots:
     void occasions_page_row_action_activates_inactive_occasion();
     void occasions_page_shows_hijri_agenda_and_auto_reason();
     void occasions_page_edit_dates_button_opens_prefilled_dialog();
+    void occasions_page_manage_offers_requires_selection();
+    void occasion_offer_dialog_loads_offers();
 
 private:
     void seedSyncDatabase(const QString& path, int* productId, int* sessionId);
@@ -3922,6 +3926,91 @@ void UiTest::occasions_page_edit_dates_button_opens_prefilled_dialog()
     QVERIFY2(!watchdogFired, "the Edit Dates dialog stayed open until the watchdog fired");
     QVERIFY2(dialogSeen, "the Edit Dates button must open the occasion dialog");
     QVERIFY2(datesOk, "the dialog must be prefilled with the auto occasion's dates");
+}
+
+void UiTest::occasions_page_manage_offers_requires_selection()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasions-manage-offers.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+
+    data::OccasionRepository occasions(db);
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("عرض الصيف");
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
+    occasion.createdAt = data::nowIso();
+    QVERIFY(occasions.insert(occasion) > 0);
+
+    ui::OccasionsPage page(db);
+    auto* manage = page.findChild<QPushButton*>(QStringLiteral("occasionManageOffersButton"));
+    QVERIFY2(manage != nullptr, "the occasions page needs a manage-offers button");
+    QCOMPARE(manage->text(), QStringLiteral("إدارة العروض"));
+    QVERIFY2(!manage->isEnabled(), "manage offers must stay disabled until a row is selected");
+
+    page.table()->selectRow(0);
+    QVERIFY2(manage->isEnabled(), "manage offers must enable for the selected occasion");
+}
+
+void UiTest::occasion_offer_dialog_loads_offers()
+{
+    const QString path = m_dir.filePath(QStringLiteral("occasion-offer-dialog.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+
+    data::ProductRepository products(db);
+    core::Product product;
+    product.barcode = QStringLiteral("6130000000888");
+    product.name = QStringLiteral("منتج العرض");
+    product.costPriceCents = 500;
+    product.salePriceCents = 1200;
+    const int productId = products.save(product);
+    QVERIFY2(productId > 0, qPrintable(db.lastError()));
+
+    data::OccasionRepository occasions(db);
+    core::Occasion occasion;
+    occasion.name = QStringLiteral("عرض");
+    occasion.startsAt = data::toIso(QDateTime::currentDateTime().addDays(-1));
+    occasion.endsAt = data::toIso(QDateTime::currentDateTime().addDays(1));
+    occasion.createdAt = data::nowIso();
+    const int occasionId = occasions.insert(occasion);
+    QVERIFY2(occasionId > 0, qPrintable(db.lastError()));
+
+    QSqlQuery offer(db.handle());
+    QVERIFY(offer.prepare(QStringLiteral(
+        "INSERT INTO occasion_offers (occasion_id, product_id, offer_price_cents, discount_percent, "
+        "bonus_pieces) VALUES (?, ?, ?, ?, ?)")));
+    offer.addBindValue(occasionId);
+    offer.addBindValue(productId);
+    offer.addBindValue(900);
+    offer.addBindValue(QVariant());
+    offer.addBindValue(2);
+    QVERIFY2(offer.exec(), qPrintable(db.lastError()));
+
+    bool dialogSeen = false;
+    int rowCount = -1;
+    QString productName;
+    QTimer::singleShot(0, [&]() {
+        auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        if (!modal) {
+            return;
+        }
+        dialogSeen = true;
+        auto* table = modal->findChild<QTableWidget*>(QStringLiteral("occasionOfferTable"));
+        if (table) {
+            rowCount = table->rowCount();
+            if (rowCount > 0 && table->item(0, 0)) {
+                productName = table->item(0, 0)->text();
+            }
+        }
+        modal->reject();
+    });
+
+    ui::showOccasionOfferDialog(nullptr, db, occasionId);
+
+    QVERIFY2(dialogSeen, "the manage-offers dialog must open");
+    QCOMPARE(rowCount, 1);
+    QCOMPARE(productName, product.name);
 }
 
 void UiTest::language_dialog_returns_the_chosen_code()

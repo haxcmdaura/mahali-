@@ -52,7 +52,7 @@ std::optional<core::OccasionOffer> OccasionOfferRepository::findByOccasionAndPro
     return offerFromQuery(query);
 }
 
-QVector<core::OccasionOffer> OccasionOfferRepository::findByOccasion(int occasionId) const
+QVector<core::OccasionOffer> OccasionOfferRepository::findByOccasionId(int occasionId) const
 {
     QVector<core::OccasionOffer> offers;
     QSqlQuery query(m_db.handle());
@@ -60,13 +60,47 @@ QVector<core::OccasionOffer> OccasionOfferRepository::findByOccasion(int occasio
                       .arg(QLatin1StringView(kOccasionOfferColumns)));
     query.addBindValue(occasionId);
     if (!query.exec()) {
-        m_db.recordError(query.lastError(), QStringLiteral("OccasionOfferRepository::findByOccasion"));
+        m_db.recordError(query.lastError(), QStringLiteral("OccasionOfferRepository::findByOccasionId"));
         return offers;
     }
     while (query.next()) {
         offers.push_back(offerFromQuery(query));
     }
     return offers;
+}
+
+int OccasionOfferRepository::insert(const core::OccasionOffer& offer)
+{
+    QSqlQuery query(m_db.handle());
+    query.prepare(QStringLiteral(
+        "INSERT INTO occasion_offers (occasion_id, product_id, offer_price_cents, discount_percent, "
+        "bonus_pieces) VALUES (?, ?, ?, ?, ?)"));
+    query.addBindValue(offer.occasionId);
+    query.addBindValue(offer.productId);
+    query.addBindValue(offer.offerPriceCents.has_value()
+                           ? QVariant::fromValue(*offer.offerPriceCents)
+                           : QVariant());
+    query.addBindValue(offer.discountPercent.has_value()
+                           ? QVariant::fromValue(*offer.discountPercent)
+                           : QVariant());
+    query.addBindValue(offer.bonusPieces > 0 ? QVariant::fromValue(offer.bonusPieces) : QVariant());
+    if (!query.exec()) {
+        m_db.recordError(query.lastError(), QStringLiteral("OccasionOfferRepository::insert"));
+        return 0;
+    }
+    return query.lastInsertId().toInt();
+}
+
+bool OccasionOfferRepository::remove(int id)
+{
+    QSqlQuery query(m_db.handle());
+    query.prepare(QStringLiteral("DELETE FROM occasion_offers WHERE id = ?"));
+    query.addBindValue(id);
+    if (!query.exec()) {
+        m_db.recordError(query.lastError(), QStringLiteral("OccasionOfferRepository::remove"));
+        return false;
+    }
+    return query.numRowsAffected() > 0;
 }
 
 } // namespace app::data
