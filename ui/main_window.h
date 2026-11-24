@@ -132,6 +132,7 @@ private slots:
     void onUpdateDownloadFinished(const QString& path);
     void onUpdateDownloadFailed(const QString& reason);
     void onRestartToInstall();
+    void checkQuickItemRestocks();
 
 private:
     void refreshOccasionLabel();

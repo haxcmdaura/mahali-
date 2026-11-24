@@ -42,6 +42,8 @@ struct Product {
     bool isQuickItem = false;
     // How many days a quick item is expected to last before the owner restocks it.
     int restockDays = 1;
+    // ISO date of the last restock cycle reset. Empty on rows that predate it.
+    QString lastRestockedAt;
 };
 
 } // namespace app::core

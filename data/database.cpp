@@ -588,7 +588,10 @@ void Database::createSchema()
             // not enough on its own: only products the owner creates there belong.
             "is_quick_item INTEGER NOT NULL DEFAULT 0,"
             // How many days the owner expects a quick item to last before restocking.
-            "restock_days INTEGER NOT NULL DEFAULT 1);"),
+            "restock_days INTEGER NOT NULL DEFAULT 1,"
+            // ISO date of the last restock-cycle reset. Empty on rows that predate
+            // the reminder; saving a product fills it in when it is blank.
+            "last_restocked_at TEXT NOT NULL DEFAULT '');"),
 
         QStringLiteral(
             "CREATE TABLE IF NOT EXISTS sales ("

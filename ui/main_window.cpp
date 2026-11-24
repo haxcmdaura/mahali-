@@ -27,6 +27,7 @@
 #include <QStyle>
 #include <QToolButton>
 #include <QTimer>
+#include <QStringList>
 #include <QThread>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -48,6 +49,7 @@
 #include "customers_page.h"
 #include "data/occasion_repository.h"
 #include "data/occasion_service.h"
+#include "data/quick_item_service.h"
 #include "data/setting_repository.h"
 #include "expenses_page.h"
 #include "login_dialog.h"
@@ -309,6 +311,12 @@ MainWindow::MainWindow(app::data::Database& db, ServerController& controller, QW
     });
 
     QTimer::singleShot(0, this, [this]() { maybeShowOccasionGreeting(); });
+
+    QTimer::singleShot(4000, this, [this]() { checkQuickItemRestocks(); });
+    auto* restockTimer = new QTimer(this);
+    restockTimer->setInterval(24 * 60 * 60 * 1000);
+    connect(restockTimer, &QTimer::timeout, this, &MainWindow::checkQuickItemRestocks);
+    restockTimer->start();
 
     // Built up front but idle: the download only starts when the user asks for
     // it, and a bar is only ever shown when a newer release exists.
@@ -1228,6 +1236,38 @@ void MainWindow::maybeShowOccasionGreeting()
     dialog->open();
     dialog->raise();
     dialog->activateWindow();
+}
+
+void MainWindow::checkQuickItemRestocks()
+{
+    data::QuickItemService service(m_db);
+    const QVector<data::DueRestock> due = service.getDueRestocks();
+    if (due.isEmpty()) {
+        return;
+    }
+
+    QStringList lines;
+    for (const data::DueRestock& item : due) {
+        lines << tr("حان وقت إعادة الشراء: %1 - تم بيع %2")
+                     .arg(item.productName)
+                     .arg(item.quantitySold);
+    }
+
+    auto* toast = new QLabel(lines.join(QLatin1Char('\n')), this);
+    toast->setObjectName(QStringLiteral("restockToast"));
+    toast->setWordWrap(true);
+    toast->setAlignment(Qt::AlignCenter);
+    toast->setStyleSheet(QStringLiteral(
+        "QLabel#restockToast { background-color: #b45309; color: #ffffff; "
+        "border-radius: 8px; padding: 10px 16px; font-weight: 600; }"));
+    toast->adjustSize();
+    toast->move((width() - toast->width()) / 2, height() - toast->height() - 40);
+    toast->show();
+    toast->raise();
+    QTimer::singleShot(6000, toast, [toast]() {
+        toast->hide();
+        toast->deleteLater();
+    });
 }
 
 bool MainWindow::activateOccasion(int occasionId)

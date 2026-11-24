@@ -57,6 +57,7 @@
 #include "occasion_repository.h"
 #include "occasion_service.h"
 #include "occasion_offer_repository.h"
+#include "quick_item_service.h"
 #include "core/hijri_utils.h"
 #include "core/i18n.h"
 #include "core/zakat_notifier.h"
@@ -93,6 +94,7 @@ private slots:
     void product_repository_round_trips_package_fields();
     void quick_items_roundtrip();
     void quick_items_require_explicit_flag();
+    void quick_item_restock_due_reports_sold_and_resets_date();
     void two_products_without_barcode();
     void barcode_with_value_still_unique();
     void normalize_barcode_azerty();
@@ -748,6 +750,7 @@ void DataLayerTest::quick_items_require_explicit_flag()
     QVERIFY(stored.has_value());
     QVERIFY2(stored->isQuickItem, "the explicit quick-item flag must round-trip");
     QCOMPARE(stored->restockDays, 3);
+    QCOMPARE(stored->lastRestockedAt, QDate::currentDate().toString(Qt::ISODate));
 
     core::Product plainNoBarcode;
     plainNoBarcode.barcode = QString();
@@ -762,6 +765,50 @@ void DataLayerTest::quick_items_require_explicit_flag()
     for (const core::Product& product : quick) {
         QVERIFY(product.id != plainId);
     }
+}
+
+void DataLayerTest::quick_item_restock_due_reports_sold_and_resets_date()
+{
+    const QString path = m_dir.filePath(QStringLiteral("quick_item_restocks.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+
+    data::ProductRepository repo(db);
+    core::Product bread;
+    bread.barcode = QString();
+    bread.name = QStringLiteral("خبز");
+    bread.salePriceCents = 100;
+    bread.costPriceCents = 50;
+    bread.isQuickItem = true;
+    bread.restockDays = 3;
+    bread.lastRestockedAt = QDate::currentDate().addDays(-4).toString(Qt::ISODate);
+    const int productId = repo.save(bread);
+    QVERIFY(productId > 0);
+
+    data::CashSessionRepository sessions(db);
+    const int sessionId = sessions.open(100000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 2;
+    item.unitKind = QStringLiteral("piece");
+    item.unitPriceCents = 100;
+    const data::SaleRecordResult result =
+        data::SaleService(db).recordSale({item}, sessionId, QStringLiteral("dev"),
+                                         /*allowOversold=*/false);
+    QVERIFY2(result.ok, qPrintable(result.error));
+
+    data::QuickItemService service(db);
+    const QVector<data::DueRestock> due = service.getDueRestocks();
+    QCOMPARE(due.size(), 1);
+    QCOMPARE(due.first().productName, QStringLiteral("خبز"));
+    QCOMPARE(due.first().quantitySold, 2LL);
+
+    const auto stored = repo.findById(productId);
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->lastRestockedAt, QDate::currentDate().toString(Qt::ISODate));
+    QVERIFY(service.getDueRestocks().isEmpty());
 }
 
 void DataLayerTest::two_products_without_barcode()
@@ -1808,7 +1855,7 @@ void DataLayerTest::product_packages_migration_adds_columns_to_a_legacy_ledger()
         // assertion true whatever the stamp was and stop it testing anything. The
         // figure moves with every new migration, which is the whole point: a bump
         // that forgot to actually stamp this database would leave it one short.
-        QCOMPARE(data::readSchemaVersion(migratedDb), 18);
+        QCOMPARE(data::readSchemaVersion(migratedDb), 19);
         migratedDb.close();
     }
     QSqlDatabase::removeDatabase(connectionName);
@@ -1877,7 +1924,7 @@ void DataLayerTest::migration_14_backfills_pieces_per_package_from_package_size(
 
         // Pinned to the literal for the same reason as the package migration test:
         // it must move with each new migration, or it stops testing the stamp.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 18);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 19);
 
         // A second run changes nothing. The first run moved row 1's new column off
         // the default, so the guard's WHERE clause no longer matches it, and the two
@@ -1894,7 +1941,7 @@ void DataLayerTest::migration_14_backfills_pieces_per_package_from_package_size(
         }
         QVERIFY(!again.next());
         // Still stamped after the second, idempotent run.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 18);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 19);
 
         legacyDb.close();
     }
@@ -1973,7 +2020,7 @@ void DataLayerTest::weight_products_migration_drops_the_package_fields()
 
         // Pinned to the literal for the same reason as the other migration tests:
         // it must move with each new migration, or it stops testing the stamp.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 18);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 19);
 
         // A second run changes nothing. Row 1 no longer matches the guard because
         // its values are already the defaults, and the rows it does not match were
@@ -1989,7 +2036,7 @@ void DataLayerTest::weight_products_migration_drops_the_package_fields()
         QCOMPARE(again.value(1).toString(), QString());
         QCOMPARE(again.value(2).toInt(), 1);
         QCOMPARE(again.value(3).toInt(), 0);
-        QCOMPARE(data::readSchemaVersion(legacyDb), 18);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 19);
 
         legacyDb.close();
     }

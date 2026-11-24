@@ -852,6 +852,21 @@ void migrateProductQuickItem(const QSqlDatabase& db)
     }
 }
 
+// 19 — the date a quick item's restock cycle started
+//
+// Empty for existing rows: the repository fills it the next time the product is
+// saved, and the reminder treats an empty value as never restocked.
+void migrateProductLastRestockedAt(const QSqlDatabase& db)
+{
+    const QStringList columns = tableColumns(db, QStringLiteral("products"));
+    if (columns.isEmpty() || columns.contains(QStringLiteral("last_restocked_at"))) {
+        return;
+    }
+    run(db,
+        QStringLiteral("ALTER TABLE products ADD COLUMN last_restocked_at TEXT NOT NULL DEFAULT ''"),
+        QStringLiteral("add products.last_restocked_at"));
+}
+
 void migrateOccasionOffers(const QSqlDatabase& db)
 {
     const QStringList occasions = tableColumns(db, QStringLiteral("occasions"));
@@ -945,6 +960,7 @@ const Migration kMigrations[] = {
     {16, "weight product package cleanup", migrateWeightProductsDropPackageFields},
     {17, "occasion offers", migrateOccasionOffers},
     {18, "product quick items", migrateProductQuickItem},
+    {19, "product last restocked at", migrateProductLastRestockedAt},
 };
 
 } // namespace

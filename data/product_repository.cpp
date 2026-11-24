@@ -42,13 +42,14 @@ core::Product productFromQuery(const QSqlQuery& query)
     product.packageCostCents = query.value(13).toLongLong();
     product.isQuickItem = query.value(14).toInt() != 0;
     product.restockDays = query.value(15).toInt();
+    product.lastRestockedAt = query.value(16).toString();
     return product;
 }
 
 const char* kProductColumns =
     "id, barcode, name, cost_price_cents, sale_price_cents, quantity, unit, package_size, active, "
     "sold_by_weight, package_name, pieces_per_package, package_barcode, package_cost_cents, "
-    "is_quick_item, restock_days";
+    "is_quick_item, restock_days, last_restocked_at";
 
 const char* kQuickItemsFilter = "active = 1 AND is_quick_item = 1";
 
@@ -85,6 +86,14 @@ QVariant barcodeVariant(const QString& barcode)
 // answer, and it is a fallback rather than a stored value because it is a default
 // for this product rather than a fact about it: a shop that packs in boxes should
 // not have to retype "كرتونة" on every product to keep it.
+QString lastRestockedOrDefault(const QString& lastRestockedAt)
+{
+    if (lastRestockedAt.trimmed().isEmpty()) {
+        return QDate::currentDate().toString(Qt::ISODate);
+    }
+    return lastRestockedAt;
+}
+
 QString packageNameOrDefault(const QString& packageName)
 {
     return packageName.trimmed().isEmpty() ? core::Product{}.packageName : packageName;
@@ -181,8 +190,8 @@ int ProductRepository::save(const core::Product& product)
             QStringLiteral("INSERT INTO products "
                            "(barcode, name, cost_price_cents, sale_price_cents, quantity, unit, package_size, active, sold_by_weight, "
                            "package_name, pieces_per_package, package_barcode, package_cost_cents, "
-                           "is_quick_item, restock_days) "
-                           "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+                           "is_quick_item, restock_days, last_restocked_at) "
+                           "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
         query.addBindValue(barcodeVariant(product.barcode));
         query.addBindValue(product.name);
         query.addBindValue(product.costPriceCents);
@@ -202,6 +211,7 @@ int ProductRepository::save(const core::Product& product)
         query.addBindValue(product.packageCostCents);
         query.addBindValue(product.isQuickItem ? 1 : 0);
         query.addBindValue(product.restockDays);
+        query.addBindValue(lastRestockedOrDefault(product.lastRestockedAt));
         if (!query.exec()) {
             m_db.recordError(query.lastError(), QStringLiteral("ProductRepository::save"));
             return 0;
@@ -214,7 +224,8 @@ int ProductRepository::save(const core::Product& product)
                        "barcode = ?, name = ?, cost_price_cents = ?, sale_price_cents = ?, "
                        "unit = ?, package_size = ?, active = ?, sold_by_weight = ?, "
                        "package_name = ?, pieces_per_package = ?, package_barcode = ?, "
-                       "package_cost_cents = ?, is_quick_item = ?, restock_days = ? "
+                       "package_cost_cents = ?, is_quick_item = ?, restock_days = ?, "
+                       "last_restocked_at = ? "
                        "WHERE id = ?"));
     query.addBindValue(barcodeVariant(product.barcode));
     query.addBindValue(product.name);
@@ -234,6 +245,7 @@ int ProductRepository::save(const core::Product& product)
     query.addBindValue(product.packageCostCents);
     query.addBindValue(product.isQuickItem ? 1 : 0);
     query.addBindValue(product.restockDays);
+    query.addBindValue(lastRestockedOrDefault(product.lastRestockedAt));
     query.addBindValue(product.id);
     if (!query.exec()) {
         m_db.recordError(query.lastError(), QStringLiteral("ProductRepository::save"));

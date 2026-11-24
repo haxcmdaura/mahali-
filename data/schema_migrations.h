@@ -12,7 +12,7 @@ namespace app::data {
 // version is what separates "built by this release" from "carried over from an
 // older one"; the difference is exactly the set of migrations that still has to
 // run.
-constexpr int kSchemaVersion = 18;
+constexpr int kSchemaVersion = 19;
 
 // Applies every migration the database has not seen yet, in order. Each one runs
 // in its own transaction and stamps its own version before that transaction

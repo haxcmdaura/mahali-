@@ -48,6 +48,8 @@ target_sources(mahali-data PRIVATE
     payment_repository.cpp
     payment_service.cpp
     product_repository.cpp
+    quick_item_service.cpp
+    quick_item_service.h
     purchase_item_repository.cpp
     purchase_repository.cpp
     purchase_service.cpp
