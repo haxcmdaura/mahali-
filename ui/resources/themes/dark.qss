@@ -983,13 +983,13 @@ QWidget#quickItemsBar QFrame#quickCard:hover {
 
 /* Outlined and unfilled, the way the light theme draws it: the add tile is not
    a product, and the accent dashed edge is the only hint that says so. */
-QWidget#quickItemsBar QFrame#quickAddCard {
+QWidget#quickItemsBar QPushButton#quickAddButton {
     background: transparent;
     border: 1px dashed #525252;
     border-radius: 14px;
 }
 
-QWidget#quickItemsBar QFrame#quickAddCard:hover {
+QWidget#quickItemsBar QPushButton#quickAddButton:hover {
     background: @ACCENT_SOFT@;
     border: 1px dashed @ACCENT@;
 }

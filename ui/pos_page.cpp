@@ -43,6 +43,7 @@
 #include "data/sale_rules.h"
 #include "data/sale_service.h"
 #include "dialogs/product_dialog.h"
+#include "dialogs/quick_item_dialog.h"
 #include "dialogs/select_customer_dialog.h"
 #include "dialogs/select_product_dialog.h"
 #include "format_utils.h"
@@ -373,7 +374,8 @@ PosPage::PosPage(app::data::Database& db, QWidget* parent)
     connect(m_table, &QTableWidget::cellChanged, this, &PosPage::onCellChanged);
     connect(m_table, &QTableWidget::cellDoubleClicked, this, &PosPage::onCellDoubleClicked);
     connect(m_quickItems, &QuickItemsBar::productClicked, this, &PosPage::onQuickItemClicked);
-    connect(m_quickItems, &QuickItemsBar::addNewRequested, this, &PosPage::onAddQuickProduct);
+    connect(m_quickItems, &QuickItemsBar::addQuickItemRequested, this,
+            &PosPage::onAddQuickProduct);
 
     // The filter is installed on the page itself as well as on the entry field,
     // because the entry is not the only thing it watches: the page's own Show
@@ -856,29 +858,12 @@ void PosPage::addEntry()
 
 void PosPage::onAddQuickProduct()
 {
-    core::Product draft;
-    draft.unit = QStringLiteral("piece");
-    draft.active = true;
-
-    const std::optional<core::Product> created = showProductDialog(this, m_db, draft);
-    if (!created) {
+    if (showQuickItemDialog(this, m_db) <= 0) {
         m_entry->setFocus();
         return;
     }
-    const int id = data::ProductRepository(m_db).save(*created);
-    if (id == 0) {
-        setNotice(tr("Impossible d'enregistrer le produit."), false);
-        m_entry->setFocus();
-        return;
-    }
-    core::Product saved = *created;
-    saved.id = id;
     refreshQuickItems();
-    if (saved.soldByWeight) {
-        startWeightEntry(saved);
-        return;
-    }
-    addProductToCart(saved, 1);
+    m_entry->setFocus();
 }
 
 void PosPage::onQuickItemClicked(int productId)

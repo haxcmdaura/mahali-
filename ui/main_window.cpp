@@ -1009,7 +1009,7 @@ void MainWindow::refreshThemeIcons()
         // along, so the brand now shows the shop it is a till for. The colour is
         // set here rather than in the stylesheet because the accent is a theme
         // value, and a pixmap keeps the colour it was painted with: a theme
-        // switch has to repaint it, exactly as QuickAddCard's glyph does.
+        // switch has to repaint it, as it does every theme-coloured glyph.
         m_brandIcon->setPixmap(appIcon(Icon::Shop, accent, 28).pixmap(28, 28));
     }
     if (m_settingsBtn) {

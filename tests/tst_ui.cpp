@@ -176,6 +176,7 @@ private slots:
     void barcode_dialog_does_not_close();
     void product_dialog_writes_package_fields_from_the_shared_widget();
     void quick_items_bar_lists_products();
+    void quick_item_add_dialog_saves_and_refreshes_bar();
     void pos_quick_item_focuses_quantity_cell();
     void customerCreditAndPayment();
     void expensesAndDrawings();
@@ -2182,6 +2183,74 @@ void UiTest::quick_items_bar_lists_products()
     bar.refresh();
     QCOMPARE(bar.cardCount(), 1);
     QCOMPARE(bar.findChildren<app::ui::QuickItemCard*>().value(0)->productId(), breadId);
+}
+
+void UiTest::quick_item_add_dialog_saves_and_refreshes_bar()
+{
+    const QString path = m_dir.filePath(QStringLiteral("quick-item-add-dialog.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+
+    ui::PosPage page(db);
+    app::ui::QuickItemsBar* bar = page.quickItemsBar();
+    QVERIFY(bar != nullptr);
+    QCOMPARE(bar->cardCount(), 0);
+
+    QPushButton* add = bar->findChild<QPushButton*>(QStringLiteral("quickAddButton"));
+    QVERIFY2(add != nullptr, "the quick-items bar needs a + button");
+
+    bool dialogSeen = false;
+    bool fieldsFilled = false;
+    bool watchdogFired = false;
+    QTimer::singleShot(0, [&]() {
+        auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        if (!modal) {
+            return;
+        }
+        dialogSeen = true;
+        auto* name = modal->findChild<QLineEdit*>(QStringLiteral("quickItemNameField"));
+        auto* price = modal->findChild<QLineEdit*>(QStringLiteral("quickItemPriceField"));
+        auto* days = modal->findChild<QSpinBox*>(QStringLiteral("quickItemRestockDays"));
+        if (!name || !price || !days) {
+            modal->reject();
+            return;
+        }
+        fieldsFilled = true;
+        name->setText(QStringLiteral("خبز"));
+        price->setText(QStringLiteral("25.00"));
+        days->setValue(3);
+        if (auto* buttons = modal->findChild<QDialogButtonBox*>()) {
+            if (QPushButton* save = buttons->button(QDialogButtonBox::Save)) {
+                save->click();
+            }
+        }
+    });
+    QTimer watchdog;
+    watchdog.setSingleShot(true);
+    QObject::connect(&watchdog, &QTimer::timeout, [&watchdogFired]() {
+        watchdogFired = true;
+        if (auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget())) {
+            modal->reject();
+        }
+    });
+    watchdog.start(3000);
+
+    add->click();
+
+    QVERIFY2(!watchdogFired, "the quick item dialog stayed open until the watchdog fired");
+    QVERIFY2(dialogSeen, "the + button must open the quick item dialog");
+    QVERIFY2(fieldsFilled, "the quick item dialog must expose name, price, and restock fields");
+
+    data::ProductRepository repo(db);
+    const auto quick = repo.findQuickItems();
+    QCOMPARE(quick.size(), std::size_t(1));
+    const core::Product& saved = quick.front();
+    QVERIFY2(saved.isQuickItem, "the saved product must be explicitly marked as a quick item");
+    QVERIFY(saved.barcode.isEmpty());
+    QCOMPARE(saved.name, QStringLiteral("خبز"));
+    QCOMPARE(saved.salePriceCents, 2500LL);
+    QCOMPARE(saved.restockDays, 3);
+    QCOMPARE(bar->cardCount(), 1);
 }
 
 void UiTest::pos_quick_item_focuses_quantity_cell()
