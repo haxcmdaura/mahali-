@@ -40,14 +40,17 @@ core::Product productFromQuery(const QSqlQuery& query)
     product.piecesPerPackage = query.value(11).toInt();
     product.packageBarcode = query.value(12).toString();
     product.packageCostCents = query.value(13).toLongLong();
+    product.isQuickItem = query.value(14).toInt() != 0;
+    product.restockDays = query.value(15).toInt();
     return product;
 }
 
 const char* kProductColumns =
     "id, barcode, name, cost_price_cents, sale_price_cents, quantity, unit, package_size, active, "
-    "sold_by_weight, package_name, pieces_per_package, package_barcode, package_cost_cents";
+    "sold_by_weight, package_name, pieces_per_package, package_barcode, package_cost_cents, "
+    "is_quick_item, restock_days";
 
-const char* kQuickItemsFilter = "active = 1 AND (barcode IS NULL OR TRIM(barcode) = '')";
+const char* kQuickItemsFilter = "active = 1 AND is_quick_item = 1";
 
 // Every table holding a product line, and so every one whose rows a deleted
 // product would take the meaning of with it. supplier_return_items is here for
@@ -177,8 +180,9 @@ int ProductRepository::save(const core::Product& product)
         query.prepare(
             QStringLiteral("INSERT INTO products "
                            "(barcode, name, cost_price_cents, sale_price_cents, quantity, unit, package_size, active, sold_by_weight, "
-                           "package_name, pieces_per_package, package_barcode, package_cost_cents) "
-                           "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)"));
+                           "package_name, pieces_per_package, package_barcode, package_cost_cents, "
+                           "is_quick_item, restock_days) "
+                           "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
         query.addBindValue(barcodeVariant(product.barcode));
         query.addBindValue(product.name);
         query.addBindValue(product.costPriceCents);
@@ -196,6 +200,8 @@ int ProductRepository::save(const core::Product& product)
         query.addBindValue(piecesPerPackageOrOne(product.piecesPerPackage));
         query.addBindValue(barcodeVariant(product.packageBarcode));
         query.addBindValue(product.packageCostCents);
+        query.addBindValue(product.isQuickItem ? 1 : 0);
+        query.addBindValue(product.restockDays);
         if (!query.exec()) {
             m_db.recordError(query.lastError(), QStringLiteral("ProductRepository::save"));
             return 0;
@@ -208,7 +214,7 @@ int ProductRepository::save(const core::Product& product)
                        "barcode = ?, name = ?, cost_price_cents = ?, sale_price_cents = ?, "
                        "unit = ?, package_size = ?, active = ?, sold_by_weight = ?, "
                        "package_name = ?, pieces_per_package = ?, package_barcode = ?, "
-                       "package_cost_cents = ? "
+                       "package_cost_cents = ?, is_quick_item = ?, restock_days = ? "
                        "WHERE id = ?"));
     query.addBindValue(barcodeVariant(product.barcode));
     query.addBindValue(product.name);
@@ -226,6 +232,8 @@ int ProductRepository::save(const core::Product& product)
     query.addBindValue(piecesPerPackageOrOne(product.piecesPerPackage));
     query.addBindValue(barcodeVariant(product.packageBarcode));
     query.addBindValue(product.packageCostCents);
+    query.addBindValue(product.isQuickItem ? 1 : 0);
+    query.addBindValue(product.restockDays);
     query.addBindValue(product.id);
     if (!query.exec()) {
         m_db.recordError(query.lastError(), QStringLiteral("ProductRepository::save"));

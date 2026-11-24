@@ -583,7 +583,12 @@ void Database::createSchema()
             // What a carton costs, in cents, as invoiced. Not derived by dividing,
             // because the division rounds and the remainder is exactly what a
             // shelf price has to be checked against.
-            "package_cost_cents INTEGER NOT NULL DEFAULT 0);"),
+            "package_cost_cents INTEGER NOT NULL DEFAULT 0,"
+            // Explicit membership in the POS quick-items bar. A blank barcode is
+            // not enough on its own: only products the owner creates there belong.
+            "is_quick_item INTEGER NOT NULL DEFAULT 0,"
+            // How many days the owner expects a quick item to last before restocking.
+            "restock_days INTEGER NOT NULL DEFAULT 1);"),
 
         QStringLiteral(
             "CREATE TABLE IF NOT EXISTS sales ("

@@ -2130,9 +2130,10 @@ void UiTest::quick_items_bar_lists_products()
     QVERIFY(products.save(scanned) > 0);
 
     core::Product bread;
-    bread.barcode = QString();  // null -> no barcode -> a quick item
+    bread.barcode = QString();  // null -> no barcode
     bread.name = QStringLiteral("خبز شعير");
     bread.salePriceCents = 2500;
+    bread.isQuickItem = true;
     const int breadId = products.save(bread);
     QVERIFY(breadId > 0);
 
@@ -2140,6 +2141,7 @@ void UiTest::quick_items_bar_lists_products()
     water.barcode = QString();
     water.name = QStringLiteral("ماء");
     water.salePriceCents = 1500;
+    water.isQuickItem = true;
     const int waterId = products.save(water);
     QVERIFY(waterId > 0);
 
@@ -2193,6 +2195,7 @@ void UiTest::pos_quick_item_focuses_quantity_cell()
     bread.barcode = QString();
     bread.name = QStringLiteral("خبز");
     bread.salePriceCents = 2500;
+    bread.isQuickItem = true;
     QVERIFY(products.save(bread) > 0);
 
     ui::PosPage page(db);

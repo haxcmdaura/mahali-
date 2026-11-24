@@ -828,6 +828,30 @@ void migrateWeightProductsDropPackageFields(const QSqlDatabase& db)
         QStringLiteral("clear package fields on weight products"));
 }
 
+// 18 — quick items become an explicit flag
+//
+// The bar used to list every active product with no barcode, which also swept in
+// products that only happened to lack one. The flag says which products the owner
+// deliberately put there; existing rows stay at 0 until they are marked. The
+// restock window starts at one day, the default the bar will use.
+void migrateProductQuickItem(const QSqlDatabase& db)
+{
+    const QStringList columns = tableColumns(db, QStringLiteral("products"));
+    if (columns.isEmpty()) {
+        return;
+    }
+    if (!columns.contains(QStringLiteral("is_quick_item"))) {
+        run(db,
+            QStringLiteral("ALTER TABLE products ADD COLUMN is_quick_item INTEGER NOT NULL DEFAULT 0"),
+            QStringLiteral("add products.is_quick_item"));
+    }
+    if (!columns.contains(QStringLiteral("restock_days"))) {
+        run(db,
+            QStringLiteral("ALTER TABLE products ADD COLUMN restock_days INTEGER NOT NULL DEFAULT 1"),
+            QStringLiteral("add products.restock_days"));
+    }
+}
+
 void migrateOccasionOffers(const QSqlDatabase& db)
 {
     const QStringList occasions = tableColumns(db, QStringLiteral("occasions"));
@@ -920,6 +944,7 @@ const Migration kMigrations[] = {
     // future reader might trust is left behind.
     {16, "weight product package cleanup", migrateWeightProductsDropPackageFields},
     {17, "occasion offers", migrateOccasionOffers},
+    {18, "product quick items", migrateProductQuickItem},
 };
 
 } // namespace

@@ -92,6 +92,7 @@ private slots:
     void product_visibility_filter();
     void product_repository_round_trips_package_fields();
     void quick_items_roundtrip();
+    void quick_items_require_explicit_flag();
     void two_products_without_barcode();
     void barcode_with_value_still_unique();
     void normalize_barcode_azerty();
@@ -688,12 +689,14 @@ void DataLayerTest::quick_items_roundtrip()
     core::Product bread;
     bread.barcode = QString();  // null -> "no barcode"
     bread.name = QStringLiteral("خبز");
+    bread.isQuickItem = true;
     const int breadId = repo.save(bread);
     QVERIFY(breadId > 0);
 
     core::Product water;
     water.barcode = QString();
     water.name = QStringLiteral("ماء");
+    water.isQuickItem = true;
     const int waterId = repo.save(water);
     QVERIFY(waterId > 0);
 
@@ -724,6 +727,41 @@ void DataLayerTest::quick_items_roundtrip()
     repo.setActive(waterId, false);
     QCOMPARE(repo.findQuickItems().size(), std::size_t(1));
     QCOMPARE(repo.findQuickItems().front().id, breadId);
+}
+
+void DataLayerTest::quick_items_require_explicit_flag()
+{
+    const QString path = m_dir.filePath(QStringLiteral("quick_items_explicit.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository repo(db);
+
+    core::Product explicitQuick;
+    explicitQuick.barcode = QString();
+    explicitQuick.name = QStringLiteral("خبز");
+    explicitQuick.isQuickItem = true;
+    explicitQuick.restockDays = 3;
+    const int quickId = repo.save(explicitQuick);
+    QVERIFY(quickId > 0);
+
+    const auto stored = repo.findById(quickId);
+    QVERIFY(stored.has_value());
+    QVERIFY2(stored->isQuickItem, "the explicit quick-item flag must round-trip");
+    QCOMPARE(stored->restockDays, 3);
+
+    core::Product plainNoBarcode;
+    plainNoBarcode.barcode = QString();
+    plainNoBarcode.name = QStringLiteral("منتج بلا باركود");
+    plainNoBarcode.isQuickItem = false;
+    const int plainId = repo.save(plainNoBarcode);
+    QVERIFY(plainId > 0);
+
+    const auto quick = repo.findQuickItems();
+    QCOMPARE(quick.size(), std::size_t(1));
+    QCOMPARE(quick.front().id, quickId);
+    for (const core::Product& product : quick) {
+        QVERIFY(product.id != plainId);
+    }
 }
 
 void DataLayerTest::two_products_without_barcode()
@@ -954,11 +992,13 @@ void DataLayerTest::legacy_products_migration()
     core::Product first;
     first.barcode = QString();
     first.name = QStringLiteral("خبز");
+    first.isQuickItem = true;
     const int firstId = repo.save(first);
     QVERIFY(firstId > 0);
     core::Product second;
     second.barcode = QString();
     second.name = QStringLiteral("ماء");
+    second.isQuickItem = true;
     const int secondId = repo.save(second);
     QVERIFY(secondId > 0);
     QCOMPARE(repo.findQuickItems().size(), std::size_t(2));
@@ -1768,7 +1808,7 @@ void DataLayerTest::product_packages_migration_adds_columns_to_a_legacy_ledger()
         // assertion true whatever the stamp was and stop it testing anything. The
         // figure moves with every new migration, which is the whole point: a bump
         // that forgot to actually stamp this database would leave it one short.
-        QCOMPARE(data::readSchemaVersion(migratedDb), 17);
+        QCOMPARE(data::readSchemaVersion(migratedDb), 18);
         migratedDb.close();
     }
     QSqlDatabase::removeDatabase(connectionName);
@@ -1837,7 +1877,7 @@ void DataLayerTest::migration_14_backfills_pieces_per_package_from_package_size(
 
         // Pinned to the literal for the same reason as the package migration test:
         // it must move with each new migration, or it stops testing the stamp.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 17);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 18);
 
         // A second run changes nothing. The first run moved row 1's new column off
         // the default, so the guard's WHERE clause no longer matches it, and the two
@@ -1854,7 +1894,7 @@ void DataLayerTest::migration_14_backfills_pieces_per_package_from_package_size(
         }
         QVERIFY(!again.next());
         // Still stamped after the second, idempotent run.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 17);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 18);
 
         legacyDb.close();
     }
@@ -1933,7 +1973,7 @@ void DataLayerTest::weight_products_migration_drops_the_package_fields()
 
         // Pinned to the literal for the same reason as the other migration tests:
         // it must move with each new migration, or it stops testing the stamp.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 17);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 18);
 
         // A second run changes nothing. Row 1 no longer matches the guard because
         // its values are already the defaults, and the rows it does not match were
@@ -1949,7 +1989,7 @@ void DataLayerTest::weight_products_migration_drops_the_package_fields()
         QCOMPARE(again.value(1).toString(), QString());
         QCOMPARE(again.value(2).toInt(), 1);
         QCOMPARE(again.value(3).toInt(), 0);
-        QCOMPARE(data::readSchemaVersion(legacyDb), 17);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 18);
 
         legacyDb.close();
     }
