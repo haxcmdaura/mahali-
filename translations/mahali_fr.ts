@@ -524,6 +524,49 @@ Stock : %4</translation>
     </message>
 </context>
 <context>
+    <name>ProductListPage</name>
+    <message>
+        <location filename="../apps/android/qml/ProductListPage.qml" line="+14"/>
+        <source>Code-barres ou nom…</source>
+        <translation>Code-barres ou nom…</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Sync</source>
+        <translation>Synchroniser</translation>
+    </message>
+    <message>
+        <location line="+89"/>
+        <source>Vente — à venir</source>
+        <translation>Vente — à venir</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Synchronisation</source>
+        <translation>Synchronisation</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Adresse IP du serveur</source>
+        <translation>Adresse IP du serveur</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Clé de synchronisation</source>
+        <translation>Clé de synchronisation</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Sync Now</source>
+        <translation>Synchroniser maintenant</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Synchronisation en cours...</source>
+        <translation>Synchronisation en cours...</translation>
+    </message>
+</context>
+<context>
     <name>RefundsPage</name>
     <message>
         <location filename="../ui/refunds_page.cpp" line="+45"/>
@@ -564,7 +607,29 @@ Stock : %4</translation>
         <translation>Ajouter au stock</translation>
     </message>
     <message>
+        <location filename="../ui/dialogs/occasion_offer_dialog.cpp" line="+65"/>
+        <source>لا توجد منتجات لإضافتها إلى العرض</source>
+        <translation>Aucun produit à ajouter à l&apos;offre</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <location line="+122"/>
+        <source>إضافة عرض</source>
+        <translation>Ajouter une offre</translation>
+    </message>
+    <message>
+        <location line="-111"/>
+        <source>اتركه فارغاً لعدم تغيير السعر</source>
+        <translation>Laissez vide pour ne pas changer le prix</translation>
+    </message>
+    <message>
         <location line="+4"/>
+        <source>0 - 100</source>
+        <translation>0 - 100</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <location filename="../ui/dialogs/purchase_dialog.cpp" line="+4"/>
         <location line="+75"/>
         <location line="+245"/>
         <location line="+105"/>
@@ -574,7 +639,109 @@ Stock : %4</translation>
         <translation>0</translation>
     </message>
     <message>
-        <location line="-417"/>
+        <location line="+3"/>
+        <source>المنتج</source>
+        <translation>Produit</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+86"/>
+        <source>سعر العرض</source>
+        <translation>Prix de l&apos;offre</translation>
+    </message>
+    <message>
+        <location line="-85"/>
+        <source>نسبة الخصم %</source>
+        <translation>Remise %</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+85"/>
+        <source>حبات إضافية</source>
+        <translation>Pièces bonus</translation>
+    </message>
+    <message>
+        <location line="-80"/>
+        <source>حفظ</source>
+        <translation>Enregistrer</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>إلغاء</source>
+        <translation>Annuler</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>اختر منتجاً</source>
+        <translation>Choisissez un produit</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>سعر العرض غير صالح</source>
+        <translation>Prix de l&apos;offre invalide</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>نسبة الخصم يجب أن تكون بين 0 و 100</source>
+        <translation>La remise doit être comprise entre 0 et 100</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>عدد الحبات الإضافية غير صالح</source>
+        <translation>Nombre de pièces bonus invalide</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>إدارة العروض</source>
+        <translation>Gérer les offres</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>عروض المناسبة</source>
+        <translation>Offres de l&apos;occasion</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>اسم المنتج</source>
+        <translation>Nom du produit</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>نسبة الخصم</source>
+        <translation>Remise</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>إجراءات</source>
+        <translation>Actions</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>إغلاق</source>
+        <translation>Fermer</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>منتج #%1</source>
+        <translation>Produit #%1</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>حذف</source>
+        <translation>Supprimer</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>تعذر حذف العرض</source>
+        <translation>Impossible de supprimer l&apos;offre</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>تعذر حفظ العرض</source>
+        <translation>Impossible d&apos;enregistrer l&apos;offre</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/purchase_dialog.cpp" line="-417"/>
         <source>Fournisseur</source>
         <translation>Fournisseur</translation>
     </message>
@@ -706,7 +873,7 @@ Stock : %4</translation>
         <location line="+100"/>
         <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+11"/>
         <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+59"/>
-        <location filename="../ui/occasions_page.cpp" line="+136"/>
+        <location filename="../ui/occasions_page.cpp" line="+137"/>
         <source>Enregistrer</source>
         <translation>Enregistrer</translation>
     </message>
@@ -723,7 +890,14 @@ Stock : %4</translation>
         <translation>Annuler</translation>
     </message>
     <message>
-        <location line="+276"/>
+        <location filename="../ui/dialogs/occasion_offer_dialog.cpp" line="-195"/>
+        <location line="+52"/>
+        <location line="+7"/>
+        <location line="+10"/>
+        <location line="+11"/>
+        <location line="+99"/>
+        <location line="+16"/>
+        <location filename="../ui/dialogs/purchase_dialog.cpp" line="+276"/>
         <location line="+15"/>
         <location line="+63"/>
         <location line="+57"/>
@@ -745,7 +919,7 @@ Stock : %4</translation>
         <translation>Erreur</translation>
     </message>
     <message>
-        <location line="-223"/>
+        <location filename="../ui/dialogs/purchase_dialog.cpp" line="-223"/>
         <location line="+78"/>
         <source>Produit introuvable</source>
         <translation>Produit introuvable</translation>
@@ -1098,17 +1272,17 @@ Stock : %4</translation>
     <message>
         <location line="+102"/>
         <source>g</source>
-        <translation type="unfinished"></translation>
+        <translation>g</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>colis</source>
-        <translation type="unfinished"></translation>
+        <translation>colis</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>pcs</source>
-        <translation type="unfinished"></translation>
+        <translation>pcs</translation>
     </message>
     <message>
         <location line="+74"/>
@@ -1153,17 +1327,17 @@ Stock : %4</translation>
     <message>
         <location line="+3"/>
         <source>تسجيل دفع الزكاة لهذا العام</source>
-        <translation type="unfinished"></translation>
+        <translation>Enregistrer le paiement de la Zakat de cette année</translation>
     </message>
     <message>
         <location line="+145"/>
         <source>تعذّر تسجيل دفع الزكاة</source>
-        <translation type="unfinished"></translation>
+        <translation>Impossible d&apos;enregistrer le paiement de la Zakat</translation>
     </message>
     <message>
         <location line="+6"/>
         <source>دُفعت الزكاة عن عام %1. بارك الله فيك.</source>
-        <translation type="unfinished"></translation>
+        <translation>Zakat payée pour l&apos;année %1. Merci.</translation>
     </message>
     <message>
         <location line="-111"/>
@@ -1194,22 +1368,22 @@ Stock : %4</translation>
     <message>
         <location filename="../ui/dialogs/select_product_dialog.cpp" line="-11"/>
         <source>Choisir un produit</source>
-        <translation type="unfinished"></translation>
+        <translation>Choisir un produit</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>Nom ou code-barres</source>
-        <translation type="unfinished"></translation>
+        <translation>Nom ou code-barres</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>Prix</source>
-        <translation type="unfinished">Prix</translation>
+        <translation>Prix</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>Stock</source>
-        <translation type="unfinished">Stock</translation>
+        <translation>Stock</translation>
     </message>
     <message>
         <location filename="../ui/occasions_page.cpp" line="-24"/>
@@ -2138,6 +2312,11 @@ Stock : %4</translation>
     </message>
     <message>
         <location line="+5"/>
+        <source>إدارة العروض</source>
+        <translation>Gérer les offres</translation>
+    </message>
+    <message>
+        <location line="+5"/>
         <source>Activer manuellement</source>
         <translation>Activer manuellement</translation>
     </message>
@@ -2157,7 +2336,7 @@ Stock : %4</translation>
         <translation>Modifier les dates</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+30"/>
         <source>ID</source>
         <translation>ID</translation>
     </message>
@@ -2197,13 +2376,13 @@ Stock : %4</translation>
         <translation>Liste des occasions</translation>
     </message>
     <message>
-        <location line="+42"/>
-        <location line="+102"/>
+        <location line="+47"/>
+        <location line="+109"/>
         <source>نعم</source>
         <translation>Oui</translation>
     </message>
     <message>
-        <location line="-102"/>
+        <location line="-109"/>
         <source>لا</source>
         <translation>Non</translation>
     </message>
@@ -2213,12 +2392,17 @@ Stock : %4</translation>
         <translation>Désactiver</translation>
     </message>
     <message>
+        <location line="+0"/>
+        <source>تفعيل</source>
+        <translation>Activer</translation>
+    </message>
+    <message>
         <location line="+5"/>
         <source>تعديل</source>
         <translation>Modifier</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+23"/>
         <source>manuel</source>
         <translation>manuel</translation>
     </message>
@@ -2254,21 +2438,21 @@ Stock : %4</translation>
     </message>
     <message>
         <location line="+71"/>
-        <location line="+46"/>
+        <location line="+16"/>
+        <location line="+51"/>
         <location line="+7"/>
-        <location line="+8"/>
-        <location line="+12"/>
+        <location line="+13"/>
         <location line="+12"/>
         <source>Erreur</source>
-        <translation type="unfinished">Erreur</translation>
+        <translation>Erreur</translation>
     </message>
     <message>
-        <location line="-84"/>
+        <location line="-98"/>
         <source>Impossible de désactiver l&apos;occasion</source>
         <translation>Impossible de désactiver l&apos;occasion</translation>
     </message>
     <message>
-        <location line="+45"/>
+        <location line="+66"/>
         <source>لا توجد مناسبة لتعديل تواريخها</source>
         <translation>Aucune occasion dont les dates puissent être modifiées</translation>
     </message>
@@ -2278,12 +2462,12 @@ Stock : %4</translation>
         <translation>Sélectionnez une occasion</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="-58"/>
         <source>Impossible d&apos;activer l&apos;occasion</source>
         <translation>Impossible d&apos;activer l&apos;occasion</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+71"/>
         <source>Impossible de passer en mode automatique</source>
         <translation>Impossible de passer en mode automatique</translation>
     </message>
@@ -2377,12 +2561,12 @@ Stock : %4</translation>
     </message>
     <message>
         <location line="+37"/>
-        <location line="+963"/>
+        <location line="+961"/>
         <source>Ajustement</source>
         <translation>Ajustement</translation>
     </message>
     <message>
-        <location line="-958"/>
+        <location line="-956"/>
         <source>Somme à ajouter (+) ou à retirer (-) sur la facture entière</source>
         <translation>Somme à ajouter (+) ou à retirer (-) sur la facture entière</translation>
     </message>
@@ -2395,12 +2579,12 @@ Stock : %4</translation>
         <location line="+4"/>
         <location line="+1"/>
         <location line="+829"/>
-        <location line="+172"/>
+        <location line="+170"/>
         <source>Valider la vente (Entrée)</source>
         <translation>Valider la vente (Entrée)</translation>
     </message>
     <message>
-        <location line="-952"/>
+        <location line="-950"/>
         <source>طبع الإيصال</source>
         <translation>Imprimer le reçu</translation>
     </message>
@@ -2478,14 +2662,13 @@ Stock : %4</translation>
         <translation>Reste : %1</translation>
     </message>
     <message>
-        <location line="+77"/>
         <source>Offre: %1 → %2</source>
-        <translation>Offre : %1 → %2</translation>
+        <translation type="vanished">Offre : %1 → %2</translation>
     </message>
     <message>
-        <location line="+121"/>
+        <location line="+196"/>
         <source>تعديل غير صالح</source>
-        <translation type="unfinished"></translation>
+        <translation>Modification invalide</translation>
     </message>
     <message>
         <location line="+110"/>
@@ -2534,7 +2717,7 @@ Stock : %4</translation>
         <translation>Le poids %1 grammes est-il correct ?</translation>
     </message>
     <message>
-        <location line="-404"/>
+        <location line="-402"/>
         <location line="+52"/>
         <location filename="../ui/printing/receipt.cpp" line="+45"/>
         <location line="+182"/>
@@ -2548,7 +2731,12 @@ Stock : %4</translation>
         <translation>Carton</translation>
     </message>
     <message>
-        <location line="+1213"/>
+        <location line="+1132"/>
+        <source>Offre : %1 → %2</source>
+        <translation>Offre : %1 → %2</translation>
+    </message>
+    <message>
+        <location line="+79"/>
         <source>À CRÉDIT : %1 · Solde : %2</source>
         <translation>À CRÉDIT : %1 · Solde : %2</translation>
     </message>
@@ -3437,18 +3625,18 @@ Stock : %4</translation>
     <message>
         <location line="-161"/>
         <source>نسخ احتياطي الآن</source>
-        <translation type="unfinished"></translation>
+        <translation>Sauvegarder maintenant</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>استعادة من نسخة</source>
-        <translation type="unfinished"></translation>
+        <translation>Restaurer une sauvegarde</translation>
     </message>
     <message>
         <location line="+2"/>
         <location line="+253"/>
         <source>تنظيف المنتجات غير المستخدمة</source>
-        <translation type="unfinished"></translation>
+        <translation>Nettoyer les produits inutilisés</translation>
     </message>
     <message>
         <location line="-227"/>
@@ -3485,39 +3673,39 @@ Stock : %4</translation>
     <message>
         <location line="+13"/>
         <source>حفظ النسخة الاحتياطية</source>
-        <translation type="unfinished"></translation>
+        <translation>Enregistrer la sauvegarde</translation>
     </message>
     <message>
         <location line="+1"/>
         <location line="+16"/>
         <source>قواعد بيانات SQLite (*.sqlite)</source>
-        <translation type="unfinished"></translation>
+        <translation>Bases de données SQLite (*.sqlite)</translation>
     </message>
     <message>
         <location line="-10"/>
         <source>تم إنشاء النسخة الاحتياطية: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Sauvegarde créée : %1</translation>
     </message>
     <message>
         <location line="+3"/>
         <location line="+74"/>
         <source>تعذّر إنشاء النسخة الاحتياطية: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Impossible de créer la sauvegarde : %1</translation>
     </message>
     <message>
         <location line="-69"/>
         <source>اختيار نسخة احتياطية</source>
-        <translation type="unfinished"></translation>
+        <translation>Choisir une sauvegarde</translation>
     </message>
     <message>
         <location line="+8"/>
         <source>ستُستعاد النسخة عند إعادة تشغيل البرنامج</source>
-        <translation type="unfinished"></translation>
+        <translation>La sauvegarde sera restaurée au redémarrage du programme</translation>
     </message>
     <message>
         <location line="+2"/>
         <source>تعذّرت الاستعادة: %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Échec de la restauration : %1</translation>
     </message>
     <message>
         <location line="+15"/>
@@ -3553,52 +3741,52 @@ Stock : %4</translation>
     <message>
         <location line="+42"/>
         <source>إلغاء</source>
-        <translation type="unfinished"></translation>
+        <translation>Annuler</translation>
     </message>
     <message>
         <location line="+21"/>
         <source>فحص المنتجات غير النشطة...</source>
-        <translation type="unfinished"></translation>
+        <translation>Recherche des produits inactifs...</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>تم إلغاء فحص المنتجات.</source>
-        <translation type="unfinished"></translation>
+        <translation>Recherche des produits annulée.</translation>
     </message>
     <message>
         <location line="+30"/>
         <source>سيتم حذف %1 منتج غير نشط وغير مستخدم نهائياً.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 produit(s) inactif(s) et inutilisé(s) seront supprimé(s) définitivement.</translation>
     </message>
     <message>
         <location line="+3"/>
         <source>سيتم تخطي %1 منتج مستخدم. النسخة الاحتياطية: %2</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 produit(s) utilisé(s) seront ignoré(s). Sauvegarde : %2</translation>
     </message>
     <message>
         <location line="+7"/>
         <source>تم إلغاء التنظيف.</source>
-        <translation type="unfinished"></translation>
+        <translation>Nettoyage annulé.</translation>
     </message>
     <message>
         <location line="+5"/>
         <source>لا توجد منتجات غير مستخدمة للحذف.</source>
-        <translation type="unfinished"></translation>
+        <translation>Aucun produit inutilisé à supprimer.</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>حذف المنتجات...</source>
-        <translation type="unfinished"></translation>
+        <translation>Suppression des produits...</translation>
     </message>
     <message>
         <location line="+14"/>
         <source>تم إلغاء التنظيف بعد حذف %1 منتج.</source>
-        <translation type="unfinished"></translation>
+        <translation>Nettoyage annulé après suppression de %1 produit(s).</translation>
     </message>
     <message>
         <location line="+32"/>
         <source>تم حذف %1 منتج، وتخطي %2 منتج مستخدم، وتعذّر حذف %3 منتج.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1 produit(s) supprimé(s), %2 ignoré(s), %3 non supprimé(s).</translation>
     </message>
     <message>
         <location line="+158"/>
@@ -3901,24 +4089,31 @@ Stock : %4</translation>
     <message>
         <location line="+72"/>
         <source>محلي — النسخ الاحتياطي</source>
-        <translation type="unfinished"></translation>
+        <translation>Local — Sauvegarde</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>تعذّر إكمال النسخة الاحتياطية اليومية:
 %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Impossible de terminer la sauvegarde quotidienne :
+%1</translation>
     </message>
     <message>
         <location line="+11"/>
         <source>محلي — الاستعادة</source>
-        <translation type="unfinished"></translation>
+        <translation>Local — Restauration</translation>
     </message>
     <message>
         <location line="+1"/>
         <source>تعذّرت استعادة النسخة الاحتياطية:
 %1</source>
-        <translation type="unfinished"></translation>
+        <translation>Impossible de restaurer la sauvegarde :
+%1</translation>
+    </message>
+    <message>
+        <location filename="../apps/android/qml/main.qml" line="+9"/>
+        <source>Mahali</source>
+        <translation>Mahali</translation>
     </message>
 </context>
 </TS>
