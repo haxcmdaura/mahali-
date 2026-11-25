@@ -3,13 +3,56 @@
 #include <QDateTime>
 #include <QMap>
 #include <QSqlQuery>
+#include <limits>
 
 #include "date_utils.h"
 #include "cash_drawer.h"
 #include "audit_log_repository.h"
 #include "core/cash_movement.h"
+#include "core/line_total.h"
+#include "core/purchase_item.h"
+#include "sale_rules.h"
 
 namespace app::data {
+
+PurchaseLineResult makePurchaseItem(const core::Product& product, long long quantity,
+                                    long long unitPriceCents)
+{
+    PurchaseLineResult result;
+    if (quantity <= 0) {
+        result.error = QStringLiteral("quantity must be positive");
+        return result;
+    }
+    if (unitPriceCents < 0) {
+        result.error = QStringLiteral("unit price must be non-negative");
+        return result;
+    }
+
+    // The product is the authority on the unit: a weight product's price is per
+    // kilogram and its quantity is already grams, so the shared function divides
+    // the thousand out exactly as the sale path does.
+    const UnitKind kind = product.soldByWeight ? UnitKind::Weight : UnitKind::Piece;
+    const std::optional<long long> total = core::lineTotalCents(quantity, unitPriceCents, kind);
+    if (!total.has_value()) {
+        result.error = QStringLiteral("line total overflows");
+        return result;
+    }
+
+    core::PurchaseItem item;
+    item.productId = product.id;
+    item.description = product.name;
+    item.quantity = quantity;
+    item.unit = product.soldByWeight
+        ? QStringLiteral("kg")
+        : (product.unit.isEmpty() ? QStringLiteral("piece") : product.unit);
+    item.unitPriceCents = unitPriceCents;
+    item.totalCents = *total;
+    item.unitKind = toString(kind);
+
+    result.item = item;
+    result.ok = true;
+    return result;
+}
 
 PurchaseService::PurchaseService(Database& db, PurchaseRepository& purchases, PurchaseItemRepository& items,
                                  ProductRepository& products, StockMovementRepository& stockMovements,
@@ -71,6 +114,52 @@ PurchaseResult PurchaseService::recordPurchase(const core::Purchase& purchase,
     for (const core::PurchaseItem& item : items) {
         if (item.quantity <= 0) {
             result.error = QStringLiteral("quantity must be positive");
+            return result;
+        }
+        if (item.unitPriceCents < 0) {
+            result.error = QStringLiteral("unit price must be non-negative");
+            return result;
+        }
+        QString unitKind = item.unitKind.isEmpty() ? QStringLiteral("piece") : item.unitKind;
+        const std::optional<UnitKind> parsedKind = fromString(unitKind);
+        if (!parsedKind.has_value()) {
+            result.error = QStringLiteral("unknown unit '%1'").arg(unitKind);
+            return result;
+        }
+        if (*parsedKind == UnitKind::Package) {
+            result.error = QStringLiteral("purchase lines cannot use the package unit");
+            return result;
+        }
+        if (item.productId.has_value()) {
+            const auto product = m_products.findById(*item.productId);
+            if (product.has_value()) {
+                if (product->soldByWeight && *parsedKind != UnitKind::Weight) {
+                    result.error =
+                        QStringLiteral("product %1 is sold by weight and must use the weight unit").arg(product->name);
+                    return result;
+                }
+                if (!product->soldByWeight && *parsedKind == UnitKind::Weight) {
+                    result.error = QStringLiteral("product %1 is not sold by weight and cannot use the weight unit")
+                                       .arg(product->name);
+                    return result;
+                }
+            }
+        }
+        // A weight line stores grams at a per-kilogram price. The shared
+        // function divides the thousand out, so a purchase and a sale agree to
+        // the cent, and returns nullopt when the multiplication cannot fit.
+        const std::optional<long long> expectedTotal =
+            core::lineTotalCents(item.quantity, item.unitPriceCents, *parsedKind);
+        if (!expectedTotal.has_value()) {
+            result.error = QStringLiteral("line total overflows");
+            return result;
+        }
+        if (*expectedTotal != item.totalCents) {
+            result.error = QStringLiteral("line total mismatch");
+            return result;
+        }
+        if (!detail::sumFits(subtotalCents, item.totalCents)) {
+            result.error = QStringLiteral("subtotal overflow");
             return result;
         }
         subtotalCents += item.totalCents;

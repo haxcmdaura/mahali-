@@ -1,58 +1,27 @@
 #pragma once
 
-#include <limits>
 #include <optional>
 #include <QString>
 #include <QVector>
 #include <QDebug>
 
+#include "core/line_total.h"
+#include "core/sale_item.h"
 #include "product_repository.h"
 #include "stock_movement_repository.h"
 
 namespace app::data {
 
+// The unit words and the overflow arithmetic live in core so the purchase path
+// can share them without depending on this header. The names stay in this
+// namespace so every existing call site keeps reading the same.
+using core::UnitKind;
+using core::toString;
+using core::fromString;
+
 namespace detail {
-
-// Whether a * b is representable as a long long. Signed overflow is undefined
-// behaviour, and a wrapped amount is not a wrong amount, it is a plausible wrong
-// amount of money.
-//
-// Done in unsigned magnitudes on purpose. The tempting shortcut
-// `a < 0 && b < min / b` reads like a guard on the negative range and is not one:
-// with a quantity of -2 and a cost of 5000, min / -2 comes out as a large
-// positive number, so a comparison the wrong way round rejects every ordinary
-// small figure and lets through the one that cannot be stored. A cancellation is
-// exactly the case that needs this to be right — its lines are negative and
-// perfectly ordinary.
-inline bool productFits(long long a, long long b)
-{
-    // Two to the 63rd: the width of the negative range, one wider than max.
-    const unsigned long long limit =
-        static_cast<unsigned long long>(std::numeric_limits<long long>::max()) + 1ULL;
-    const auto magnitude = [](long long value) -> unsigned long long {
-        return value < 0 ? 0ULL - static_cast<unsigned long long>(value)
-                          : static_cast<unsigned long long>(value);
-    };
-    const unsigned long long left = magnitude(a);
-    const unsigned long long right = magnitude(b);
-    if (left != 0 && right > limit / left) {
-        return false;
-    }
-    const unsigned long long product = left * right;
-    // The negative range reaches one further than the positive one, so the same
-    // product can be too large to store either way round depending on the sign.
-    return (a < 0) != (b < 0) ? product <= limit : product < limit;
-}
-
-// Whether a + b is representable, checked rather than performed.
-inline bool sumFits(long long a, long long b)
-{
-    if (b > 0 && a > std::numeric_limits<long long>::max() - b) {
-        return false;
-    }
-    return !(b < 0 && a < std::numeric_limits<long long>::min() - b);
-}
-
+using core::detail::productFits;
+using core::detail::sumFits;
 } // namespace detail
 
 // Shared accounting rules for recording a sale or customer debt. Both the

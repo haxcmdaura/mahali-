@@ -6,6 +6,7 @@
 
 #include "core/purchase.h"
 #include "core/purchase_item.h"
+#include "core/product.h"
 #include "core/supplier_payment.h"
 #include "cash_drawer.h"
 #include "database.h"
@@ -26,6 +27,20 @@ struct PurchaseResult {
     int purchaseId = 0;
     QString error;
 };
+
+struct PurchaseLineResult {
+    bool ok = false;
+    core::PurchaseItem item;
+    QString error;
+};
+
+// Builds one invoice line from the product and what the operator typed. A
+// weight product's quantity is already in grams and its price is per kilogram,
+// so the total comes from the same shared arithmetic as a sale; a piece product
+// is quantity times price. The two units cannot cross because the product, not
+// the caller, decides whether the line is weighed.
+PurchaseLineResult makePurchaseItem(const core::Product& product, long long quantity,
+                                    long long unitPriceCents);
 
 class PurchaseService {
 public:

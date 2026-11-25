@@ -36,6 +36,7 @@ target_sources(mahali-core PRIVATE
     customer_transaction_item.h
     device.h
     expense.h
+    line_total.h
     owner_drawing.h
     payment.h
     product.h
@@ -67,6 +68,7 @@ target_sources(mahali-core PRIVATE
     user.h
     version.cpp
     version.h
+    weight_parser.h
     zakat_calculator.cpp
     zakat_calculator.h)
 

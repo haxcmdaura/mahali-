@@ -33,6 +33,7 @@
 #include "core/barcode_utils.h"
 #include "core/product.h"
 #include "core/supplier_payment.h"
+#include "core/weight_parser.h"
 #include "data/cash_session_repository.h"
 #include "data/date_utils.h"
 #include "data/purchase_item_repository.h"
@@ -62,6 +63,17 @@ constexpr int kColRemove = 5;
 // being a form and the operator is transcribing by hand, which is the job an
 // import is for.
 constexpr int kMaxLines = 200;
+
+enum class LineProblem { None, Quantity, Price, Total };
+
+// One row read back exactly as it is on screen. Keeping the problem instead of
+// the service's English text lets the dialog say the same French sentence it
+// always has.
+struct RowLine {
+    bool ok = false;
+    core::PurchaseItem item;
+    LineProblem problem = LineProblem::None;
+};
 
 QString tr(const char* text)
 {
@@ -278,25 +290,79 @@ PurchaseDialogResult showPurchaseDialog(QWidget* parent, app::data::Database& db
 
     // ---- the lines ----
 
-    // Everything below reads the widgets back rather than keeping a shadow copy
-    // of the invoice, so what is saved is what is on screen.
-    const auto lineTotal = [](int row, QTableWidget* table) {
-        const auto* qty = qobject_cast<QSpinBox*>(table->cellWidget(row, kColQuantity));
-        const auto* price = qobject_cast<QLineEdit*>(table->cellWidget(row, kColPrice));
-        if (!qty || !price) {
-            return 0LL;
+    // The quantity editor carries the unit in its type: a spin box counts
+    // pieces, a line edit holds kilograms that parseWeightGrams turns into
+    // grams. Both end up as integer grams or pieces with no formula repeated.
+    const auto quantityForRow = [](QTableWidget* table, int row) -> std::optional<long long> {
+        QWidget* editor = table->cellWidget(row, kColQuantity);
+        if (const auto* spin = qobject_cast<QSpinBox*>(editor)) {
+            return static_cast<long long>(spin->value());
         }
-        const std::optional<long long> unitPrice = parseMoney(price->text());
-        if (!unitPrice.has_value()) {
-            return 0LL;
+        if (const auto* text = qobject_cast<QLineEdit*>(editor)) {
+            return core::parseWeightGrams(text->text());
         }
-        return static_cast<long long>(qty->value()) * *unitPrice;
+        return std::nullopt;
+    };
+
+    // The row's name field carries what bindRow learned about the product so a
+    // total can be shown without asking the database on every keystroke. The
+    // save path reloads the product and checks the name again.
+    const auto productForRow = [](QTableWidget* table, int row) -> std::optional<core::Product> {
+        const auto* field = qobject_cast<QLineEdit*>(table->cellWidget(row, kColProduct));
+        if (!field) {
+            return std::nullopt;
+        }
+        const int productId = field->property("productId").toInt();
+        if (productId <= 0) {
+            return std::nullopt;
+        }
+        core::Product product;
+        product.id = productId;
+        product.name = field->text().trimmed();
+        product.unit = field->property("productUnit").toString();
+        product.soldByWeight = field->property("productSoldByWeight").toBool();
+        return product;
+    };
+
+    // The one place a row becomes an invoice line. Both the running total and
+    // the save loop come through here, so the figure on screen and the figure
+    // written are the same arithmetic.
+    const auto lineForRow = [&](int row, const core::Product& product) -> RowLine {
+        RowLine result;
+        const std::optional<long long> quantity = quantityForRow(itemsTable, row);
+        if (!quantity.has_value() || *quantity <= 0) {
+            result.problem = LineProblem::Quantity;
+            return result;
+        }
+
+        const auto* price = qobject_cast<QLineEdit*>(itemsTable->cellWidget(row, kColPrice));
+        const std::optional<long long> unitPrice = price ? parseMoney(price->text()) : std::nullopt;
+        if (!unitPrice.has_value() || *unitPrice <= 0) {
+            result.problem = LineProblem::Price;
+            return result;
+        }
+
+        const data::PurchaseLineResult made = data::makePurchaseItem(product, *quantity, *unitPrice);
+        if (!made.ok) {
+            result.problem = LineProblem::Total;
+            return result;
+        }
+        result.ok = true;
+        result.item = made.item;
+        return result;
     };
 
     const auto recompute = [&]() {
         long long subtotal = 0;
         for (int row = 0; row < itemsTable->rowCount(); ++row) {
-            const long long total = lineTotal(row, itemsTable);
+            long long total = 0;
+            if (const std::optional<core::Product> product = productForRow(itemsTable, row);
+                product.has_value()) {
+                const RowLine line = lineForRow(row, *product);
+                if (line.ok) {
+                    total = line.item.totalCents;
+                }
+            }
             subtotal += total;
             if (QTableWidgetItem* cell = itemsTable->item(row, kColTotal)) {
                 cell->setText(formatMoney(total));
@@ -322,6 +388,34 @@ PurchaseDialogResult showPurchaseDialog(QWidget* parent, app::data::Database& db
         methodCombo->setEnabled(paid > 0);
     };
 
+    const auto makeQuantityEditor = [&](bool weight) -> QWidget* {
+        if (weight) {
+            auto* qty = new QLineEdit;
+            qty->setObjectName(QStringLiteral("weightQuantity"));
+            qty->setPlaceholderText(QStringLiteral("kg"));
+            QObject::connect(qty, &QLineEdit::editingFinished, &dialog, [&]() { recompute(); });
+            QObject::connect(qty, &QLineEdit::textChanged, &dialog, [&]() { recompute(); });
+            return qty;
+        }
+        auto* qty = new QSpinBox;
+        qty->setRange(1, 999999);
+        qty->setValue(1);
+        QObject::connect(qty, QOverload<int>::of(&QSpinBox::valueChanged), &dialog,
+                         [&]() { recompute(); });
+        return qty;
+    };
+
+    const auto setQuantityEditor = [&](int row, bool weight) {
+        QWidget* current = itemsTable->cellWidget(row, kColQuantity);
+        const bool isWeight = qobject_cast<QLineEdit*>(current) != nullptr;
+        const bool isPiece = qobject_cast<QSpinBox*>(current) != nullptr;
+        if ((weight && isWeight) || (!weight && isPiece)) {
+            return false;
+        }
+        itemsTable->setCellWidget(row, kColQuantity, makeQuantityEditor(weight));
+        return true;
+    };
+
     // A row is identified by the widget sitting in it, not by a number captured
     // when it was built: removing a line renumbers every row below it, and a
     // captured index would then point at the wrong product.
@@ -342,17 +436,42 @@ PurchaseDialogResult showPurchaseDialog(QWidget* parent, app::data::Database& db
         // The id rides on the field itself rather than in a parallel table, so a
         // row carries its own meaning and survives the renumbering above.
         name->setProperty("productId", product.id);
+        name->setProperty("productUnit", product.unit);
+        name->setProperty("productSoldByWeight", product.soldByWeight);
         name->setText(product.name);
 
+        // A weight product gets a decimal kilogram field and a piece product an
+        // integer count. Swapping the editor also throws away the old value,
+        // because "3" means three pieces or three kilograms and must not carry
+        // across that change.
+        const bool swapped = setQuantityEditor(row, product.soldByWeight);
+
         if (QTableWidgetItem* unit = itemsTable->item(row, kColUnit)) {
-            unit->setText(product.unit.isEmpty() ? QStringLiteral("piece") : product.unit);
+            unit->setText(product.soldByWeight
+                              ? QStringLiteral("kg")
+                              : (product.unit.isEmpty() ? QStringLiteral("piece") : product.unit));
         }
         // What the article currently costs is the honest first guess for a
-        // purchase price; it still has to be confirmed line by line.
+        // purchase price; it still has to be confirmed line by line. A weight
+        // line's price is per kilogram, which the placeholder and suffix say.
         auto* price = qobject_cast<QLineEdit*>(itemsTable->cellWidget(row, kColPrice));
-        if (price && price->text().trimmed().isEmpty()) {
-            price->setText(formatMoney(product.costPriceCents > 0 ? product.costPriceCents
-                                                                  : product.salePriceCents));
+        if (price) {
+            if (swapped) {
+                price->clear();
+            }
+            price->setPlaceholderText(product.soldByWeight
+                                          ? tr("Prix unitaire") + QStringLiteral(" / kg")
+                                          : tr("0"));
+            if (price->text().trimmed().isEmpty()) {
+                QString text = formatMoney(product.costPriceCents > 0 ? product.costPriceCents
+                                                                      : product.salePriceCents);
+                if (product.soldByWeight) {
+                    // parseMoney drops the suffix, so it is a label on the
+                    // figure and not part of what is saved.
+                    text += QStringLiteral(" / kg");
+                }
+                price->setText(text);
+            }
         }
         recompute();
     };
@@ -403,6 +522,9 @@ PurchaseDialogResult showPurchaseDialog(QWidget* parent, app::data::Database& db
         const QString text = field->text().trimmed();
         if (text.isEmpty()) {
             field->setProperty("productId", 0);
+            field->setProperty("productUnit", QString());
+            field->setProperty("productSoldByWeight", false);
+            setQuantityEditor(row, false);
             if (QTableWidgetItem* unit = itemsTable->item(row, kColUnit)) {
                 unit->setText(QString());
             }
@@ -441,12 +563,7 @@ PurchaseDialogResult showPurchaseDialog(QWidget* parent, app::data::Database& db
         });
         itemsTable->setCellWidget(row, kColProduct, name);
 
-        auto* qty = new QSpinBox;
-        qty->setRange(1, 999999);
-        qty->setValue(1);
-        QObject::connect(qty, QOverload<int>::of(&QSpinBox::valueChanged), &dialog,
-                         [&]() { recompute(); });
-        itemsTable->setCellWidget(row, kColQuantity, qty);
+        itemsTable->setCellWidget(row, kColQuantity, makeQuantityEditor(false));
 
         auto* price = new QLineEdit;
         price->setPlaceholderText(tr("0"));
@@ -566,8 +683,6 @@ PurchaseDialogResult showPurchaseDialog(QWidget* parent, app::data::Database& db
         for (int row = 0; row < itemsTable->rowCount(); ++row) {
             const int number = row + 1;
             const auto* field = qobject_cast<QLineEdit*>(itemsTable->cellWidget(row, kColProduct));
-            const auto* qty = qobject_cast<QSpinBox*>(itemsTable->cellWidget(row, kColQuantity));
-            const auto* price = qobject_cast<QLineEdit*>(itemsTable->cellWidget(row, kColPrice));
             const int productId = field ? field->property("productId").toInt() : 0;
 
             // A field edited after the product was bound would save a name that
@@ -580,28 +695,20 @@ PurchaseDialogResult showPurchaseDialog(QWidget* parent, app::data::Database& db
                                      tr("Ligne %1 : produit introuvable").arg(number));
                 return;
             }
-            if (!qty || qty->value() <= 0) {
-                QMessageBox::warning(&dialog, tr("Erreur"),
-                                     tr("Ligne %1 : quantité invalide").arg(number));
-                return;
-            }
-            const std::optional<long long> unitPrice =
-                price ? parseMoney(price->text()) : std::nullopt;
-            if (!unitPrice.has_value() || *unitPrice <= 0) {
-                QMessageBox::warning(&dialog, tr("Erreur"),
-                                     tr("Ligne %1 : prix unitaire obligatoire").arg(number));
-                return;
-            }
 
-            core::PurchaseItem line;
-            line.productId = product->id;
-            line.description = product->name;
-            line.quantity = qty->value();
-            line.unit = product->unit.isEmpty() ? QStringLiteral("piece") : product->unit;
-            line.unitPriceCents = *unitPrice;
-            line.totalCents = line.quantity * line.unitPriceCents;
-            subtotal += line.totalCents;
-            lines.append(line);
+            const RowLine made = lineForRow(row, *product);
+            if (!made.ok) {
+                if (made.problem == LineProblem::Price) {
+                    QMessageBox::warning(&dialog, tr("Erreur"),
+                                         tr("Ligne %1 : prix unitaire obligatoire").arg(number));
+                } else {
+                    QMessageBox::warning(&dialog, tr("Erreur"),
+                                         tr("Ligne %1 : quantité invalide").arg(number));
+                }
+                return;
+            }
+            subtotal += made.item.totalCents;
+            lines.append(made.item);
         }
 
         const long long vat = parseMoney(vatField->text()).value_or(0);

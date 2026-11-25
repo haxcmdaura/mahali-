@@ -2,6 +2,7 @@
 
 #include "core/cash_session_calculator.h"
 #include "core/profit_loss_calculator.h"
+#include "core/weight_parser.h"
 #include "core/zakat_calculator.h"
 
 class FinanceTest : public QObject
@@ -13,6 +14,7 @@ private slots:
     void cashSessionVariance();
     void zakatBaseTreatsDebtAsCash();
     void zakatBaseStockCashReceivables();
+    void parseWeightGrams();
 };
 
 void FinanceTest::profitLoss()
@@ -69,6 +71,42 @@ void FinanceTest::zakatBaseStockCashReceivables()
 
     app::core::ZakatInputs nothing;
     QCOMPARE(ZakatCalculator::zakatBase(nothing), 0LL);
+}
+
+void FinanceTest::parseWeightGrams()
+{
+    struct Case {
+        QString text;
+        std::optional<long long> grams;
+    };
+    const QVector<Case> cases = {
+        {QStringLiteral("2.5"), 2500},
+        {QStringLiteral("2,5"), 2500},
+        {QStringLiteral("٢٫٥"), 2500},
+        {QStringLiteral("0.250"), 250},
+        {QStringLiteral("0.001"), 1},
+        {QStringLiteral("0.0005"), std::nullopt},
+        {QStringLiteral("2.5000"), 2500},
+        {QStringLiteral("2.5001"), std::nullopt},
+        {QStringLiteral("1,000"), 1000},
+        {QStringLiteral("1.000"), 1000},
+        {QStringLiteral("1,234.5"), std::nullopt},
+        {QStringLiteral("0"), std::nullopt},
+        {QStringLiteral("-1"), std::nullopt},
+        {QStringLiteral(""), std::nullopt},
+        {QStringLiteral("10001"), std::nullopt},
+        {QStringLiteral("10000"), 10000000},
+    };
+
+    for (const Case& item : cases) {
+        const std::optional<long long> actual = app::core::parseWeightGrams(item.text);
+        if (item.grams.has_value()) {
+            QVERIFY2(actual.has_value(), qPrintable(item.text));
+            QCOMPARE(*actual, *item.grams);
+        } else {
+            QVERIFY2(!actual.has_value(), qPrintable(item.text));
+        }
+    }
 }
 
 QTEST_GUILESS_MAIN(FinanceTest)

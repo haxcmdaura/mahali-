@@ -35,6 +35,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include "ui/dialogs/language_dialog.h"
+#include "ui/dialogs/purchase_dialog.h"
 #include "ui/login_dialog.h"
 #include "ui/users_page.h"
 #include "ui/widgets/app_icon.h"
@@ -58,6 +59,7 @@
 #include "data/payment_repository.h"
 #include "data/payment_service.h"
 #include "data/product_repository.h"
+#include "data/purchase_item_repository.h"
 #include "data/report_service.h"
 #include "data/sale_item_repository.h"
 #include "data/sale_repository.h"
@@ -143,6 +145,7 @@ private slots:
     void product_dialog_reveals_the_weight_checkbox();
     void product_dialog_saves_the_weight_flag();
     void product_dialog_hides_package_fields_for_a_weight_product();
+    void purchase_dialog_stores_decimal_kilograms_as_grams();
     void products_page_marks_weight_products();
     void products_page_shows_kilograms_for_a_weight_product();
     void products_page_quantity_edit_accepts_grams_for_a_weight_product();
@@ -3827,6 +3830,104 @@ void UiTest::product_dialog_hides_package_fields_for_a_weight_product()
 
     QVERIFY2(!watchdogFired, "the product dialog had to be closed by the watchdog");
     QVERIFY2(modalOpened, "the add-product button did not open the product dialog");
+}
+
+void UiTest::purchase_dialog_stores_decimal_kilograms_as_grams()
+{
+    const QString path = m_dir.filePath(QStringLiteral("purchase-dialog-weight.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+
+    data::SupplierRepository suppliers(db);
+    core::Supplier supplier;
+    supplier.name = QStringLiteral("مورد الوزن");
+    supplier.active = true;
+    const int supplierId = suppliers.save(supplier);
+    QVERIFY(supplierId > 0);
+
+    data::ProductRepository products(db);
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.unit = QStringLiteral("kg");
+    product.soldByWeight = true;
+    product.costPriceCents = 2000;
+    product.salePriceCents = 3000;
+    product.active = true;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+
+    bool modalOpened = false;
+    bool watchdogFired = false;
+    QTimer watchdog;
+    watchdog.setSingleShot(true);
+    QObject::connect(&watchdog, &QTimer::timeout, [&]() {
+        watchdogFired = true;
+        if (auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget())) {
+            modal->reject();
+        }
+    });
+    watchdog.start(5000);
+
+    QTimer::singleShot(0, [&]() {
+        auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        if (!modal) {
+            return;
+        }
+        modalOpened = true;
+        QCoreApplication::processEvents();
+
+        auto* table = modal->findChild<QTableWidget*>(QStringLiteral("productTable"));
+        QVERIFY(table != nullptr);
+        QCOMPARE(table->rowCount(), 1);
+
+        auto* name = qobject_cast<QLineEdit*>(table->cellWidget(0, 0));
+        QVERIFY(name != nullptr);
+        name->setText(product.name);
+        QTest::keyClick(name, Qt::Key_Return);
+        QCoreApplication::processEvents();
+        QCOMPARE(table->rowCount(), 1);
+
+        auto* quantity = modal->findChild<QLineEdit*>(QStringLiteral("weightQuantity"));
+        QVERIFY(quantity != nullptr);
+        quantity->setText(QStringLiteral("10.5"));
+
+        auto* price = qobject_cast<QLineEdit*>(table->cellWidget(0, 3));
+        QVERIFY(price != nullptr);
+        price->setText(ui::formatMoney(2000));
+        QCoreApplication::processEvents();
+
+        QCheckBox* addToStock = nullptr;
+        for (QCheckBox* box : modal->findChildren<QCheckBox*>()) {
+            if (box->text().contains(QStringLiteral("stock"), Qt::CaseInsensitive)) {
+                addToStock = box;
+                break;
+            }
+        }
+        QVERIFY(addToStock != nullptr);
+        addToStock->setChecked(true);
+        QCoreApplication::processEvents();
+
+        auto* save = modal->findChild<QPushButton*>(QStringLiteral("primary"));
+        QVERIFY(save != nullptr);
+        save->click();
+    });
+
+    const ui::PurchaseDialogResult result = ui::showPurchaseDialog(nullptr, db, supplierId);
+    QVERIFY2(!watchdogFired, "the purchase dialog had to be closed by the watchdog");
+    QVERIFY2(modalOpened, "the purchase dialog did not open");
+    QVERIFY2(result.saved, "the purchase dialog did not save the invoice");
+
+    data::PurchaseItemRepository items(db);
+    const QVector<core::PurchaseItem> lines = items.findByPurchase(result.purchaseId);
+    QCOMPARE(lines.size(), 1);
+    QCOMPARE(lines.front().quantity, 10500LL);
+    QCOMPARE(lines.front().unitKind, QStringLiteral("weight"));
+    QCOMPARE(lines.front().totalCents, 21000LL);
+
+    const auto stored = products.findById(productId);
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->quantity, 10500LL);
+    QCOMPARE(stored->costPriceCents, 2000LL);
 }
 
 void UiTest::products_page_shows_kilograms_for_a_weight_product()
