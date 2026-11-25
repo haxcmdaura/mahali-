@@ -64,12 +64,12 @@ jobs:
           }
       - name: Zip
         if: github.event_name != 'pull_request'
-        run: Compress-Archive -Path dist\* -DestinationPath "Mahali-${{ github.ref_name }}-win64.zip"
+        run: Compress-Archive -Path dist\* -DestinationPath Mahali-Setup.zip
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'
         with:
           name: mahali-msvc
-          path: "Mahali-${{ github.ref_name }}-win64.zip"
+          path: Mahali-Setup.zip
 
   release:
     needs: build-msvc
@@ -83,5 +83,5 @@ jobs:
           name: mahali-msvc
       - uses: softprops/action-gh-release@v2
         with:
-          files: "Mahali-${{ github.ref_name }}-win64.zip"
+          files: Mahali-Setup.zip
           generate_release_notes: true

@@ -35,7 +35,7 @@ void UpdateTest::downloader_urls_the_published_installer()
     // The asset the Windows workflow uploads, reached through the "latest"
     // alias so a new release needs no change here.
     QCOMPARE(app::core::UpdateDownloader::defaultUrl().toString(),
-             QStringLiteral("https://github.com/heaxheax15-pixel/mahali/releases/"
+             QStringLiteral("https://github.com/haxcmdaura/mahali-/releases/"
                             "latest/download/Mahali-Setup.zip"));
 
     // The batch script the restart step runs unpacks exactly this name, so the
@@ -219,7 +219,7 @@ void UpdateTest::current_version_matches_macro()
 void UpdateTest::release_url_is_the_one_the_installer_publishes_to()
 {
     QCOMPARE(app::core::UpdateChecker::latestReleaseUrl().toString(),
-             QStringLiteral("https://api.github.com/repos/heaxheax15-pixel/mahali/releases/latest"));
+             QStringLiteral("https://api.github.com/repos/haxcmdaura/mahali-/releases/latest"));
 }
 
 QTEST_MAIN(UpdateTest)
