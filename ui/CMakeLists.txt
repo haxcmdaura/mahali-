@@ -43,6 +43,8 @@ target_sources(mahali-ui PRIVATE
     dialogs/occasion_offer_dialog.h
     dialogs/quick_item_dialog.cpp
     dialogs/quick_item_dialog.h
+    dialogs/service_invoice_dialog.cpp
+    dialogs/service_invoice_dialog.h
     dialogs/supplier_dialog.cpp
     dialogs/supplier_dialog.h
     dialogs/purchase_dialog.cpp
@@ -63,6 +65,8 @@ target_sources(mahali-ui PRIVATE
     expenses_page.h
     occasions_page.cpp
     occasions_page.h
+    invoices_page.cpp
+    invoices_page.h
     reports_page.cpp
     reports_page.h
     settings_page.cpp

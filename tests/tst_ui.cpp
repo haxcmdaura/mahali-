@@ -14,6 +14,7 @@
 #include <QComboBox>
 #include <QHeaderView>
 #include <QTableView>
+#include <QTabWidget>
 #include <QTableWidget>
 #include <QFont>
 #include <QTextBlock>
@@ -69,6 +70,7 @@
 #include "data/sale_item_repository.h"
 #include "data/sale_repository.h"
 #include "data/sale_service.h"
+#include "data/service_invoice_repository.h"
 #include "data/setting_repository.h"
 #include "data/stock_movement_repository.h"
 #include "data/supplier_repository.h"
@@ -79,6 +81,7 @@
 #include "ui/customers_page.h"
 #include "ui/expenses_page.h"
 #include "ui/occasions_page.h"
+#include "ui/invoices_page.h"
 #include "ui/dialogs/occasion_offer_dialog.h"
 #include "core/format_utils.h"
 #include "ui/pos_page.h"
@@ -178,6 +181,8 @@ private slots:
     void quick_items_bar_lists_products();
     void quick_item_add_dialog_saves_and_refreshes_bar();
     void pos_quick_item_focuses_quantity_cell();
+    void invoices_page_has_three_tabs();
+    void service_invoice_dialog_saves_into_services_tab();
     void customerCreditAndPayment();
     void expensesAndDrawings();
     void reportBuilds();
@@ -2283,6 +2288,97 @@ void UiTest::pos_quick_item_focuses_quantity_cell()
     QCOMPARE(grid->currentRow(), 0);
     QCOMPARE(grid->currentColumn(), 3);
     QVERIFY2(grid->item(0, 3) != nullptr, "the quantity cell must exist for the new row");
+}
+
+void UiTest::invoices_page_has_three_tabs()
+{
+    const QString path = m_dir.filePath(QStringLiteral("invoices-tabs.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+
+    ui::InvoicesPage page(db);
+    QTabWidget* tabs = page.tabs();
+    QVERIFY2(tabs != nullptr, "the invoices page needs a tab widget");
+    QCOMPARE(tabs->count(), 3);
+    QCOMPARE(tabs->tabText(0), QStringLiteral("Factures Fournisseurs"));
+    QCOMPARE(tabs->tabText(1), QStringLiteral("Factures Ventes"));
+    QCOMPARE(tabs->tabText(2), QStringLiteral("Factures Services"));
+}
+
+void UiTest::service_invoice_dialog_saves_into_services_tab()
+{
+    const QString path = m_dir.filePath(QStringLiteral("service-invoice-dialog.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+
+    ui::InvoicesPage page(db);
+    QVERIFY(page.tabs() != nullptr);
+    QCOMPARE(page.tabs()->count(), 3);
+    page.tabs()->setCurrentIndex(2);
+
+    QPushButton* add = page.findChild<QPushButton*>(QStringLiteral("newServiceInvoiceButton"));
+    QVERIFY2(add != nullptr, "the services tab needs a new-invoice button");
+
+    bool dialogSeen = false;
+    bool fieldsFilled = false;
+    bool watchdogFired = false;
+    QTimer::singleShot(0, [&]() {
+        auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget());
+        if (!modal) {
+            return;
+        }
+        dialogSeen = true;
+        auto* type = modal->findChild<QComboBox*>(QStringLiteral("serviceInvoiceTypeCombo"));
+        auto* invoiceDate = modal->findChild<QDateEdit*>(QStringLiteral("serviceInvoiceDateField"));
+        auto* amount = modal->findChild<QLineEdit*>(QStringLiteral("serviceInvoiceAmountField"));
+        auto* dueDate = modal->findChild<QDateEdit*>(QStringLiteral("serviceInvoiceDueDateField"));
+        auto* status = modal->findChild<QComboBox*>(QStringLiteral("serviceInvoiceStatusCombo"));
+        auto* notes = modal->findChild<QLineEdit*>(QStringLiteral("serviceInvoiceNotesField"));
+        if (!type || !invoiceDate || !amount || !dueDate || !status || !notes) {
+            modal->reject();
+            return;
+        }
+        fieldsFilled = true;
+        type->setCurrentIndex(type->findData(QStringLiteral("electricity")));
+        invoiceDate->setDate(QDate(2026, 11, 1));
+        amount->setText(QStringLiteral("123.45"));
+        dueDate->setDate(QDate(2026, 11, 15));
+        status->setCurrentIndex(status->findData(QStringLiteral("paid")));
+        notes->setText(QStringLiteral("فاتورة الكهرباء"));
+        if (auto* buttons = modal->findChild<QDialogButtonBox*>()) {
+            if (QPushButton* save = buttons->button(QDialogButtonBox::Save)) {
+                save->click();
+            }
+        }
+    });
+    QTimer watchdog;
+    watchdog.setSingleShot(true);
+    QObject::connect(&watchdog, &QTimer::timeout, [&watchdogFired]() {
+        watchdogFired = true;
+        if (auto* modal = qobject_cast<QDialog*>(QApplication::activeModalWidget())) {
+            modal->reject();
+        }
+    });
+    watchdog.start(3000);
+
+    add->click();
+
+    QVERIFY2(!watchdogFired, "the service invoice dialog stayed open until the watchdog fired");
+    QVERIFY2(dialogSeen, "the new-service button must open the service invoice dialog");
+    QVERIFY2(fieldsFilled, "the dialog must expose type, dates, amount, status, and notes");
+
+    data::ServiceInvoiceRepository repo(db);
+    const auto saved = repo.findAll();
+    QCOMPARE(saved.size(), std::size_t(1));
+    QCOMPARE(saved.front().type, QStringLiteral("electricity"));
+    QCOMPARE(saved.front().invoiceDate, QStringLiteral("2026-11-01"));
+    QCOMPARE(saved.front().amountCents, 12345LL);
+    QCOMPARE(saved.front().dueDate, QStringLiteral("2026-11-15"));
+    QCOMPARE(saved.front().status, QStringLiteral("paid"));
+
+    QTableWidget* table = page.servicesTable();
+    QVERIFY2(table != nullptr, "the services tab needs a table");
+    QCOMPARE(table->rowCount(), 1);
 }
 
 void UiTest::customerCreditAndPayment()

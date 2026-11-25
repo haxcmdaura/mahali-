@@ -263,32 +263,47 @@ void SalesPage::showDetails()
     if (row < 0) {
         return;
     }
-    const int saleId = m_table->item(row, 0)->data(Qt::UserRole).toInt();
-    data::SaleRepository sales(m_db);
+    const QTableWidgetItem* idItem = m_table->item(row, 0);
+    if (!idItem) {
+        return;
+    }
+    showSaleDetailsDialog(this, m_db, idItem->data(Qt::UserRole).toInt());
+}
+
+void showSaleDetailsDialog(QWidget* parent, app::data::Database& db, int saleId)
+{
+    data::SaleRepository sales(db);
     const auto sale = sales.findById(saleId);
     if (!sale) {
         return;
     }
 
-    ScanSafeDialog dialog(this);
-    dialog.setWindowTitle(tr("تفاصيل البيع #%1 (%2)").arg(sale->id).arg(formatMoney(sale->totalCents)));
+    const auto detailsTr = [](const char* text) {
+        return QCoreApplication::translate("SalesPage", text);
+    };
+
+    ScanSafeDialog dialog(parent);
+    dialog.setWindowTitle(detailsTr("تفاصيل البيع #%1 (%2)")
+                              .arg(sale->id)
+                              .arg(formatMoney(sale->totalCents)));
     dialog.setModal(true);
 
     const QString number = sale->receiptNumber.isEmpty()
-                               ? tr("الإيصال رقم : (غير مُرقّم)")
-                               : tr("الإيصال رقم : %1").arg(sale->receiptNumber);
+                               ? detailsTr("الإيصال رقم : (غير مُرقّم)")
+                               : detailsTr("الإيصال رقم : %1").arg(sale->receiptNumber);
     auto* numberLabel = new QLabel(number);
     numberLabel->setObjectName(QStringLiteral("saleReceiptNumber"));
 
     auto* items = new QTableWidget;
     items->setColumnCount(4);
     items->setHorizontalHeaderLabels(
-        {tr("المنتج"), tr("الكمية"), tr("سعر الوحدة"), tr("الإجمالي")});
+        {detailsTr("المنتج"), detailsTr("الكمية"), detailsTr("سعر الوحدة"),
+         detailsTr("الإجمالي")});
     items->setEditTriggers(QAbstractItemView::NoEditTriggers);
     items->horizontalHeader()->setStretchLastSection(true);
 
-    data::ProductRepository products(m_db);
-    data::SaleItemRepository saleItems(m_db);
+    data::ProductRepository products(db);
+    data::SaleItemRepository saleItems(db);
     for (const core::SaleItem& item : saleItems.findBySaleId(saleId)) {
         const auto product = products.findById(item.productId);
         const QString name = product ? product->name : QStringLiteral("(#%1)").arg(item.productId);
@@ -302,7 +317,7 @@ void SalesPage::showDetails()
     }
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close);
-    buttons->button(QDialogButtonBox::Close)->setText(tr("Fermer"));
+    buttons->button(QDialogButtonBox::Close)->setText(detailsTr("Fermer"));
     for (QAbstractButton* b : buttons->buttons()) {
         if (auto* pb = qobject_cast<QPushButton*>(b)) {
             pb->setAutoDefault(false);
@@ -317,5 +332,4 @@ void SalesPage::showDetails()
     layout->addWidget(buttons);
     dialog.exec();
 }
-
 } // namespace app::ui

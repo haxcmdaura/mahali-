@@ -52,6 +52,7 @@
 #include "data/quick_item_service.h"
 #include "data/setting_repository.h"
 #include "expenses_page.h"
+#include "invoices_page.h"
 #include "login_dialog.h"
 #include "occasions_page.h"
 #include "pos_page.h"
@@ -95,6 +96,7 @@ constexpr int Settings = 13;
 // an index of their own; slipping a page in between them would silently repoint
 // every button built after it at the wrong page.
 constexpr int Stock = 14;
+constexpr int Invoices = 15;
 } // namespace page
 
 // One of the quick square buttons in the top bar: one letter, nothing else.
@@ -228,6 +230,8 @@ MainWindow::MainWindow(app::data::Database& db, ServerController& controller, QW
         // The stock page is one of the pages the top bar puts a square button for.
         {[this] { return static_cast<QWidget*>(new StockPage(m_db)); },
          [](QWidget* w) { qobject_cast<StockPage*>(w)->refresh(); }},
+        {[this] { return static_cast<QWidget*>(new InvoicesPage(m_db)); },
+         [](QWidget* w) { qobject_cast<InvoicesPage*>(w)->refresh(); }},
     };
 
     // An empty widget per index until the page is opened. The stack keeps the
@@ -240,8 +244,8 @@ MainWindow::MainWindow(app::data::Database& db, ServerController& controller, QW
     // Index guards rather than trust: the stack and the page:: constants above
     // are written side by side, and a mismatch should fail loudly here rather
     // than show the wrong page to someone trying to take money.
-    Q_ASSERT(m_pages->count() == page::Stock + 1);
-    Q_ASSERT(m_pageFactories.size() == page::Stock + 1);
+    Q_ASSERT(m_pages->count() == page::Invoices + 1);
+    Q_ASSERT(m_pageFactories.size() == page::Invoices + 1);
 
     auto* central = new QWidget;
     // The root is vertical: the top bar spans the full width, the update bar
@@ -450,7 +454,8 @@ void MainWindow::onPageChanged(int row)
 {
     static const char* const pageNames[] = {
         "pos", "products", "customers", "suppliers", "cash-session", "sales", "expenses",
-        "reports", "refunds", "audit-log", "users", "purchases", "occasions", "settings", "stock"};
+        "reports", "refunds", "audit-log", "users", "purchases", "occasions", "settings", "stock",
+        "invoices"};
     // The page is built before it is shown, so the operator never sees a
     // placeholder, and the re-read below lands on the widget now in the stack.
     const bool measureUi = qEnvironmentVariableIsSet("MAHALI_UI_PERF");
@@ -937,6 +942,7 @@ void MainWindow::buildNavForRole(const QString& role)
                            {Icon::People, tr("العملاء"), page::Customers},
                            {Icon::Truck, tr("الموردون"), page::Suppliers},
                            {Icon::Truck, tr("Achats"), page::Purchases},
+                           {Icon::Receipt, tr("Factures"), page::Invoices},
                            {Icon::Sun, tr("المناسبات"), page::Occasions},
                        });
 
