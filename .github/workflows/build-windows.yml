@@ -63,8 +63,10 @@ jobs:
             throw "Missing deployed Qt files: $($missing -join ', ')"
           }
       - name: Zip
+        if: github.event_name != 'pull_request'
         run: Compress-Archive -Path dist\* -DestinationPath "Mahali-${{ github.ref_name }}-win64.zip"
       - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
         with:
           name: mahali-msvc
           path: "Mahali-${{ github.ref_name }}-win64.zip"
