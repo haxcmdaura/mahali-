@@ -33,6 +33,7 @@ class AuditLogPage;
 class CashSessionPage;
 class CustomersPage;
 class ExpensesPage;
+class OccasionsPage;
 class PosPage;
 class ProductsPage;
 class RefundsPage;
@@ -87,6 +88,7 @@ public:
     CashSessionPage* cashSessionPage();
     SalesPage* salesPage();
     ExpensesPage* expensesPage();
+    OccasionsPage* occasionsPage();
     ReportsPage* reportsPage();
     SettingsPage* settingsPage();
     RefundsPage* refundsPage();
@@ -98,6 +100,7 @@ public:
     bool activateOccasion(int occasionId);
     void deactivateOccasion();
     QString occasionLabelText() const;
+    void maybeShowOccasionGreeting();
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
@@ -129,9 +132,11 @@ private slots:
     void onUpdateDownloadFinished(const QString& path);
     void onUpdateDownloadFailed(const QString& reason);
     void onRestartToInstall();
+    void checkQuickItemRestocks();
 
 private:
     void refreshOccasionLabel();
+    void refreshOccasionTheme(bool preserveManualPreview = false);
     void refreshSessionLabel();
     void buildNavForRole(const QString& role);
     void showUpdateBar(const QString& tag);
@@ -185,6 +190,7 @@ private:
     // One zakat reminder check per run of the app. Kept because the check is a
     // pure read now, so nothing but this stops it being asked twice.
     bool m_zakatCheckedThisSession = false;
+    bool m_greetingCheckedThisSession = false;
     // The column the nav groups are added to. Held so a role change can empty
     // it and build the groups again without rebuilding the window.
     QVBoxLayout* m_sidebarGroupLayout = nullptr;
@@ -215,6 +221,7 @@ private:
     // Always present rather than created on demand, so activation and
     // deactivation only have to change its text.
     QLabel* m_occasionLabel = nullptr;
+    QLabel* m_greetingLabel = nullptr;
     // The app's mark. A pixmap, which a stylesheet cannot recolour, so it is
     // redrawn by refreshThemeIcons along with the buttons rather than styled.
     QLabel* m_brandIcon = nullptr;

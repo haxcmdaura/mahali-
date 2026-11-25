@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QList>
+#include <QPrinterInfo>
 #include <QString>
 
 #include "receipt.h"
@@ -20,12 +22,18 @@ void printReceiptToPrinter(QTextDocument* doc, QPrinter& printer);
 // OutputFormat::PdfFormat instead of a real printer.
 void configurePrinterForPaper(QPrinter& printer, ReceiptPaper paper);
 
+bool isPrinterAvailable(const QPrinterInfo& printer,
+                        const QList<QPrinterInfo>& availablePrinters);
+
 // Saves the receipt as a PDF inside the shop's receipts folder, and also
-// prints a paper copy when the machine has a printer. Returns the path
+// prints a paper copy when an available printer is configured. Returns the path
 // of the saved PDF, or an empty string on failure. Never opens a dialog:
 // the cashier pressed one button and expects a paper slip, not a
-// question.
+// question. printPaper=false writes the PDF only, which the headless CI test
+// uses because a Windows runner without a print spooler can block in Qt's
+// printer enumeration.
 QString printAndSaveReceipt(QTextDocument* doc, ReceiptPaper paper,
-                            app::data::Database& db, QString* error);
+                            app::data::Database& db, QString* error,
+                            bool printPaper = true);
 
 } // namespace app::ui

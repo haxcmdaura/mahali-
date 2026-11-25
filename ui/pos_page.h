@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <vector>
 
 #include <QString>
 #include <QVector>
@@ -8,6 +9,10 @@
 
 #include "core/product.h"
 #include "data/database.h"
+#include "data/occasion_offer_repository.h"
+#include "data/occasion_repository.h"
+#include "data/occasion_service.h"
+#include "data/setting_repository.h"
 
 class QEvent;
 class QFrame;
@@ -42,6 +47,9 @@ struct PosLine {
     // repriceLine(). The recorded sale re-derives it from the unit, so this is the
     // page's view of the line rather than the authority on it.
     long long piecesConsumed = 0;
+    long long bonusPieces = 0;
+    long long originalPriceCents = 0;
+    bool hasOffer = false;
 };
 
 // Fast keyboard-driven register (نقطة بيع): scan a barcode and press Enter to
@@ -125,6 +133,7 @@ private:
         UnitColumn,
         QuantityColumn,
         PriceColumn,
+        OfferColumn,
         ColumnCount,
     };
 
@@ -135,13 +144,14 @@ private:
     // the catalogue table is gone, so a product that has no quick item can only
     // be brought in by its barcode.
     void refreshQuickItems();
-    // Looks up by barcode first, then by exact name, since the entry field
-    // advertises both. Returns nothing when neither matches.
+    // Looks up by barcode first, then by name, since the entry field advertises
+    // both. Returns nothing when neither matches, or when the name is ambiguous.
     //
     // A scan ending in 'c' is a carton code and is looked up as one first; see
     // the body for the full order. unitKind is set to the side of the product the
     // scan belongs to, which is what the line it becomes is priced as.
     std::optional<core::Product> findProduct(const QString& text, QString* unitKind = nullptr) const;
+    std::vector<core::Product> findProductNameMatches(const QString& text) const;
     // The product whose package barcode is exactly this, by id only. Its own
     // repository has no such lookup, and the page may not add one.
     int productIdForPackageBarcode(const QString& barcode) const;
@@ -167,6 +177,10 @@ private:
     void onPrintLastSale();
 
     app::data::Database& m_db;
+    app::data::OccasionRepository m_occasions;
+    app::data::OccasionOfferRepository m_occasionOffers;
+    app::data::SettingRepository m_settings;
+    app::data::OccasionService m_occasionService;
     QVector<PosLine> m_lines;
     QSplitter* m_workspace = nullptr;
     QStackedWidget* m_cartStack = nullptr;

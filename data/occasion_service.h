@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QDate>
+
 #include <optional>
 
 #include "core/occasion.h"
@@ -10,35 +12,28 @@
 
 namespace app::data {
 
-// Which occasion is running. The choice is kept in settings rather than as a
-// column on the occasion, because it is a state of the shop right now, not a
-// property of the occasion itself.
+// Which occasion is running. A mode setting selects automatic date windows, a
+// manually forced occasion, or no occasion at all.
 class OccasionService {
 public:
     OccasionService(Database& db,
                     OccasionRepository& occasions,
                     SettingRepository& settings);
 
-    // The occasion running now, if any. A setting that points at a deleted or
-    // deactivated occasion reads as none rather than as a broken reference.
-    std::optional<core::Occasion> current() const;
+    QString mode() const;
 
-    // Runs an occasion from now, writing its id into settings. The occasion has
-    // to exist and be active: activating a disabled one would stamp sales with an
-    // event the shop has turned off.
-    // Runs inside a transaction so the setting and the audit log commit together.
-    // Returns false if the occasion does not exist, is disabled, or the audit
-    // log write fails.
+    std::optional<core::Occasion> current() const;
+    std::optional<core::Occasion> current(const QDate& date) const;
+
+    // Chooses an occasion manually and switches the mode to manual. The occasion
+    // has to exist; an inactive occasion is reactivated as part of the choice.
+    // Runs inside a transaction so the settings and the audit log commit together.
     bool activate(int occasionId);
 
-    // Stops whatever is running, by dropping the setting. Runs inside a
-    // transaction so the setting and the audit log commit together. Returns false
-    // if the audit log write fails.
-    bool deactivate();
+    bool setAutoMode();
+    bool disable();
 
-    // Whether the given moment falls inside the occasion's window. The bounds are
-    // inclusive at both ends, so an occasion that starts and ends at the same
-    // moment is open for that moment.
+    // Whether the given date falls inside the occasion's inclusive calendar-date window.
     bool isWithinRange(const core::Occasion& o, const QString& nowIso) const;
 
 private:

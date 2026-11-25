@@ -1,7 +1,9 @@
 #include "customer_repository.h"
 
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QVariant>
+#include <optional>
 
 namespace app::data {
 
@@ -137,7 +139,7 @@ bool CustomerRepository::setActive(int id, bool active)
 
 bool CustomerRepository::remove(int id)
 {
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         m_db.recordError(QSqlError(QStringLiteral(""), QStringLiteral("cannot begin transaction")),
                          QStringLiteral("CustomerRepository::remove"));
         return false;
@@ -171,7 +173,7 @@ bool CustomerRepository::remove(int id)
     return true;
 }
 
-long long CustomerRepository::balanceCentsFor(int customerId) const
+std::optional<long long> CustomerRepository::balanceCentsFor(int customerId) const
 {
     // What the customer owes: the figure they started on, plus everything put on
     // their ledger, minus everything taken off it.
@@ -187,15 +189,25 @@ long long CustomerRepository::balanceCentsFor(int customerId) const
     QSqlQuery opening(m_db.handle());
     opening.prepare(QStringLiteral("SELECT opening_balance_cents FROM customers WHERE id = ?"));
     opening.addBindValue(customerId);
-    if (opening.exec() && opening.next()) {
+    if (!opening.exec()) {
+        m_db.recordError(opening.lastError(), QStringLiteral("CustomerRepository::balanceCentsFor"));
+        return std::nullopt;
+    }
+    if (opening.next()) {
         balance += opening.value(0).toLongLong();
+    } else {
+        // No customer row found - treat as 0 opening but ensure we can read transactions/payments
     }
 
     QSqlQuery transactions(m_db.handle());
     transactions.prepare(QStringLiteral(
         "SELECT COALESCE(SUM(amount_cents), 0) FROM customer_transactions WHERE customer_id = ?"));
     transactions.addBindValue(customerId);
-    if (transactions.exec() && transactions.next()) {
+    if (!transactions.exec()) {
+        m_db.recordError(transactions.lastError(), QStringLiteral("CustomerRepository::balanceCentsFor"));
+        return std::nullopt;
+    }
+    if (transactions.next()) {
         balance += transactions.value(0).toLongLong();
     }
 
@@ -203,7 +215,11 @@ long long CustomerRepository::balanceCentsFor(int customerId) const
     payments.prepare(QStringLiteral(
         "SELECT COALESCE(SUM(amount_cents), 0) FROM payments WHERE customer_id = ?"));
     payments.addBindValue(customerId);
-    if (payments.exec() && payments.next()) {
+    if (!payments.exec()) {
+        m_db.recordError(payments.lastError(), QStringLiteral("CustomerRepository::balanceCentsFor"));
+        return std::nullopt;
+    }
+    if (payments.next()) {
         balance -= payments.value(0).toLongLong();
     }
 

@@ -2,6 +2,7 @@
 
 #include <QDateTime>
 #include <QString>
+#include <optional>
 #include <vector>
 
 #include "database.h"

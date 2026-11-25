@@ -1,5 +1,6 @@
 #include "sync_processor.h"
 
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonDocument>
 
@@ -22,6 +23,30 @@ QString opTypeString(app::core::SyncOpType type)
         return QStringLiteral("customer_payment");
     }
     return QString();
+}
+
+// Reads the business time of the operation. Missing is allowed for a batch from
+// a build that predates the field, and leaves the service to stamp "now"; a
+// present but unparseable value is refused rather than silently replaced, because
+// putting a late sale on the wrong day changes that day's takings and profit.
+bool readOccurredAt(const QJsonObject& op, QDateTime* out, QString* error)
+{
+    const QJsonValue value = op.value(QStringLiteral("occurredAt"));
+    if (value.isUndefined() || value.isNull()
+        || (value.isString() && value.toString().isEmpty())) {
+        return true;
+    }
+    const QDateTime parsed =
+        QDateTime::fromString(value.toString(), Qt::ISODateWithMs);
+    if (!parsed.isValid()) {
+        *error = QStringLiteral("occurredAt is not a valid ISO-8601 timestamp");
+        return false;
+    }
+    // The database stores local ISO text and reports compare it as text, so the
+    // UTC moment on the wire is converted once, here, rather than compared across
+    // two offsets.
+    *out = parsed.toLocalTime();
+    return true;
 }
 
 // Returns a human-readable permanent error, or an empty string when valid.
@@ -305,11 +330,16 @@ SyncAppliedOp SyncProcessor::applySale(const QJsonObject& json, int cashSessionI
     }
 
     const QString deviceId = json.value(QStringLiteral("deviceId")).toString();
+    QDateTime occurredAt;
+    if (!readOccurredAt(json, &occurredAt, error)) {
+        return applied;
+    }
     app::core::SyncApplyToken token;
     token.opId = applied.opId;
     token.deviceId = deviceId;
     const app::data::SaleRecordResult result = m_sales.recordSale(
-        items, cashSessionId, deviceId, /*allowOversold=*/false, &token, adjustmentCents);
+        items, cashSessionId, deviceId, /*allowOversold=*/false, &token, adjustmentCents, {},
+        occurredAt);
     if (!result.ok) {
         *error = result.error;
         return applied;
@@ -390,11 +420,16 @@ SyncAppliedOp SyncProcessor::applyDebt(const QJsonObject& json, QString* error)
     }
 
     const QString deviceId = json.value(QStringLiteral("deviceId")).toString();
+    QDateTime occurredAt;
+    if (!readOccurredAt(json, &occurredAt, error)) {
+        return applied;
+    }
     app::core::SyncApplyToken token;
     token.opId = applied.opId;
     token.deviceId = deviceId;
     const app::data::SaleRecordResult result = m_sales.recordCustomerDebt(
-        customerId, items, deviceId, /*allowOversold=*/false, &token, adjustmentCents);
+        customerId, items, deviceId, /*allowOversold=*/false, &token, adjustmentCents, {},
+        occurredAt);
     if (!result.ok) {
         *error = result.error;
         return applied;
@@ -429,11 +464,16 @@ SyncAppliedOp SyncProcessor::applyPayment(const QJsonObject& json, int cashSessi
 
     const QString note = json.value(QStringLiteral("note")).toString();
     const QString deviceId = json.value(QStringLiteral("deviceId")).toString();
+    QDateTime occurredAt;
+    if (!readOccurredAt(json, &occurredAt, error)) {
+        return applied;
+    }
     app::core::SyncApplyToken token;
     token.opId = applied.opId;
     token.deviceId = deviceId;
     const app::data::PaymentResult result =
-        m_payments.recordCustomerPayment(customerId, amountCents, cashSessionId, note, &token);
+        m_payments.recordCustomerPayment(customerId, amountCents, cashSessionId, note, &token,
+                                         occurredAt);
     if (!result.ok) {
         *error = result.error;
         return applied;

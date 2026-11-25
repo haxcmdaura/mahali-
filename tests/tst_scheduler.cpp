@@ -1,9 +1,11 @@
 #include <QtTest/QtTest>
 
+#include <QHostAddress>
 #include <QSignalSpy>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QUrl>
-#include <functional>
 
 #include "data/cash_movement_repository.h"
 #include "data/cash_session_repository.h"
@@ -36,9 +38,7 @@ private slots:
 
 private:
     void seed(const QString& path, int* productId, int* sessionId);
-    void waitFor(const std::function<bool()>& cond, int timeoutMs);
     static QUrl endpointFor(quint16 port);
-    static QUrl deadEndpoint();
 
     QTemporaryDir m_dir;
     QString m_deviceDbPath;
@@ -83,33 +83,12 @@ void SyncSchedulerTest::seed(const QString& path, int* productId, int* sessionId
     QVERIFY(movements.insert(inbound) > 0);
 }
 
-void SyncSchedulerTest::waitFor(const std::function<bool()>& cond, int timeoutMs)
-{
-    const int step = 25;
-    int waited = 0;
-    while (!cond() && waited < timeoutMs) {
-        QTest::qWait(step);
-        waited += step;
-    }
-    QVERIFY2(cond(), "condition not satisfied within timeout");
-}
-
 QUrl SyncSchedulerTest::endpointFor(quint16 port)
 {
     QUrl endpoint;
     endpoint.setScheme(QStringLiteral("http"));
     endpoint.setHost(QStringLiteral("127.0.0.1"));
     endpoint.setPort(port);
-    endpoint.setPath(QStringLiteral("/api/sync"));
-    return endpoint;
-}
-
-QUrl SyncSchedulerTest::deadEndpoint()
-{
-    QUrl endpoint;
-    endpoint.setScheme(QStringLiteral("http"));
-    endpoint.setHost(QStringLiteral("127.0.0.1"));
-    endpoint.setPort(1); // nothing listens here
     endpoint.setPath(QStringLiteral("/api/sync"));
     return endpoint;
 }
@@ -166,7 +145,7 @@ void SyncSchedulerTest::autoSyncDrainsOutboxAndAppliesServerSide()
     QSignalSpy spy(&scheduler, &network::SyncScheduler::syncCompleted);
     scheduler.start();
 
-    waitFor([&] { return outbox.countPending() == 0; }, 4000);
+    QTRY_VERIFY_WITH_TIMEOUT(outbox.countPending() == 0, 30000);
     scheduler.stop();
 
     QVERIFY(spy.count() >= 1);
@@ -205,14 +184,41 @@ void SyncSchedulerTest::backoffRetriesWhileOfflineThenRecovers()
     const data::DeviceOpResult recorded = ledger.recordSale({ item }, sessionId);
     QVERIFY2(recorded.ok, qPrintable(recorded.error));
 
+    // A local server that always answers 503 keeps the retry path
+    // deterministic. A closed port can sit in connect() on Windows long enough
+    // to stall the scheduler's own event loop.
+    QTcpServer unavailable;
+    QVERIFY2(unavailable.listen(QHostAddress::LocalHost, 0),
+             qPrintable(unavailable.errorString()));
+    QObject::connect(&unavailable, &QTcpServer::newConnection, &unavailable, [&unavailable]() {
+        while (QTcpSocket* socket = unavailable.nextPendingConnection()) {
+            QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket]() {
+                socket->readAll();
+                socket->write("HTTP/1.1 503 Service Unavailable\r\n"
+                              "Content-Type: text/plain\r\n"
+                              "Content-Length: 0\r\n"
+                              "Connection: close\r\n\r\n");
+                socket->disconnectFromHost();
+            });
+            QObject::connect(socket, &QTcpSocket::disconnected, socket,
+                             &QObject::deleteLater);
+        }
+    });
+
     // LAN down: the scheduler keeps retrying per the backoff, never losing the op.
-    network::SyncScheduler scheduler(device, deadEndpoint(), m_key);
+    network::SyncScheduler scheduler(device, endpointFor(unavailable.serverPort()), m_key);
     scheduler.setBaseInterval(50);
     scheduler.setMaxInterval(200);
     scheduler.start();
 
     data::SyncOutboxRepository outbox(device);
-    QTest::qWait(500);
+    const auto hasRetried = [&]() {
+        const auto pending = outbox.findPending(1);
+        return pending.size() == 1 && pending[0].attempts >= 2;
+    };
+    QTRY_VERIFY_WITH_TIMEOUT(hasRetried(), 30000);
+    QTRY_VERIFY_WITH_TIMEOUT(scheduler.currentInterval() > scheduler.baseIntervalForTest(),
+                             30000);
     scheduler.stop();
     QCOMPARE(outbox.countPending(), 1); // nothing lost
     const auto retried = outbox.findPending(1);
@@ -232,7 +238,7 @@ void SyncSchedulerTest::backoffRetriesWhileOfflineThenRecovers()
     resumed.setBaseInterval(50);
     resumed.setMaxInterval(200);
     resumed.start();
-    waitFor([&] { return outbox.countPending() == 0; }, 4000);
+    QTRY_VERIFY_WITH_TIMEOUT(outbox.countPending() == 0, 30000);
     resumed.stop();
 
     data::SaleRepository sales(server);

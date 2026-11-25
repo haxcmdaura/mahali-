@@ -16,6 +16,7 @@ public:
     std::optional<core::Occasion> findById(int id) const;
     QVector<core::Occasion> findAll() const;
     QVector<core::Occasion> findActive() const;
+    QVector<core::Occasion> findCurrent(const QString& date) const;
     int insert(const core::Occasion& o);
     bool update(const core::Occasion& o);
     bool remove(int id);

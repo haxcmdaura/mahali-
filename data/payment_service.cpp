@@ -19,7 +19,8 @@ PaymentService::PaymentService(Database& db)
 
 PaymentResult PaymentService::recordCustomerPayment(int customerId, long long amountCents, int cashSessionId,
                                                     const QString& note,
-                                                    const core::SyncApplyToken* applyToken)
+                                                    const core::SyncApplyToken* applyToken,
+                                                    const QDateTime& occurredAt)
 {
     PaymentResult result;
     if (amountCents <= 0) {
@@ -41,7 +42,7 @@ PaymentResult PaymentService::recordCustomerPayment(int customerId, long long am
         }
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
@@ -57,7 +58,7 @@ PaymentResult PaymentService::recordCustomerPayment(int customerId, long long am
     core::Payment payment;
     payment.customerId = customerId;
     payment.amountCents = amountCents;
-    payment.createdAt = QDateTime::currentDateTime();
+    payment.createdAt = occurredAt.isValid() ? occurredAt : QDateTime::currentDateTime();
     payment.note = note;
     const int paymentId = m_payments.insert(payment);
     if (paymentId == 0) {
@@ -138,7 +139,7 @@ PaymentResult PaymentService::refundCustomerPayment(int paymentId, int cashSessi
         return result;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }

@@ -17,6 +17,10 @@ enum class DatabaseMode {
 
 class Database {
 public:
+    // Opening a database below this build's schema first writes a
+    // backups/pre-migration-v<from>-<time>.sqlite copy beside it. A failed copy
+    // stops the upgrade; the version is only advanced by migrations that commit.
+    // A database stamped by a newer build is refused before anything is written.
     explicit Database(const QString& filePath, DatabaseMode mode = DatabaseMode::Device);
     ~Database();
 
@@ -25,9 +29,25 @@ public:
 
     QSqlDatabase handle() const;
 
+    // The file this connection points at. Restore is path-based because it has
+    // to run before this object exists; callers that are already open use this
+    // only to name the database in a pending-restore marker.
+    QString filePath() const;
+
     bool beginTransaction();
+    // BEGIN IMMEDIATE takes the write lock before the first read. A deferred
+    // transaction that reads and then writes can fail with SQLITE_BUSY_SNAPSHOT
+    // in WAL when another connection commits in between, and busy_timeout does
+    // not help there. Writers use this so the wait happens up front instead.
+    bool beginWriteTransaction();
     bool commit();
     bool rollback();
+
+    // Writes a consistent copy of this database to destinationPath. The copy is
+    // taken with VACUUM INTO, so it includes committed WAL content and is a
+    // standalone database rather than a file-level snapshot. Refuses to overwrite
+    // an existing path; the reason is left in lastError().
+    bool backupTo(const QString& destinationPath);
 
     QString lastError() const;
 

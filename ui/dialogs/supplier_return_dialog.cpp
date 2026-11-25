@@ -73,8 +73,8 @@ SupplierReturnDialogResult showSupplierReturnDialog(QWidget* parent, app::data::
     data::StockMovementRepository stockMovements(db);
     data::SupplierReturnRepository returnRows(db);
     data::SupplierReturnItemRepository returnItems(db);
-    data::SupplierReturnService service(db, returnRows, returnItems, suppliers, purchases, products,
-                                        stockMovements);
+    data::SupplierReturnService service(db, returnRows, returnItems, suppliers, purchases,
+                                        purchaseItems, products, stockMovements);
 
     ScanSafeDialog dialog(parent);
     dialog.setWindowTitle(tr("Nouveau retour"));
@@ -222,7 +222,14 @@ SupplierReturnDialogResult showSupplierReturnDialog(QWidget* parent, app::data::
                 item->setFlags(item->flags() & ~Qt::ItemIsEditable);
                 return item;
             };
-            itemsTable->setItem(row, kColBought, readOnly(QString::number(line.quantity)));
+            const QString unitKind =
+                line.unitKind.isEmpty() ? QStringLiteral("piece") : line.unitKind;
+            const QString unitLabel = unitKind == QStringLiteral("weight")
+                ? tr("g")
+                : (unitKind == QStringLiteral("package") ? tr("colis") : tr("pcs"));
+            itemsTable->setItem(
+                row, kColBought,
+                readOnly(QStringLiteral("%1 %2").arg(line.quantity).arg(unitLabel)));
             itemsTable->setItem(row, kColUnitPrice, readOnly(formatMoney(line.unitPriceCents)));
 
             // Capped at what the invoice says was bought: handing back more than
@@ -230,8 +237,14 @@ SupplierReturnDialogResult showSupplierReturnDialog(QWidget* parent, app::data::
             auto* returned = new QSpinBox;
             returned->setRange(0, static_cast<int>(qMin(line.quantity, 999999LL)));
             returned->setValue(0);
-            // The unit price is kept on the box, so the credit for this line is
-            // worked out from the figure the invoice was written with.
+            // A weight line's quantity is grams and its price is per kilogram, so
+            // the spin box says grams and the service does the division. A carton
+            // line's quantity is boxes and the service expands it to pieces for
+            // the shelf.
+            returned->setSuffix(QStringLiteral(" ") + unitLabel);
+            // The unit and invoice price ride on the box, so the credit and the
+            // stock movement are worked out from the line the operator saw.
+            returned->setProperty("unitKind", unitKind);
             returned->setProperty("unitPriceCents", line.unitPriceCents);
             itemsTable->setCellWidget(row, kColReturned, returned);
         }
@@ -282,8 +295,8 @@ SupplierReturnDialogResult showSupplierReturnDialog(QWidget* parent, app::data::
                     line.productId = productId;
                 }
                 line.quantity = returned->value();
+                line.unitKind = returned->property("unitKind").toString();
                 line.unitPriceCents = returned->property("unitPriceCents").toLongLong();
-                line.totalCents = line.quantity * line.unitPriceCents;
                 lines.append(line);
             }
             if (lines.isEmpty()) {

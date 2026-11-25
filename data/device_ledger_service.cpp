@@ -117,7 +117,7 @@ DeviceOpResult DeviceLedgerService::recordSale(const QVector<core::SaleItem>& it
         return result;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
@@ -268,7 +268,7 @@ DeviceOpResult DeviceLedgerService::recordCustomerDebt(int customerId, const QVe
         return result;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
@@ -398,7 +398,7 @@ DeviceOpResult DeviceLedgerService::recordCustomerPayment(int customerId, long l
         return result;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }

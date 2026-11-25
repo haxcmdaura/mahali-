@@ -41,6 +41,12 @@ public:
     QString syncKey() const;
     QString noticeText() const;
 
+    // The dialogs live in the button handlers below; these two entry points are
+    // also what the UI test drives, so a modal file picker is not needed to
+    // prove the service result reached the page.
+    bool backupNowTo(const QString& destinationPath, QString* error = nullptr);
+    bool requestRestoreFrom(const QString& sourcePath, QString* error = nullptr);
+
     void setShopName(const QString& name);
     void setCurrencySymbol(const QString& symbol);
     void setZakatEnabled(bool enabled);
@@ -53,9 +59,11 @@ public slots:
 private slots:
     // Manual update check, reported to the user rather than logged.
     void checkForUpdates();
+    void cleanupInactiveProducts();
 
 private:
     void finishUpdateCheck(app::core::UpdateChecker* checker);
+    void showNotice(const QString& text, bool ok);
 
     app::data::Database& m_db;
     QLineEdit* m_shopName;
@@ -71,6 +79,7 @@ private:
     QLineEdit* m_receiptFolder = nullptr;
     QPushButton* m_save;
     QPushButton* m_checkUpdates = nullptr;
+    QPushButton* m_cleanupInactive = nullptr;
     QLabel* m_preview;
     QLabel* m_notice;
 };

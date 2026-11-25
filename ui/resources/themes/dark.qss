@@ -983,13 +983,13 @@ QWidget#quickItemsBar QFrame#quickCard:hover {
 
 /* Outlined and unfilled, the way the light theme draws it: the add tile is not
    a product, and the accent dashed edge is the only hint that says so. */
-QWidget#quickItemsBar QFrame#quickAddCard {
+QWidget#quickItemsBar QPushButton#quickAddButton {
     background: transparent;
     border: 1px dashed #525252;
     border-radius: 14px;
 }
 
-QWidget#quickItemsBar QFrame#quickAddCard:hover {
+QWidget#quickItemsBar QPushButton#quickAddButton:hover {
     background: @ACCENT_SOFT@;
     border: 1px dashed @ACCENT@;
 }
@@ -1060,7 +1060,8 @@ QStatusBar QPushButton:hover {
 /* The occasion badge sits in the top bar. It is a small chip rather than a
    paragraph of text, so it gets its own ground to carry the gold without
    competing with the controls beside it. */
-QLabel#occasionLabel {
+QLabel#occasionLabel,
+QLabel#occasionGreetingLabel {
     background: @ACCENT_SOFT@;
     color: @ACCENT@;
     border-radius: 7px;

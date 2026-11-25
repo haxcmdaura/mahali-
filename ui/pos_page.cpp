@@ -28,10 +28,14 @@
 #include <functional>
 
 #include "core/barcode_utils.h"
+#include "core/product_name_matcher.h"
 #include "core/sale_item.h"
 #include "core/session.h"
 #include "data/cash_session_repository.h"
 #include "data/customer_repository.h"
+#include "data/occasion_offer_repository.h"
+#include "data/occasion_repository.h"
+#include "data/occasion_service.h"
 #include "data/setting_repository.h"
 #include "printing/receipt.h"
 #include "printing/receipt_printer.h"
@@ -39,7 +43,9 @@
 #include "data/sale_rules.h"
 #include "data/sale_service.h"
 #include "dialogs/product_dialog.h"
+#include "dialogs/quick_item_dialog.h"
 #include "dialogs/select_customer_dialog.h"
+#include "dialogs/select_product_dialog.h"
 #include "format_utils.h"
 #include "quick_items_bar.h"
 #include "widgets/app_icon.h"
@@ -74,6 +80,10 @@ QString displayPackageName(const QString& stored)
 PosPage::PosPage(app::data::Database& db, QWidget* parent)
     : QWidget(parent)
     , m_db(db)
+    , m_occasions(db)
+    , m_occasionOffers(db)
+    , m_settings(db)
+    , m_occasionService(db, m_occasions, m_settings)
 {
     auto* root = new QVBoxLayout(this);
     padPageLayout(root);
@@ -136,7 +146,7 @@ PosPage::PosPage(app::data::Database& db, QWidget* parent)
     m_table->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_table->setColumnCount(ColumnCount);
     m_table->setHorizontalHeaderLabels(
-        {tr("Produit"), tr("Code-barres"), tr("الوحدة"), tr("Qté"), tr("Prix")});
+        {tr("Produit"), tr("Code-barres"), tr("الوحدة"), tr("Qté"), tr("Prix"), tr("Offre")});
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     // Only the quantity takes a typed edit, and only from the keyboard: F2 or
@@ -153,6 +163,7 @@ PosPage::PosPage(app::data::Database& db, QWidget* parent)
     m_table->horizontalHeader()->setSectionResizeMode(UnitColumn, QHeaderView::Fixed);
     m_table->horizontalHeader()->setSectionResizeMode(QuantityColumn, QHeaderView::Fixed);
     m_table->horizontalHeader()->setSectionResizeMode(PriceColumn, QHeaderView::Fixed);
+    m_table->horizontalHeader()->setSectionResizeMode(OfferColumn, QHeaderView::Fixed);
     m_table->verticalHeader()->setDefaultSectionSize(44);
     m_table->horizontalHeader()->setFixedHeight(34);
     m_table->verticalHeader()->hide();
@@ -160,6 +171,7 @@ PosPage::PosPage(app::data::Database& db, QWidget* parent)
     m_table->setColumnWidth(UnitColumn, 80);
     m_table->setColumnWidth(QuantityColumn, 64);
     m_table->setColumnWidth(PriceColumn, 80);
+    m_table->setColumnWidth(OfferColumn, 160);
     // The typography the wide table already had, kept so the grid reads as the
     // same size it read as when it was the catalogue: 14pt for a tablet, with a
     // heavier 12pt header row above it.
@@ -362,7 +374,8 @@ PosPage::PosPage(app::data::Database& db, QWidget* parent)
     connect(m_table, &QTableWidget::cellChanged, this, &PosPage::onCellChanged);
     connect(m_table, &QTableWidget::cellDoubleClicked, this, &PosPage::onCellDoubleClicked);
     connect(m_quickItems, &QuickItemsBar::productClicked, this, &PosPage::onQuickItemClicked);
-    connect(m_quickItems, &QuickItemsBar::addNewRequested, this, &PosPage::onAddQuickProduct);
+    connect(m_quickItems, &QuickItemsBar::addQuickItemRequested, this,
+            &PosPage::onAddQuickProduct);
 
     // The filter is installed on the page itself as well as on the entry field,
     // because the entry is not the only thing it watches: the page's own Show
@@ -614,15 +627,20 @@ std::optional<core::Product> PosPage::findProduct(const QString& text, QString* 
         }
         return byBarcode;
     }
-    for (const core::Product& candidate : products.findAll()) {
-        if (candidate.active && candidate.name == text) {
-            if (unitKind) {
-                *unitKind = QStringLiteral("piece");
-            }
-            return candidate;
+    const std::vector<core::Product> matches = findProductNameMatches(text);
+    if (matches.size() == 1) {
+        if (unitKind) {
+            *unitKind = QStringLiteral("piece");
         }
+        return matches.front();
     }
     return std::nullopt;
+}
+
+std::vector<core::Product> PosPage::findProductNameMatches(const QString& text) const
+{
+    data::ProductRepository products(m_db);
+    return core::matchProductsByName(products.findAll(), text);
 }
 
 int PosPage::productIdForPackageBarcode(const QString& barcode) const
@@ -652,9 +670,10 @@ bool PosPage::repriceLine(PosLine& line, QString* error) const
     item.unitKind = line.unitKind;
     item.unitPriceCents = 0;
     data::ProductRepository products(m_db);
+    const std::optional<core::Occasion> occasion = m_occasionService.current();
     QString resolveError;
-    const QVector<core::SaleItem> resolved =
-        data::resolveSaleItems(products, {item}, /*allowOversold=*/true, &resolveError);
+    const QVector<core::SaleItem> resolved = data::resolveSaleItems(
+        products, {item}, /*allowOversold=*/true, &resolveError, &m_occasionOffers, occasion);
     if (resolved.size() != 1) {
         if (error) {
             *error = resolveError.isEmpty() ? tr("Impossible de chiffrer « %1 »").arg(line.name)
@@ -667,12 +686,31 @@ bool PosPage::repriceLine(PosLine& line, QString* error) const
     // says carton must stay a carton.
     line.unitPriceCents = resolved.first().unitPriceCents;
     line.piecesConsumed = resolved.first().piecesConsumed;
+    line.bonusPieces = resolved.first().bonusPieces;
+    line.originalPriceCents = resolved.first().originalPriceCents;
+    line.hasOffer = resolved.first().hasOffer;
+    if (line.hasOffer) {
+        line.basePriceCents = line.unitPriceCents;
+    }
     return true;
 }
 
 void PosPage::addProductToCart(const core::Product& product, long long quantity, const QString& unitKind)
 {
-    for (PosLine& line : m_lines) {
+    const bool quickItem = product.barcode.trimmed().isEmpty();
+    const auto focusQuantityCell = [this](int row) {
+        QTableWidgetItem* item = m_table->item(row, QuantityColumn);
+        if (!item) {
+            m_entry->setFocus();
+            return;
+        }
+        m_table->setCurrentCell(row, QuantityColumn);
+        m_table->scrollToItem(item);
+        m_table->editItem(item);
+    };
+
+    for (int index = 0; index < m_lines.size(); ++index) {
+        PosLine& line = m_lines[index];
         // Product AND unit. The same product twice is one line only when both are
         // the same: a piece and a carton of one product are two lines, because a
         // single quantity and a single price cannot mean both. Merging them would
@@ -684,7 +722,11 @@ void PosPage::addProductToCart(const core::Product& product, long long quantity,
                           .arg(line.name, formatMoney(line.unitPriceCents)),
                       true);
             rebuildTable();
-            m_entry->setFocus();
+            if (quickItem) {
+                focusQuantityCell(index);
+            } else {
+                m_entry->setFocus();
+            }
             return;
         }
     }
@@ -709,7 +751,11 @@ void PosPage::addProductToCart(const core::Product& product, long long quantity,
     m_lines.append(line);
     setNotice(tr("Ajouté : %1").arg(line.name), true);
     rebuildTable();
-    m_entry->setFocus();
+    if (quickItem) {
+        focusQuantityCell(m_lines.size() - 1);
+    } else {
+        m_entry->setFocus();
+    }
 }
 
 void PosPage::addEntry()
@@ -727,6 +773,29 @@ void PosPage::addEntry()
     QString unitKind = QStringLiteral("piece");
     const std::optional<core::Product> product = findProduct(text, &unitKind);
     if (!product) {
+        const std::vector<core::Product> matches = findProductNameMatches(text);
+        if (matches.size() == 1) {
+            if (matches.front().soldByWeight) {
+                startWeightEntry(matches.front());
+            } else {
+                addProductToCart(matches.front(), 1);
+            }
+            return;
+        }
+        if (matches.size() > 1) {
+            const std::optional<core::Product> chosen = showSelectProductDialog(this, matches);
+            if (chosen) {
+                if (chosen->soldByWeight) {
+                    startWeightEntry(*chosen);
+                } else {
+                    addProductToCart(*chosen, 1);
+                }
+            } else {
+                m_entry->setFocus();
+            }
+            return;
+        }
+
         // A code nobody has registered yet is the normal first sale of a new
         // product, so the register offers to create it instead of complaining.
         core::Product draft;
@@ -768,7 +837,11 @@ void PosPage::addEntry()
                                   tr("Ajouter « %1 » à la vente en cours ?").arg(label),
                                   QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
         if (answer == QMessageBox::Yes) {
-            addProductToCart(saved, 1, unitKind);
+            if (saved.soldByWeight) {
+                startWeightEntry(saved);
+            } else {
+                addProductToCart(saved, 1, unitKind);
+            }
             return;
         }
         m_entry->setFocus();
@@ -785,31 +858,22 @@ void PosPage::addEntry()
 
 void PosPage::onAddQuickProduct()
 {
-    core::Product draft;
-    draft.unit = QStringLiteral("piece");
-    draft.active = true;
-
-    const std::optional<core::Product> created = showProductDialog(this, m_db, draft);
-    if (!created) {
+    if (showQuickItemDialog(this, m_db) <= 0) {
         m_entry->setFocus();
         return;
     }
-    const int id = data::ProductRepository(m_db).save(*created);
-    if (id == 0) {
-        setNotice(tr("Impossible d'enregistrer le produit."), false);
-        m_entry->setFocus();
-        return;
-    }
-    core::Product saved = *created;
-    saved.id = id;
     refreshQuickItems();
-    addProductToCart(saved, 1);
+    m_entry->setFocus();
 }
 
 void PosPage::onQuickItemClicked(int productId)
 {
     const std::optional<core::Product> product = data::ProductRepository(m_db).findById(productId);
     if (!product) {
+        return;
+    }
+    if (product->soldByWeight) {
+        startWeightEntry(*product);
         return;
     }
     addProductToCart(*product, 1);
@@ -954,8 +1018,13 @@ void PosPage::refreshPriceCell(int row)
     }
     const PosLine& line = m_lines[row];
     priceItem->setText(formatMoney(line.unitPriceCents));
-    priceItem->setForeground(line.unitPriceCents != line.basePriceCents ? QBrush(Qt::red)
-                                                                        : QBrush());
+    if (line.unitPriceCents != line.basePriceCents) {
+        priceItem->setForeground(QBrush(Qt::red));
+    } else if (line.hasOffer) {
+        priceItem->setForeground(QBrush(Qt::darkGreen));
+    } else {
+        priceItem->setForeground(QBrush());
+    }
 }
 
 void PosPage::onCellChanged(int row, int column)
@@ -1125,9 +1194,22 @@ void PosPage::rebuildTable()
         // noticed at a glance, since it ends up in the audit log.
         if (line.unitPriceCents != line.basePriceCents) {
             priceItem->setForeground(QBrush(Qt::red));
+        } else if (line.hasOffer) {
+            priceItem->setForeground(QBrush(Qt::darkGreen));
         }
         readOnly(priceItem);
         m_table->setItem(row, PriceColumn, priceItem);
+
+        if (line.hasOffer) {
+            const QString oldPrice = formatMoney(line.originalPriceCents);
+            const QString newPrice = formatMoney(line.unitPriceCents);
+            auto* offerLabel = new QLabel(QStringLiteral("<s>%1</s> %2").arg(oldPrice, newPrice));
+            offerLabel->setObjectName(QStringLiteral("posOfferIndicator"));
+            offerLabel->setTextFormat(Qt::RichText);
+            offerLabel->setAlignment(Qt::AlignCenter);
+            offerLabel->setToolTip(tr("Offre : %1 → %2").arg(oldPrice, newPrice));
+            m_table->setCellWidget(row, OfferColumn, offerLabel);
+        }
     }
 
     // The adjustment, as a line of the invoice. It is a row rather than a line:
@@ -1203,7 +1285,7 @@ void PosPage::enterCreditMode()
     // The balance belongs on the bar, not only in the picker that was just closed:
     // this is the figure the cashier is about to add to, and a sale that pushes an
     // account further under is the whole reason to be looking at it.
-    const long long balance = repo.balanceCentsFor(*customerId);
+    const long long balance = repo.balanceCentsFor(*customerId).value_or(0);
     m_creditLabel->setText(tr("À CRÉDIT : %1 · Solde : %2")
                                .arg(customer->name, formatMoney(balance)));
     m_creditBar->setVisible(true);
@@ -1240,7 +1322,7 @@ void PosPage::completeSale()
     // money taken off them. Both are worth a refusal.
     const std::optional<long long> adjustment = adjustmentFromField();
     if (!adjustment.has_value()) {
-        setNotice(tr("Ajustement invalide"), false);
+        setNotice(tr("تعديل غير صالح"), false);
         return;
     }
     const long long adjustmentCents = *adjustment;
@@ -1271,6 +1353,7 @@ void PosPage::completeSale()
         // derived from this one string and from the same product row the screen
         // read.
         item.unitKind = line.unitKind;
+        item.priceOverridden = line.unitPriceCents != line.basePriceCents;
         items.append(item);
 
         // What the cashier edited, handed to the service rather than written here:
@@ -1386,6 +1469,8 @@ void PosPage::startWeightEntry(const core::Product& product)
     auto* gramsField = new QLineEdit;
     gramsField->setObjectName(QStringLiteral("posWeightField"));
     gramsField->setValidator(new QIntValidator(1, 100000, gramsField));
+    gramsField->setPlaceholderText(tr("الوزن (غرام)"));
+    gramsField->setToolTip(tr("الوزن (غرام)"));
     gramsField->setText(m_lastWeightText);
     connect(gramsField, &QLineEdit::textChanged,
             this, &PosPage::onWeightChanged);
@@ -1412,8 +1497,9 @@ void PosPage::onWeightChanged(const QString& text)
 {
     if (!m_hasWeightProduct || m_weightInput == nullptr) { return; }
     m_lastWeightText = text;
-    const long long grams = m_weightInput->text().toLongLong();
-    const long long total = m_weightProduct.salePriceCents * grams / 1000;
+    bool ok = false;
+    const long long grams = text.trimmed().toLongLong(&ok);
+    const long long total = (ok && grams > 0) ? m_weightProduct.salePriceCents * grams / 1000 : 0;
     if (auto* item = m_emptyTable->item(0, 3)) {
         item->setText(formatMoney(total));
     }
@@ -1422,8 +1508,12 @@ void PosPage::onWeightChanged(const QString& text)
 void PosPage::onWeightSubmitted()
 {
     if (!m_hasWeightProduct || m_weightInput == nullptr) { return; }
-    const long long grams = m_weightInput->text().toLongLong();
-    if (grams <= 0) { return; }
+    bool ok = false;
+    const long long grams = m_weightInput->text().trimmed().toLongLong(&ok);
+    if (!ok || grams <= 0) {
+        setNotice(tr("وزن غير صالح"), false);
+        return;
+    }
 
     if (grams > 2000) {
         const auto answer = QMessageBox::question(

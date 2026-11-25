@@ -17,8 +17,18 @@ target_link_libraries(tst_data
         mahali-data
         Qt${QT_VERSION_MAJOR}::Test
         Qt${QT_VERSION_MAJOR}::Widgets)
+target_compile_definitions(tst_data PRIVATE
+    MAHALI_TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 
 add_test(NAME data COMMAND tst_data)
+
+add_executable(tst_backup tst_backup.cpp)
+target_link_libraries(tst_backup
+    PRIVATE
+        mahali-data
+        Qt${QT_VERSION_MAJOR}::Test)
+
+add_test(NAME backup COMMAND tst_backup)
 
 add_executable(tst_purchase_service tst_purchase_service.cpp)
 target_link_libraries(tst_purchase_service
@@ -93,6 +103,22 @@ target_link_libraries(tst_finance
         Qt${QT_VERSION_MAJOR}::Test)
 
 add_test(NAME finance COMMAND tst_finance)
+
+add_executable(tst_product_name_matcher tst_product_name_matcher.cpp)
+target_link_libraries(tst_product_name_matcher
+    PRIVATE
+        mahali-core
+        Qt${QT_VERSION_MAJOR}::Test)
+
+add_test(NAME product_name_matcher COMMAND tst_product_name_matcher)
+
+add_executable(tst_product_cleanup tst_product_cleanup.cpp)
+target_link_libraries(tst_product_cleanup
+    PRIVATE
+        mahali-core
+        Qt${QT_VERSION_MAJOR}::Test)
+
+add_test(NAME product_cleanup COMMAND tst_product_cleanup)
 
 add_executable(tst_sync tst_sync.cpp)
 target_link_libraries(tst_sync

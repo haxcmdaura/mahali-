@@ -21,6 +21,7 @@ target_link_libraries(mahali-data
 
 target_sources(mahali-data PRIVATE
     database.cpp
+    backup_service.cpp
     admin_secret_repository.cpp
     audit_log_repository.cpp
     applied_op_repository.cpp
@@ -47,6 +48,8 @@ target_sources(mahali-data PRIVATE
     payment_repository.cpp
     payment_service.cpp
     product_repository.cpp
+    quick_item_service.cpp
+    quick_item_service.h
     purchase_item_repository.cpp
     purchase_repository.cpp
     purchase_service.cpp
@@ -57,6 +60,8 @@ target_sources(mahali-data PRIVATE
     sale_item_repository.cpp
     sale_repository.cpp
     sale_service.cpp
+    service_invoice_repository.cpp
+    service_invoice_repository.h
     setting_repository.cpp
     sync_key.cpp
     stock_movement_repository.cpp
@@ -67,6 +72,8 @@ target_sources(mahali-data PRIVATE
     supplier_return_service.cpp
     supplier_payment_service.cpp
     occasion_repository.cpp
+    occasion_offer_repository.cpp
+    occasion_offer_repository.h
     occasion_service.cpp
     supplier_report_service.cpp
     daily_report_service.cpp
@@ -74,7 +81,9 @@ target_sources(mahali-data PRIVATE
     sync_sequence_repository.cpp
     user_repository.cpp
     zakat_history_repository.cpp
-    zakat_history_repository.h)
+    zakat_history_repository.h
+    zakat_service.cpp
+    zakat_service.h)
 
 set_target_properties(mahali-data PROPERTIES
     POSITION_INDEPENDENT_CODE ON)

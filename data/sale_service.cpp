@@ -70,6 +70,7 @@ SaleService::SaleService(Database& db)
     , m_cashMovements(db)
     , m_appliedOps(db)
     , m_occasions(db)
+    , m_occasionOffers(db)
     , m_settings(db)
     , m_occasionService(db, m_occasions, m_settings)
 {
@@ -110,7 +111,8 @@ SaleRecordResult SaleService::recordCustomerDebt(int customerId, const QVector<c
                                                  const QString& deviceId, bool allowOversold,
                                                  const core::SyncApplyToken* applyToken,
                                                  long long adjustmentCents,
-                                                 const QVector<PriceOverride>& overrides)
+                                                 const QVector<PriceOverride>& overrides,
+                                                 const QDateTime& occurredAt)
 {
     SaleRecordResult result;
     if (items.isEmpty()) {
@@ -124,15 +126,24 @@ SaleRecordResult SaleService::recordCustomerDebt(int customerId, const QVector<c
         }
     }
 
-QString error;
-    const QVector<core::SaleItem> resolved = resolveSaleItems(m_products, items, allowOversold, &error);
+    if (!m_db.beginWriteTransaction()) {
+        result.error = m_db.lastError();
+        return result;
+    }
+
+    const std::optional<core::Occasion> occasion = m_occasionService.current();
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        resolveSaleItems(m_products, items, allowOversold, &error, &m_occasionOffers, occasion);
     if (resolved.isEmpty()) {
+        m_db.rollback();
         result.error = error;
         return result;
     }
 
     const std::optional<long long> totalOpt = totalCentsFor(resolved);
     if (!totalOpt.has_value()) {
+        m_db.rollback();
         result.error = QStringLiteral("the sale total is too large to record");
         return result;
     }
@@ -141,18 +152,15 @@ QString error;
     // lines + adjustment, while the cost of the goods stays at the line prices,
     // which is what the profit and loss statement is built from.
     if (!detail::sumFits(*totalOpt, adjustmentCents)) {
+        m_db.rollback();
         result.error = QStringLiteral("the sale total is too large to record");
         return result;
     }
 
     const std::optional<long long> cogsOpt = cogsCentsFor(resolved);
     if (!cogsOpt.has_value()) {
+        m_db.rollback();
         result.error = QStringLiteral("the sale cost is too large to record");
-        return result;
-    }
-
-    if (!m_db.beginTransaction()) {
-        result.error = m_db.lastError();
         return result;
     }
 
@@ -163,7 +171,9 @@ QString error;
     transaction.customerId = customerId;
     transaction.amountCents = total;
     transaction.adjustmentCents = adjustmentCents;
-    transaction.createdAt = QDateTime::currentDateTime();
+    // A synced operation carries the moment the other device recorded it, so a
+    // late batch lands on the day it happened instead of the day it arrived.
+    transaction.createdAt = occurredAt.isValid() ? occurredAt : QDateTime::currentDateTime();
     const QString receiptNumber = mintReceiptNumber(m_db);
     if (receiptNumber.isEmpty()) {
         m_db.rollback();
@@ -255,7 +265,8 @@ SaleRecordResult SaleService::recordSale(const QVector<core::SaleItem>& items, i
                                          const QString& deviceId, bool allowOversold,
                                          const core::SyncApplyToken* applyToken,
                                          long long adjustmentCents,
-                                         const QVector<PriceOverride>& overrides)
+                                         const QVector<PriceOverride>& overrides,
+                                         const QDateTime& occurredAt)
 {
     SaleRecordResult result;
     if (items.isEmpty()) {
@@ -269,7 +280,7 @@ SaleRecordResult SaleService::recordSale(const QVector<core::SaleItem>& items, i
         }
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = m_db.lastError();
         return result;
     }
@@ -281,8 +292,10 @@ SaleRecordResult SaleService::recordSale(const QVector<core::SaleItem>& items, i
         return result;
     }
 
+    const std::optional<core::Occasion> occasion = m_occasionService.current();
     QString error;
-    const QVector<core::SaleItem> resolved = resolveSaleItems(m_products, items, allowOversold, &error);
+    const QVector<core::SaleItem> resolved =
+        resolveSaleItems(m_products, items, allowOversold, &error, &m_occasionOffers, occasion);
     if (resolved.isEmpty()) {
         m_db.rollback();
         result.error = error;
@@ -317,7 +330,7 @@ SaleRecordResult SaleService::recordSale(const QVector<core::SaleItem>& items, i
     const long long cogs = *cogsOpt;
 
     core::Sale sale;
-    sale.createdAt = QDateTime::currentDateTime();
+    sale.createdAt = occurredAt.isValid() ? occurredAt : QDateTime::currentDateTime();
     sale.totalCents = total;
     sale.adjustmentCents = adjustmentCents;
     sale.deviceId = deviceId;
@@ -326,7 +339,7 @@ SaleRecordResult SaleService::recordSale(const QVector<core::SaleItem>& items, i
     // reports can split a day's takings by event. Read after the transaction
     // opens: the setting is a single row, and reading it here keeps the sale and
     // the occasion it was attributed to inside one snapshot.
-    if (const std::optional<core::Occasion> occasion = m_occasionService.current()) {
+    if (occasion) {
         sale.occasionId = occasion->id;
     }
     const QString receiptNumber = mintReceiptNumber(m_db);
@@ -429,18 +442,21 @@ SaleReverseResult SaleService::reverseSale(int saleId, int cashSessionId)
         return r;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         r.error = m_db.lastError().isEmpty()
             ? QStringLiteral("reverseSale: could not start the transaction")
             : m_db.lastError();
         return r;
     }
 
-    // Nothing stops the same sale being reversed twice, and reversed_sale_id
-    // has no unique index, so the guard has to be a lookup. Inside the
-    // transaction on purpose: the lookup and the inserts it protects commit or
-    // roll back as one, so a second click that arrives while the first is still
-    // running cannot pass the check against a snapshot that is about to change.
+    // Nothing stops the same sale being reversed twice, and reversal columns have
+    // no unique index in all legacy schemas; migration 4 adds partial unique
+    // indexes (uq_sales_one_reversal / uq_customer_transactions_one_reversal)
+    // where possible but may skip when duplicates exist, so the lookup remains
+    // as a second defence. Inside the transaction on purpose: the lookup and
+    // the inserts it protects commit or roll back as one, so a second click
+    // that arrives while the first is still running cannot pass the check
+    // against a snapshot that is about to change.
     QSqlQuery existing(m_db.handle());
     existing.prepare(QStringLiteral("SELECT 1 FROM sales WHERE reversed_sale_id = ? LIMIT 1"));
     existing.addBindValue(saleId);
@@ -586,16 +602,16 @@ SaleReverseResult SaleService::reverseCustomerDebt(int transactionId)
         return r;
     }
 
-    // A payment settles debt by writing a negative row here, and one of those is
-    // not a credit sale waiting to be cancelled. Only a positive row is a sale.
-    // Reversing one would book a second amount onto a ledger that was already
-    // credited — the customer's debt would shrink by the payment as well.
+    // Payments are written to the payments table, not as negative rows in
+    // customer_transactions. Only a positive customer_transaction row is a credit
+    // sale waiting to be cancelled. Reversing a payment or a non-sale row would
+    // book a second amount onto a ledger that was already credited.
     if (original->amountCents <= 0) {
         r.error = QStringLiteral("only a credit sale can be cancelled, and this is not one");
         return r;
     }
 
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         r.error = m_db.lastError().isEmpty()
             ? QStringLiteral("could not start the transaction")
             : m_db.lastError();
@@ -603,9 +619,9 @@ SaleReverseResult SaleService::reverseCustomerDebt(int transactionId)
     }
 
     // Same reason as in reverseSale, and the same placement: inside the
-    // transaction, so the check and the rows it guards commit together. No
-    // unique index backs reversed_transaction_id yet, so this lookup is the only
-    // thing stopping a second cancellation of the same sale.
+    // transaction, so the check and the rows it guards commit together. A
+    // partial unique index may exist (migration 4) but can be skipped when
+    // duplicate data exists, so this lookup remains as a second defence.
     QSqlQuery existing(m_db.handle());
     existing.prepare(
         QStringLiteral("SELECT 1 FROM customer_transactions WHERE reversed_transaction_id = ? LIMIT 1"));

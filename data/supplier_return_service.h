@@ -6,6 +6,7 @@
 #include "core/supplier_return_item.h"
 #include "database.h"
 #include "product_repository.h"
+#include "purchase_item_repository.h"
 #include "purchase_repository.h"
 #include "stock_movement_repository.h"
 #include "supplier_return_item_repository.h"
@@ -32,6 +33,7 @@ public:
                           SupplierReturnItemRepository& returnItems,
                           SupplierRepository& suppliers,
                           PurchaseRepository& purchases,
+                          PurchaseItemRepository& purchaseItems,
                           ProductRepository& products,
                           StockMovementRepository& stockMovements);
 
@@ -56,6 +58,7 @@ private:
     SupplierReturnItemRepository& m_returnItems;
     SupplierRepository& m_suppliers;
     PurchaseRepository& m_purchases;
+    PurchaseItemRepository& m_purchaseItems;
     ProductRepository& m_products;
     StockMovementRepository& m_stockMovements;
 };

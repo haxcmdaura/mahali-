@@ -4,7 +4,12 @@
 
 #include <QPair>
 
+#include <stdexcept>
+
 #include <QCryptographicHash>
+#include <QDateTime>
+#include <QDir>
+#include <QFileInfo>
 #include <QDebug>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -23,6 +28,41 @@ const char* kSingleOpenSessionIndex = "idx_cash_sessions_one_open";
 QString uniqueConnectionName()
 {
     return QStringLiteral("mahali_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+}
+
+void runQuickCheck(const QSqlDatabase& db)
+{
+    QSqlQuery query(db);
+    if (!query.exec(QStringLiteral("PRAGMA quick_check"))) {
+        throw std::runtime_error(
+            QStringLiteral("Database quick_check could not run: %1")
+                .arg(query.lastError().text())
+                .toStdString());
+    }
+    if (!query.next()) {
+        throw std::runtime_error("Database quick_check returned no result");
+    }
+    const QString result = query.value(0).toString();
+    if (result != QLatin1String("ok")) {
+        throw std::runtime_error(
+            QStringLiteral("Database quick_check failed: %1").arg(result).toStdString());
+    }
+}
+
+QString preMigrationBackupPath(const QString& databasePath, int fromVersion)
+{
+    const QDir backupDirectory(
+        QFileInfo(databasePath).absoluteDir().filePath(QStringLiteral("backups")));
+    const QString base =
+        QStringLiteral("pre-migration-v%1-%2")
+            .arg(fromVersion)
+            .arg(QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss")));
+    QString path = backupDirectory.filePath(base + QStringLiteral(".sqlite"));
+    for (int suffix = 2; QFileInfo::exists(path); ++suffix) {
+        path = backupDirectory.filePath(
+            QStringLiteral("%1-%2.sqlite").arg(base).arg(suffix));
+    }
+    return path;
 }
 
 QStringList tableColumns(const QSqlDatabase& db, const QString& table)
@@ -319,16 +359,60 @@ Database::Database(const QString& filePath, DatabaseMode mode)
     const QString connectionName = uniqueConnectionName();
     m_db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
     m_db.setDatabaseName(filePath);
-    if (!m_db.open()) {
-        throw std::runtime_error(
-            QStringLiteral("Failed to open database: %1").arg(m_db.lastError().text()).toStdString());
+
+    // A constructor that throws does not run the destructor, so anything that
+    // fails below has to close and unregister this connection here. A failed
+    // upgrade otherwise leaves the file locked until the process exits.
+    try {
+        if (!m_db.open()) {
+            throw std::runtime_error(
+                QStringLiteral("Failed to open database: %1")
+                    .arg(m_db.lastError().text())
+                    .toStdString());
+        }
+
+        // Read-only, and before any pragma that could write the file: a database
+        // from a newer build must be refused without leaving a trace.
+        const int versionOnOpen = readSupportedSchemaVersion(m_db);
+
+        applyPragmas();
+        runQuickCheck(m_db);
+
+        // Take the copy before createSchema() touches a carried-over database, so
+        // it is the state the previous build left behind, not a half-upgraded
+        // one. A fresh file is version 0 and has nothing worth preserving. If the
+        // copy fails, the migration must not start: the point of the copy is to
+        // be the way back from a failed upgrade.
+        const int versionBeforeUpgrade = versionOnOpen;
+        if (versionBeforeUpgrade > 0 && versionBeforeUpgrade < kSchemaVersion) {
+            const QDir backupDirectory(
+                QFileInfo(filePath).absoluteDir().filePath(QStringLiteral("backups")));
+            if (!QDir().mkpath(backupDirectory.absolutePath())) {
+                throw std::runtime_error(
+                    QStringLiteral("Could not create pre-migration backup directory: %1")
+                        .arg(backupDirectory.absolutePath())
+                        .toStdString());
+            }
+            const QString backupPath = preMigrationBackupPath(filePath, versionBeforeUpgrade);
+            if (!backupTo(backupPath)) {
+                throw std::runtime_error(
+                    QStringLiteral("Pre-migration backup failed: %1")
+                        .arg(m_lastError)
+                        .toStdString());
+            }
+        }
+
+        createSchema();
+        // A fresh install gets the whole current shape from createSchema() above
+        // and has nothing to replay. A database carried over from an older build
+        // gets the shape it was created with and is walked forward from here.
+        runSchemaMigrations(m_db);
+    } catch (...) {
+        m_db.close();
+        m_db = QSqlDatabase();
+        QSqlDatabase::removeDatabase(connectionName);
+        throw;
     }
-    applyPragmas();
-    createSchema();
-    // A fresh install gets the whole current shape from createSchema() above and
-    // has nothing to replay. A database carried over from an older build gets the
-    // shape it was created with and is walked forward from here.
-    runSchemaMigrations(m_db);
 }
 
 Database::~Database()
@@ -348,10 +432,50 @@ QSqlDatabase Database::handle() const
     return m_db;
 }
 
+QString Database::filePath() const
+{
+    return m_db.databaseName();
+}
+
+bool Database::backupTo(const QString& destinationPath)
+{
+    clearError();
+    if (destinationPath.isEmpty()) {
+        m_lastError = QStringLiteral("backupTo: destination path is empty");
+        return false;
+    }
+    // VACUUM INTO refuses an existing file itself, but checking here keeps the
+    // reason explicit and avoids depending on the driver's message for a case
+    // the caller can see before any work starts.
+    if (QFileInfo::exists(destinationPath)) {
+        m_lastError = QStringLiteral("backupTo: destination already exists: %1").arg(destinationPath);
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("VACUUM INTO ?"));
+    query.addBindValue(destinationPath);
+    if (!query.exec()) {
+        recordError(query.lastError(), QStringLiteral("Database::backupTo"));
+        return false;
+    }
+    return true;
+}
+
 bool Database::beginTransaction()
 {
     if (!m_db.transaction()) {
         m_lastError = m_db.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool Database::beginWriteTransaction()
+{
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral("BEGIN IMMEDIATE"))) {
+        recordError(query.lastError(), QStringLiteral("Database::beginWriteTransaction"));
         return false;
     }
     return true;
@@ -459,7 +583,15 @@ void Database::createSchema()
             // What a carton costs, in cents, as invoiced. Not derived by dividing,
             // because the division rounds and the remainder is exactly what a
             // shelf price has to be checked against.
-            "package_cost_cents INTEGER NOT NULL DEFAULT 0);"),
+            "package_cost_cents INTEGER NOT NULL DEFAULT 0,"
+            // Explicit membership in the POS quick-items bar. A blank barcode is
+            // not enough on its own: only products the owner creates there belong.
+            "is_quick_item INTEGER NOT NULL DEFAULT 0,"
+            // How many days the owner expects a quick item to last before restocking.
+            "restock_days INTEGER NOT NULL DEFAULT 1,"
+            // ISO date of the last restock-cycle reset. Empty on rows that predate
+            // the reminder; saving a product fills it in when it is blank.
+            "last_restocked_at TEXT NOT NULL DEFAULT '');"),
 
         QStringLiteral(
             "CREATE TABLE IF NOT EXISTS sales ("
@@ -493,7 +625,27 @@ void Database::createSchema()
             "ends_at TEXT NOT NULL,"
             "icon TEXT NOT NULL DEFAULT '',"
             "active INTEGER NOT NULL DEFAULT 1,"
-            "created_at TEXT NOT NULL);"),
+            "created_at TEXT NOT NULL,"
+            "theme_key TEXT);"),
+
+        QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS occasion_offers ("
+            "id INTEGER PRIMARY KEY,"
+            "occasion_id INTEGER NOT NULL,"
+            "product_id INTEGER NOT NULL,"
+            "offer_price_cents INTEGER,"
+            "discount_percent INTEGER,"
+            "bonus_pieces INTEGER);"),
+
+        QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS service_invoices ("
+            "id INTEGER PRIMARY KEY,"
+            "type TEXT NOT NULL,"
+            "invoice_date TEXT NOT NULL,"
+            "amount_cents INTEGER NOT NULL,"
+            "due_date TEXT,"
+            "status TEXT NOT NULL DEFAULT 'unpaid',"
+            "notes TEXT);"),
 
         QStringLiteral(
             "CREATE TABLE IF NOT EXISTS sale_items ("

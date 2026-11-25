@@ -12,6 +12,10 @@ namespace app::ui {
 
 class StatCard;
 
+// Opens the shared sale-details view. Used by the sales page and by the invoices
+// page, so a sale is described the same way wherever its row is clicked.
+void showSaleDetailsDialog(QWidget* parent, app::data::Database& db, int saleId);
+
 // Today's sales (مبيعات اليوم): every sale recorded from the PC or synced from
 // any device, with a live summary (count, net total, approximate profit) and a
 // line-item detail view per sale.

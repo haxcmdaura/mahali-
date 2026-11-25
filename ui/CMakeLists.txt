@@ -37,6 +37,14 @@ target_sources(mahali-ui PRIVATE
     dialogs/language_dialog.h
     dialogs/select_customer_dialog.cpp
     dialogs/select_customer_dialog.h
+    dialogs/select_product_dialog.cpp
+    dialogs/select_product_dialog.h
+    dialogs/occasion_offer_dialog.cpp
+    dialogs/occasion_offer_dialog.h
+    dialogs/quick_item_dialog.cpp
+    dialogs/quick_item_dialog.h
+    dialogs/service_invoice_dialog.cpp
+    dialogs/service_invoice_dialog.h
     dialogs/supplier_dialog.cpp
     dialogs/supplier_dialog.h
     dialogs/purchase_dialog.cpp
@@ -55,6 +63,10 @@ target_sources(mahali-ui PRIVATE
     sales_page.h
     expenses_page.cpp
     expenses_page.h
+    occasions_page.cpp
+    occasions_page.h
+    invoices_page.cpp
+    invoices_page.h
     reports_page.cpp
     reports_page.h
     settings_page.cpp
@@ -71,6 +83,8 @@ target_sources(mahali-ui PRIVATE
     customers_page.h
     suppliers_page.cpp
     suppliers_page.h
+    purchases_page.cpp
+    purchases_page.h
     users_page.cpp
     users_page.h
     login_dialog.cpp
@@ -85,6 +99,9 @@ target_sources(mahali-ui PRIVATE
     widgets/stat_card.h
     widgets/mini_bar_chart.cpp
     widgets/mini_bar_chart.h
+    resources/themes/ramadan.qss
+    resources/themes/adha.qss
+    resources/themes/fitr.qss
     resources/app.qrc)
 
 set_target_properties(mahali-ui PROPERTIES

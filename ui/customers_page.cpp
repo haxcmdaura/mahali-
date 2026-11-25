@@ -221,7 +221,7 @@ void CustomersPage::refresh()
             && !customer.phone.contains(query, Qt::CaseInsensitive)) {
             continue;
         }
-        const long long balance = customers.balanceCentsFor(customer.id);
+        const long long balance = customers.balanceCentsFor(customer.id).value_or(0);
         if (m_filterKey == QLatin1String("debt") && balance <= 0) {
             continue;
         }

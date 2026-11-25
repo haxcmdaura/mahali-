@@ -1,6 +1,7 @@
 #include "daily_report_service.h"
 
 #include <QDateTime>
+#include <QSqlError>
 #include <QSqlQuery>
 
 #include "date_utils.h"
@@ -33,16 +34,29 @@ DailyReport DailyReportService::forDay(const QString& dayIso) const
     const QString from = widenToDayStart(dayIso);
     const QString to = widenToDayEnd(dayIso);
 
-    // Takings and the count of documents are read in one pass over the same rows.
     QSqlQuery query(m_db.handle());
-    query.prepare(QStringLiteral("SELECT COALESCE(SUM(total_cents), 0), COUNT(*) FROM sales "
-                                 "WHERE created_at >= ? AND created_at <= ?"));
+    const auto fail = [&report](const QString& step, const QSqlError& error) {
+        report.ok = false;
+        report.error = QStringLiteral("DailyReportService::forDay failed at %1: %2")
+                           .arg(step, error.text());
+        return report;
+    };
+
+    // Takings and the count of documents are read in one pass over the same rows.
+    if (!query.prepare(QStringLiteral("SELECT COALESCE(SUM(total_cents), 0), COUNT(*) FROM sales "
+                                      "WHERE created_at >= ? AND created_at <= ?"))) {
+        return fail(QStringLiteral("preparing sales totals"), query.lastError());
+    }
     query.addBindValue(from);
     query.addBindValue(to);
-    if (query.exec() && query.next()) {
-        report.salesTotalCents = query.value(0).toLongLong();
-        report.invoiceCount = query.value(1).toInt();
+    if (!query.exec()) {
+        return fail(QStringLiteral("reading sales totals"), query.lastError());
     }
+    if (!query.next()) {
+        return fail(QStringLiteral("reading sales totals"), query.lastError());
+    }
+    report.salesTotalCents = query.value(0).toLongLong();
+    report.invoiceCount = query.value(1).toInt();
 
     // Cost of goods comes off the cost frozen on each line, not off the product's
     // current average cost: a sale made last month at yesterday's price must not
@@ -51,18 +65,32 @@ DailyReport DailyReportService::forDay(const QString& dayIso) const
     // A weight line stores grams in quantity and a per-kilogram figure in
     // unit_cost_cents. The thousand that separates them is divided out
     // here for the same reason it is in the sale's own total.
-    query.prepare(QStringLiteral(
-        "SELECT COALESCE(SUM(CASE WHEN si.unit_kind = 'weight' "
-        "THEN (si.unit_cost_cents * si.quantity) / 1000 "
-        "ELSE si.unit_cost_cents * si.quantity END), 0) "
-        "FROM sale_items si "
-        "JOIN sales s ON s.id = si.sale_id "
-        "WHERE s.created_at >= ? AND s.created_at <= ?"));
+    // A package line's quantity is cartons, so it is the pieces_consumed that
+    // cost out the shelf; a weight line's quantity is already grams. The
+    // pieces_consumed is always positive even on a reversal line, so the package
+    // branch takes its sign from quantity.
+    if (!query.prepare(QStringLiteral(
+            "SELECT COALESCE(SUM(CASE "
+            "WHEN si.unit_kind = 'package' "
+            "THEN si.unit_cost_cents * CASE WHEN si.quantity < 0 "
+            "THEN -si.pieces_consumed ELSE si.pieces_consumed END "
+            "WHEN si.unit_kind = 'weight' "
+            "THEN (si.unit_cost_cents * si.quantity) / 1000 "
+            "ELSE si.unit_cost_cents * si.quantity END), 0) "
+            "FROM sale_items si "
+            "JOIN sales s ON s.id = si.sale_id "
+            "WHERE s.created_at >= ? AND s.created_at <= ?"))) {
+        return fail(QStringLiteral("preparing cost of goods"), query.lastError());
+    }
     query.addBindValue(from);
     query.addBindValue(to);
-    if (query.exec() && query.next()) {
-        report.cogsTotalCents = query.value(0).toLongLong();
+    if (!query.exec()) {
+        return fail(QStringLiteral("reading cost of goods"), query.lastError());
     }
+    if (!query.next()) {
+        return fail(QStringLiteral("reading cost of goods"), query.lastError());
+    }
+    report.cogsTotalCents = query.value(0).toLongLong();
 
     report.grossProfitCents = report.salesTotalCents - report.cogsTotalCents;
 
@@ -95,12 +123,17 @@ DailyReport DailyReportService::forDay(const QString& dayIso) const
         }
     }
 
-    query.prepare(QStringLiteral(
-        "SELECT type, COUNT(*), COALESCE(SUM(amount_cents), 0) FROM cash_movements "
-        "WHERE created_at >= ? AND created_at <= ? GROUP BY type ORDER BY MIN(created_at)"));
+    if (!query.prepare(QStringLiteral(
+            "SELECT type, COUNT(*), COALESCE(SUM(amount_cents), 0) FROM cash_movements "
+            "WHERE created_at >= ? AND created_at <= ? GROUP BY type ORDER BY MIN(created_at)"))) {
+        return fail(QStringLiteral("preparing cash lines"), query.lastError());
+    }
     query.addBindValue(from);
     query.addBindValue(to);
-    if (query.exec()) {
+    if (!query.exec()) {
+        return fail(QStringLiteral("reading cash lines"), query.lastError());
+    }
+    {
         while (query.next()) {
             DailyCashLine line;
             line.type = query.value(0).toString();
@@ -116,21 +149,26 @@ DailyReport DailyReportService::forDay(const QString& dayIso) const
     // A weight line stores grams in quantity and a per-kilogram figure in
     // unit_price_cents. The thousand that separates them is divided out
     // here for the same reason it is in the sale's own total.
-    query.prepare(QStringLiteral(
-        "SELECT si.product_id, p.name, SUM(si.quantity), "
-        "SUM(CASE WHEN si.unit_kind = 'weight' "
-        "THEN (si.unit_price_cents * si.quantity) / 1000 "
-        "ELSE si.unit_price_cents * si.quantity END) "
-        "FROM sale_items si "
-        "JOIN sales s ON s.id = si.sale_id "
-        "JOIN products p ON p.id = si.product_id "
-        "WHERE s.created_at >= ? AND s.created_at <= ? "
-        "GROUP BY si.product_id "
-        "ORDER BY SUM(si.quantity) DESC, si.product_id "
-        "LIMIT 5"));
+    if (!query.prepare(QStringLiteral(
+            "SELECT si.product_id, p.name, SUM(si.quantity), "
+            "SUM(CASE WHEN si.unit_kind = 'weight' "
+            "THEN (si.unit_price_cents * si.quantity) / 1000 "
+            "ELSE si.unit_price_cents * si.quantity END) "
+            "FROM sale_items si "
+            "JOIN sales s ON s.id = si.sale_id "
+            "JOIN products p ON p.id = si.product_id "
+            "WHERE s.created_at >= ? AND s.created_at <= ? "
+            "GROUP BY si.product_id "
+            "ORDER BY SUM(si.quantity) DESC, si.product_id "
+            "LIMIT 5"))) {
+        return fail(QStringLiteral("preparing top products"), query.lastError());
+    }
     query.addBindValue(from);
     query.addBindValue(to);
-    if (query.exec()) {
+    if (!query.exec()) {
+        return fail(QStringLiteral("reading top products"), query.lastError());
+    }
+    {
         while (query.next()) {
             TopProduct top;
             top.productId = query.value(0).toInt();
@@ -150,15 +188,20 @@ DailyReport DailyReportService::forDay(const QString& dayIso) const
     // marks it with), so keeping only amount_cents > 0 would hide the reversal
     // and list the cancelled credit sale as a debt taken today — the customer
     // would appear to owe something that was undone before the day was out.
-    query.prepare(QStringLiteral(
-        "SELECT ct.customer_id, c.name, ct.amount_cents, ct.created_at "
-        "FROM customer_transactions ct "
-        "JOIN customers c ON c.id = ct.customer_id "
-        "WHERE ct.created_at >= ? AND ct.created_at <= ? "
-        "ORDER BY ct.created_at DESC"));
+    if (!query.prepare(QStringLiteral(
+            "SELECT ct.customer_id, c.name, ct.amount_cents, ct.created_at "
+            "FROM customer_transactions ct "
+            "JOIN customers c ON c.id = ct.customer_id "
+            "WHERE ct.created_at >= ? AND ct.created_at <= ? "
+            "ORDER BY ct.created_at DESC"))) {
+        return fail(QStringLiteral("preparing new debts"), query.lastError());
+    }
     query.addBindValue(from);
     query.addBindValue(to);
-    if (query.exec()) {
+    if (!query.exec()) {
+        return fail(QStringLiteral("reading new debts"), query.lastError());
+    }
+    {
         while (query.next()) {
             NewDebt debt;
             debt.customerId = query.value(0).toInt();

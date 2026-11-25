@@ -21,6 +21,10 @@ struct SaleItem {
     // together in the COGS overflow guard, and a narrower type would truncate the
     // operand the guard exists to check (LLONG_MIN does not survive an int).
     long long piecesConsumed = 0;
+    long long bonusPieces = 0;
+    long long originalPriceCents = 0;
+    bool hasOffer = false;
+    bool priceOverridden = false;
 };
 
 } // namespace app::core

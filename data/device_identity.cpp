@@ -21,7 +21,7 @@ QString DeviceIdentity::ensure(Database& db)
     // a transaction is already open on this connection, and the commit below
     // would then close somebody else's transaction while this id was written
     // outside it, so nothing is written at all. lastError() is already set.
-    if (!db.beginTransaction()) {
+    if (!db.beginWriteTransaction()) {
         qWarning() << "device identity was not minted: cannot begin a transaction:" << db.lastError();
         return QString();
     }

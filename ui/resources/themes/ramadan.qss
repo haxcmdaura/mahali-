@@ -1,0 +1,185 @@
+QPushButton {
+    background: #800080;
+    color: #ffffff;
+    border: 1px solid #800080;
+}
+
+QPushButton:hover,
+QPushButton:pressed,
+QPushButton#primary:hover {
+    background: #6A006A;
+    border-color: #6A006A;
+}
+
+QPushButton#primary {
+    background-color: #800080;
+    color: #ffffff;
+    border: 1px solid #FFD700;
+}
+
+QPushButton#linkButton {
+    color: #800080;
+}
+
+QPushButton#linkButton:hover {
+    color: #6A006A;
+}
+
+QPushButton#danger:hover {
+    background: #6A006A;
+    border-color: #6A006A;
+}
+
+QCheckBox::indicator:hover {
+    border-color: #800080;
+}
+
+QCheckBox::indicator:checked {
+    background: #800080;
+    border-color: #800080;
+}
+
+QLineEdit:focus,
+QSpinBox:focus,
+QDoubleSpinBox:focus,
+QComboBox:focus,
+QDateEdit:focus,
+QTimeEdit:focus,
+QDateTimeEdit:focus,
+QPlainTextEdit:focus,
+QTextEdit:focus {
+    border: 1px solid #800080;
+}
+
+QComboBox QAbstractItemView {
+    selection-background-color: #F3E6FF;
+    selection-color: #800080;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    background-color: #F3E6FF;
+}
+
+QTableView,
+QTableWidget {
+    selection-background-color: #F3E6FF;
+    selection-color: #800080;
+}
+
+QTableWidget::item:selected {
+    background: #F3E6FF;
+    color: #800080;
+}
+
+QToolButton#navItem:hover {
+    color: #800080;
+}
+
+QToolButton#navItem[active="true"][direction="rtl"] {
+    background: #F3E6FF;
+    color: #800080;
+    border-right: 3px solid #800080;
+}
+
+QToolButton#navItem[active="true"][direction="ltr"] {
+    background: #F3E6FF;
+    color: #800080;
+    border-left: 3px solid #800080;
+    border-right: none;
+}
+
+QLabel[state="info"] {
+    background: #FFF4C2;
+    color: #800080;
+}
+
+QLabel#infoBar {
+    background: #FFF4C2;
+    color: #800080;
+}
+
+QLabel#occasionLabel,
+QLabel#occasionGreetingLabel {
+    background: #FFF4C2;
+    color: #800080;
+}
+
+QLabel#topSessionLabel {
+    background: #FFF4C2;
+    color: #800080;
+}
+
+QFrame#updateBar {
+    background: #FFF4C2;
+}
+
+QFrame#updateBar QLabel {
+    color: #800080;
+}
+
+QFrame#stockNotification {
+    background: #FFF4C2;
+    border: 1px solid #FFD700;
+}
+
+QPushButton#quickNavLetter:hover {
+    color: #800080;
+    border-color: #FFD700;
+}
+
+QPushButton#quickNavLetter[active="true"] {
+    background: #F3E6FF;
+    color: #800080;
+    border-color: #FFD700;
+}
+
+QPushButton#sidebarToggle:pressed {
+    background: #F3E6FF;
+    color: #800080;
+}
+
+QPushButton#periodButton:checked {
+    background: #800080;
+    color: #ffffff;
+    border-color: #FFD700;
+}
+
+QPushButton#filterChipActive {
+    background: #F3E6FF;
+    color: #800080;
+    border: 1px solid #FFD700;
+}
+
+QStatusBar QPushButton {
+    color: #800080;
+    border: 1px solid #800080;
+}
+
+QStatusBar QPushButton:hover {
+    background-color: #F3E6FF;
+}
+
+QTabBar::tab:selected {
+    color: #800080;
+}
+
+QFrame#invoiceBar QPushButton#posSaleButton {
+    background: @ACCENT@;
+    color: #ffffff;
+    border-color: @ACCENT@;
+}
+
+QFrame#invoiceBar QPushButton#posSaleButton:hover {
+    background: @WARNING@;
+    border-color: @WARNING@;
+}
+
+QFrame#creditBar {
+    background: @ACCENT_SOFT@;
+    border: 1px solid @ACCENT@;
+}
+
+QLabel#creditLabel,
+QPushButton#creditCancel {
+    color: @ACCENT@;
+}

@@ -33,7 +33,7 @@ public:
 
     // What this customer owes right now. One number, because the page, the card
     // and the footer would otherwise each re-derive it and drift apart.
-    long long balanceCentsFor(int customerId) const;
+    std::optional<long long> balanceCentsFor(int customerId) const;
 
 private:
     Database& m_db;

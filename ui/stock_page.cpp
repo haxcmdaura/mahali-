@@ -7,7 +7,6 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
-#include <QLocale>
 #include <QPushButton>
 #include <QTableWidget>
 #include <QTimer>
@@ -120,7 +119,7 @@ StockPage::StockPage(app::data::Database& db, QWidget* parent)
     m_table->setFrameShape(QFrame::NoFrame);
     m_table->setShowGrid(true);
     m_table->setColumnCount(5);
-    m_table->setHorizontalHeaderLabels({tr("Qté (كغ للميزان)"), tr("Nom"), tr("Code-barres"),
+    m_table->setHorizontalHeaderLabels({tr("Qté (g)"), tr("Nom"), tr("Code-barres"),
                                         tr("Unité"), tr("Valeur")});
     // The order is the order an operator reads this page in: how many, what, then
     // how it is identified and what it is worth. Unchanged from before, but the
@@ -217,10 +216,7 @@ void StockPage::refresh()
         m_table->insertRow(row);
         QString quantityText;
         if (product.soldByWeight) {
-            // 10000 grams reads as 10.00 kg on the shelf. The column stays a
-            // right-aligned number; only its unit changes, and the header says so.
-            quantityText = QStringLiteral("%1 كغ")
-                               .arg(QLocale().toString(product.quantity / 1000.0, 'f', 2));
+            quantityText = QStringLiteral("%1 g").arg(product.quantity);
         } else {
             quantityText = QString::number(product.quantity);
         }

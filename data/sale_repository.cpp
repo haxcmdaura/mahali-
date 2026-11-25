@@ -30,15 +30,17 @@ core::Sale saleFromQuery(const QSqlQuery& query)
         sale.occasionId = static_cast<int>(*occasionId);
     }
     sale.receiptNumber = query.value(8).toString();
+    if (const std::optional<long long> customerId = toLongLong(query.value(9))) {
+        sale.customerId = static_cast<int>(*customerId);
+    }
     return sale;
 }
 
 // adjustment_cents comes last so the indices above keep their meaning: the column
 // was added to the table after the rest of it, and every query in this file reads
 // by position. receipt_number follows it for the same reason, and customer_id
-// after that is selected but read by nothing yet: nothing writes it in this
-// phase, so it is NULL on every row and a reader that ignored the column would
-// see exactly the same sales.
+// after that is read into Sale::customerId so the invoices page can name the
+// customer. It stays NULL for a walk-in cash sale.
 const char* kSaleColumns =
     "id, created_at, total_cents, device_id, oversold, reversed_sale_id, occasion_id, adjustment_cents, "
     "receipt_number, customer_id";

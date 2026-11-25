@@ -2,6 +2,1591 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en_US">
 <context>
+    <name>CustomerDialog</name>
+    <message>
+        <location filename="../ui/dialogs/customer_dialog.cpp" line="+116"/>
+        <location line="+554"/>
+        <source>Vente à crédit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-534"/>
+        <source>Cliquez pour changer le prix</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Ajouter une ligne</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Retirer la ligne</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Produit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Quantité</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Prix unitaire</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+461"/>
+        <source>Total</source>
+        <translation type="unfinished">Total</translation>
+    </message>
+    <message>
+        <location line="-458"/>
+        <source>Quantité et prix décimaux ? Corrigez les lignes avant d&apos;enregistrer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Enregistrer la vente</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+146"/>
+        <location line="+265"/>
+        <source>Annuler</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-389"/>
+        <source>Total : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <location line="+12"/>
+        <location line="+16"/>
+        <location line="+126"/>
+        <location line="+33"/>
+        <location line="+25"/>
+        <location line="+9"/>
+        <location line="+10"/>
+        <location line="+10"/>
+        <location line="+89"/>
+        <location line="+207"/>
+        <location line="+18"/>
+        <location line="+17"/>
+        <location line="+10"/>
+        <location line="+17"/>
+        <source>Erreur</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <location line="-598"/>
+        <source>Choisissez un produit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Prix unitaire invalide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <location line="+184"/>
+        <source>Montant invalide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-125"/>
+        <source>Nouveau client</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Modifier le client</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Solde repris d&apos;un ancien registre</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Client actif</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <location line="+259"/>
+        <source>Nom</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <location line="-258"/>
+        <location line="+259"/>
+        <source>Téléphone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-258"/>
+        <location line="+259"/>
+        <source>Solde actuel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-258"/>
+        <location line="+259"/>
+        <source>Solde d&apos;ouverture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-253"/>
+        <source>Enregistrer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+39"/>
+        <source>Solde d&apos;ouverture invalide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+33"/>
+        <source>Vente à crédit impossible : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <location line="+304"/>
+        <source>Remboursement</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-303"/>
+        <source>Montant remis maintenant (max %1) :</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Le montant dépasse le solde (%1).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Aucune caisse ouverte — ouvrez-la d&apos;abord.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Remboursement impossible : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+42"/>
+        <location line="+17"/>
+        <location line="+104"/>
+        <source>Annuler une vente</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-120"/>
+        <source>Aucune vente à crédit à annuler pour ce client.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>Vente à annuler :</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Confirmer l&apos;annulation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Annuler %1 ?
+
+La vente reste visible avec un montant négatif et les produits retournent en stock.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Annulation impossible : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+39"/>
+        <source>Statut</source>
+        <translation type="unfinished">Status</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Modifier</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+213"/>
+        <source>Supprimer le client</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-191"/>
+        <source>Nouvelle vente à crédit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Annule une vente à crédit : elle reste visible avec un montant négatif, et les produits retournent en stock.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <location line="+13"/>
+        <location line="+7"/>
+        <source>Date</source>
+        <translation type="unfinished">Date</translation>
+    </message>
+    <message>
+        <location line="-19"/>
+        <source>Produits</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location line="+12"/>
+        <source>Note</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-4"/>
+        <source>Nouveau remboursement</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+8"/>
+        <source>Montant</source>
+        <translation type="unfinished">Amount</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>Type</source>
+        <translation type="unfinished">Type</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Solde après</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Informations</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Ventes à crédit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Remboursements</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Historique</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <location line="+100"/>
+        <source>Actif</source>
+        <translation>Active</translation>
+    </message>
+    <message>
+        <location line="-99"/>
+        <location line="+100"/>
+        <source>Inactif</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-63"/>
+        <source>Vente</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+54"/>
+        <source>Enregistrement impossible</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <source>Ce client doit encore %1. Enregistrez son solde d&apos;abord, ou désactivez-le.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Supprimer « %1 » ? Son historique disparaît avec lui.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Suppression impossible</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ProductDialog</name>
+    <message>
+        <location filename="../ui/dialogs/product_dialog.cpp" line="+64"/>
+        <source>⚠️  Produit existant sans nom</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>×</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Remplir les champs</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <location line="+19"/>
+        <source>تأكيد</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-18"/>
+        <source>هل أنت متأكد؟ لا يمكن التراجع.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <location line="+19"/>
+        <location line="+260"/>
+        <location line="+19"/>
+        <source>خطأ</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <location line="-297"/>
+        <source>تعذر حذف المنتج</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>هذا المنتج له تاريخ (بيع أو شراء). لا يمكن حذفه نهائيًا. هل تريد تعطيله بدلًا من ذلك؟</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>تعذر تعطيل المنتج</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>منتج جديد</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>تعديل المنتج</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <location line="+5"/>
+        <location line="+207"/>
+        <source>كرتونة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-211"/>
+        <source>غاجو</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>بالة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>كوربيّة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>الباركود</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>الاسم</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+48"/>
+        <source>سعر التكلفة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-47"/>
+        <location line="+43"/>
+        <source>سعر البيع</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-37"/>
+        <source>يُباع بالميزان (بالكيلوغرام)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>الكمية الافتتاحية</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>الوحدة</source>
+        <translation type="unfinished">Unit</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>عدد الحبات في العلبة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>اسم العلبة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>مُفعّل</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>الكمية الافتتاحية تُسجَّل مرة واحدة عند إنشاء المنتج. لتعديل المخزون لاحقاً، استخدم صفحة المخزون.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>سعر الكيلوغرام</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>تكلفة الكيلوغرام</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+40"/>
+        <source>Supprimer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+64"/>
+        <source>Code-barres : %1
+Prix de vente : %2
+Prix revient : %3
+Stock : %4</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+45"/>
+        <source>سعر البيع مطلوب ويجب أن يكون أكبر من صفر</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>الباركود مستخدم مسبقاً</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ProductListPage</name>
+    <message>
+        <location filename="../apps/android/qml/ProductListPage.qml" line="+14"/>
+        <source>Code-barres ou nom…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Sync</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+89"/>
+        <source>Vente — à venir</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Synchronisation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Adresse IP du serveur</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Clé de synchronisation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Sync Now</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Synchronisation en cours...</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>RefundsPage</name>
+    <message>
+        <location filename="../ui/refunds_page.cpp" line="+45"/>
+        <source>سبق استرداد هذا السداد</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>هذا السداد غير قابل للاسترداد</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>Rembourser</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+193"/>
+        <source>Rembourser cette vente</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+36"/>
+        <source>Rembourser ce règlement</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>app::ui</name>
+    <message>
+        <location filename="../ui/dialogs/purchase_dialog.cpp" line="+116"/>
+        <source>Nouvelle facture d&apos;achat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>Ajouter au stock</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/occasion_offer_dialog.cpp" line="+65"/>
+        <source>لا توجد منتجات لإضافتها إلى العرض</source>
+        <translation>No products available to add to the offer</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <location line="+122"/>
+        <source>إضافة عرض</source>
+        <translation>Add offer</translation>
+    </message>
+    <message>
+        <location line="-111"/>
+        <source>اتركه فارغاً لعدم تغيير السعر</source>
+        <translation>Leave empty to keep the price unchanged</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>0 - 100</source>
+        <translation>0 - 100</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <location filename="../ui/dialogs/purchase_dialog.cpp" line="+4"/>
+        <location line="+75"/>
+        <location line="+245"/>
+        <location line="+105"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+103"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+100"/>
+        <source>0</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location filename="../ui/invoices_page.cpp" line="+167"/>
+        <source>المنتج</source>
+        <translation>Product</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+86"/>
+        <source>سعر العرض</source>
+        <translation>Offer price</translation>
+    </message>
+    <message>
+        <location line="-85"/>
+        <source>نسبة الخصم %</source>
+        <translation>Discount %</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+85"/>
+        <source>حبات إضافية</source>
+        <translation>Bonus pieces</translation>
+    </message>
+    <message>
+        <location line="-80"/>
+        <location filename="../ui/dialogs/quick_item_dialog.cpp" line="+66"/>
+        <location filename="../ui/dialogs/service_invoice_dialog.cpp" line="+107"/>
+        <source>حفظ</source>
+        <translation>Save</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location filename="../ui/dialogs/quick_item_dialog.cpp" line="+2"/>
+        <location filename="../ui/dialogs/service_invoice_dialog.cpp" line="+2"/>
+        <source>إلغاء</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>اختر منتجاً</source>
+        <translation>Choose a product</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>سعر العرض غير صالح</source>
+        <translation>Invalid offer price</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>نسبة الخصم يجب أن تكون بين 0 و 100</source>
+        <translation>Discount must be between 0 and 100</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>عدد الحبات الإضافية غير صالح</source>
+        <translation>Invalid number of bonus pieces</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>إدارة العروض</source>
+        <translation>Manage offers</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>عروض المناسبة</source>
+        <translation>Occasion offers</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>اسم المنتج</source>
+        <translation>Product name</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>نسبة الخصم</source>
+        <translation>Discount %</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>إجراءات</source>
+        <translation>Actions</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>إغلاق</source>
+        <translation>Close</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>منتج #%1</source>
+        <translation>Product #%1</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>حذف</source>
+        <translation>Delete</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>تعذر حذف العرض</source>
+        <translation>Could not delete the offer</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>تعذر حفظ العرض</source>
+        <translation>Could not save the offer</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/purchase_dialog.cpp" line="-417"/>
+        <source>Fournisseur</source>
+        <translation type="unfinished">Supplier</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="+279"/>
+        <source>N° Facture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="+0"/>
+        <location line="+14"/>
+        <location line="+10"/>
+        <location line="+6"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+53"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+53"/>
+        <source>Date</source>
+        <translation type="unfinished">Date</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+67"/>
+        <source>TVA</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-65"/>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="-16"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+1"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+1"/>
+        <source>Note</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Scanner ou rechercher...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="-28"/>
+        <source>Produit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Qté</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Unité</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <location line="+277"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+0"/>
+        <source>Prix unitaire</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-276"/>
+        <location line="+41"/>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="-14"/>
+        <source>Total</source>
+        <translation type="unfinished">Total</translation>
+    </message>
+    <message>
+        <location line="-31"/>
+        <source>+</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Payé intégralement</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Sous-total</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Montant payé</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="+1"/>
+        <source>Reste</source>
+        <translation type="unfinished">Remaining</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="-31"/>
+        <source>Espèces (sorti du tiroir)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+1"/>
+        <source>À crédit (sur le compte fournisseur)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+2"/>
+        <source>Par banque / chèque</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+3"/>
+        <source>Les espèces sortent du tiroir et doivent être imputées à une session ouverte.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+23"/>
+        <source>Mode de règlement</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="-111"/>
+        <location line="+100"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+11"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+59"/>
+        <location filename="../ui/occasions_page.cpp" line="+137"/>
+        <source>Enregistrer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location filename="../ui/dialogs/select_customer_dialog.cpp" line="+91"/>
+        <location filename="../ui/dialogs/select_product_dialog.cpp" line="+56"/>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="-99"/>
+        <location line="+163"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+2"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+2"/>
+        <location filename="../ui/occasions_page.cpp" line="+1"/>
+        <source>Annuler</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/occasion_offer_dialog.cpp" line="-195"/>
+        <location line="+52"/>
+        <location line="+7"/>
+        <location line="+10"/>
+        <location line="+11"/>
+        <location line="+99"/>
+        <location line="+16"/>
+        <location filename="../ui/dialogs/purchase_dialog.cpp" line="+276"/>
+        <location line="+15"/>
+        <location line="+63"/>
+        <location line="+57"/>
+        <location line="+4"/>
+        <location line="+19"/>
+        <location line="+8"/>
+        <location line="+3"/>
+        <location line="+24"/>
+        <location line="+30"/>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="-136"/>
+        <location line="+290"/>
+        <location line="+7"/>
+        <location line="+14"/>
+        <location line="+13"/>
+        <location line="+21"/>
+        <location filename="../ui/occasions_page.cpp" line="+18"/>
+        <location line="+4"/>
+        <source>Erreur</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/purchase_dialog.cpp" line="-223"/>
+        <location line="+78"/>
+        <source>Produit introuvable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-62"/>
+        <source>Une facture ne peut pas dépasser %1 lignes.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Produit…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+111"/>
+        <source>Choisissez un fournisseur</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Ajoutez au moins un produit à la facture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Ligne %1 : produit introuvable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Ligne %1 : quantité invalide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-3"/>
+        <source>Ligne %1 : prix unitaire obligatoire</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <source>Aucun tiroir ouvert. Ouvrez une session de caisse, ou indiquez que la facture est réglée sur le compte ou par banque.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>Enregistrement impossible : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/select_customer_dialog.cpp" line="-33"/>
+        <source>Choisir un client</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Nom ou téléphone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <location filename="../ui/dialogs/select_product_dialog.cpp" line="-12"/>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="-396"/>
+        <location line="+109"/>
+        <location filename="../ui/occasions_page.cpp" line="-31"/>
+        <source>Nom</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="-108"/>
+        <location line="+109"/>
+        <source>Téléphone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Solde</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/supplier_dialog.cpp" line="-129"/>
+        <source>Nouveau fournisseur</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Modifier le fournisseur</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <location line="+110"/>
+        <source>Solde repris d&apos;un ancien registre</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-109"/>
+        <location line="+110"/>
+        <source>Fournisseur actif</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-104"/>
+        <location line="+109"/>
+        <source>Adresse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-108"/>
+        <location line="+109"/>
+        <source>Notes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-108"/>
+        <location line="+109"/>
+        <source>Solde actuel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-108"/>
+        <location line="+109"/>
+        <source>Solde d&apos;ouverture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-63"/>
+        <location line="+297"/>
+        <source>Solde d&apos;ouverture invalide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-217"/>
+        <source>Nouvelle facture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Payé</source>
+        <translation type="unfinished">Paid</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="-106"/>
+        <source>Nouveau paiement</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+10"/>
+        <location line="+6"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="+92"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="-86"/>
+        <source>Montant</source>
+        <translation type="unfinished">Amount</translation>
+    </message>
+    <message>
+        <location line="-16"/>
+        <location line="+10"/>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="-1"/>
+        <source>Facture liée</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-3"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="-21"/>
+        <source>Nouveau retour</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+100"/>
+        <source>Type</source>
+        <translation type="unfinished">Type</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Solde après</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Informations</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Factures d&apos;achat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Paiements</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Retours</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Historique</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Supprimer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+40"/>
+        <location line="+3"/>
+        <source>—</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Total impayé : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+26"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="-41"/>
+        <source>Facture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Paiement</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Retour</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+59"/>
+        <source>Le nom est obligatoire</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>Enregistrement impossible</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Ce fournisseur a des factures, des paiements ou des retours. Désactivez-le plutôt que de le supprimer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Supprimer le fournisseur</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Supprimer « %1 » ?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Suppression impossible</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/supplier_payment_dialog.cpp" line="-83"/>
+        <source>Solde actuel : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Aucune (paiement général)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Facture du %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>%1 — reste %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Reste : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Comment le paiement a été réglé ?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+59"/>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="+172"/>
+        <source>Le montant doit être supérieur à zéro</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Le montant dépasse le solde dû (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Choisissez comment le paiement a été réglé</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Aucun tiroir ouvert. Ouvrez une session de caisse, ou enregistrez le paiement sur le compte ou par banque.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/supplier_return_dialog.cpp" line="-225"/>
+        <source>Retour général (montant)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Retour lié à une facture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>%1 — %2 du %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Facture #%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>Qté achetée</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Qté retournée</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+102"/>
+        <source>g</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>colis</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>pcs</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+74"/>
+        <source>Choisissez au moins un produit à retourner</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/zakat_dialog.cpp" line="+56"/>
+        <source>الزكاة السنوية</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>🕌 الوقت السنوي لإخراج الزكاة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>أدخل سعر غرام الذهب اليوم لحساب النصاب.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>سعر الغرام الواحد (DA/gram)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Enregistrer le Nisab</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>حساب الزكاة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>Plus tard</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>تسجيل دفع الزكاة لهذا العام</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+40"/>
+        <source>النصاب = %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Nisab enregistré.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+58"/>
+        <source>الزكاة الواجبة = %1 × 2.5% = %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>لم تبلغ النصاب (%1 من %2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <location line="+6"/>
+        <source>الزكاة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-5"/>
+        <source>تعذّر تسجيل دفع الزكاة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>دُفعت الزكاة عن عام %1. بارك الله فيك.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/select_product_dialog.cpp" line="-11"/>
+        <source>Choisir un produit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Nom ou code-barres</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Prix</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Stock</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/occasions_page.cpp" line="-24"/>
+        <source>Nouvelle occasion</source>
+        <translation>New occasion</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Modifier l&apos;occasion</source>
+        <translation>Edit occasion</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>Date de début</source>
+        <translation>Start date</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Date de fin</source>
+        <translation>End date</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Clé de thème</source>
+        <translation>Theme key</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>Le nom est requis</source>
+        <translation>Name is required</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>La date de fin doit suivre la date de début</source>
+        <translation>End date must not be before start date</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/quick_item_dialog.cpp" line="-25"/>
+        <source>إضافة منتج سريع</source>
+        <translation>Add quick item</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>الاسم</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>السعر</source>
+        <translation>Price</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>أيام التعبئة</source>
+        <translation>Restock days</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <location line="+7"/>
+        <location line="+17"/>
+        <location filename="../ui/dialogs/service_invoice_dialog.cpp" line="+12"/>
+        <location line="+17"/>
+        <source>خطأ</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <location line="-24"/>
+        <source>الاسم مطلوب</source>
+        <translation>Name is required</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>السعر يجب أن يكون أكبر من صفر</source>
+        <translation>Price must be greater than zero</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>تعذر حفظ المنتج السريع</source>
+        <translation>Could not save the quick item</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/service_invoice_dialog.cpp" line="-84"/>
+        <source>Nouvelle facture service</source>
+        <translation>New service invoice</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Modifier la facture service</source>
+        <translation>Edit service invoice</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <location filename="../ui/invoices_page.cpp" line="-100"/>
+        <source>كهرباء</source>
+        <translation>Electricity</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location filename="../ui/invoices_page.cpp" line="+3"/>
+        <source>غاز</source>
+        <translation>Gas</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location filename="../ui/invoices_page.cpp" line="+3"/>
+        <source>ماء</source>
+        <translation>Water</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <location filename="../ui/invoices_page.cpp" line="+11"/>
+        <source>غير مدفوعة</source>
+        <translation>Unpaid</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location filename="../ui/invoices_page.cpp" line="-3"/>
+        <source>مدفوعة</source>
+        <translation>Paid</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>النوع</source>
+        <translation>Type</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>تاريخ الفاتورة</source>
+        <translation>Invoice date</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>المبلغ</source>
+        <translation>Amount</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>تاريخ الاستحقاق</source>
+        <translation>Due date</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>الحالة</source>
+        <translation>Status</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>ملاحظات</source>
+        <translation>Notes</translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>المبلغ يجب أن يكون أكبر من صفر</source>
+        <translation>The amount must be greater than zero</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>تعذر حفظ الفاتورة</source>
+        <translation>Could not save the invoice</translation>
+    </message>
+    <message>
+        <location filename="../ui/invoices_page.cpp" line="+66"/>
+        <source>تفاصيل فاتورة الشراء #%1</source>
+        <translation>Purchase invoice details #%1</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>المورد: %1
+رقم الفاتورة: %2
+التاريخ: %3
+الإجمالي: %4    المدفوع: %5    المتبقي: %6</source>
+        <translation>Supplier: %1
+Invoice number: %2
+Date: %3
+Total: %4    Paid: %5    Remaining: %6</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>الكمية</source>
+        <translation>Quantity</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>الوحدة</source>
+        <translation>Unit</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>سعر الوحدة</source>
+        <translation>Unit price</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>الإجمالي</source>
+        <translation>Total</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>Fermer</source>
+        <translation>Close</translation>
+    </message>
+</context>
+<context>
     <name>app::ui::AuditLogPage</name>
     <message>
         <location filename="../ui/audit_log_page.cpp" line="+24"/>
@@ -68,6 +1653,11 @@
     </message>
     <message>
         <location line="+3"/>
+        <source>سداد مورد</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
         <source>استرداد</source>
         <translation type="unfinished"></translation>
     </message>
@@ -119,12 +1709,12 @@
     <message>
         <location line="+0"/>
         <source>النوع</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Type</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>المبلغ</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Amount</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -137,18 +1727,18 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+27"/>
+        <location line="+34"/>
         <source>لا توجد جلسة مفتوحة حالياً — ابدأ جلسة برصيد الفتح.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+26"/>
+        <location line="+27"/>
         <source>—</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-22"/>
+        <location line="-23"/>
         <source>آخر جلسة أُغلقت بفرق %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -158,7 +1748,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+14"/>
         <source>الجلسة #%1 مفتوحة منذ %2</source>
         <translation type="unfinished"></translation>
     </message>
@@ -169,16 +1759,16 @@
     </message>
     <message>
         <location line="+1"/>
-        <source>الجلسة #%1 — مفتوحة: %2  |  %3  |  %4</source>
+        <source>الجلسة #%1 — مفتوحة: %2  |  %3  |  %4  |  حركات قديمة بلا مرجع: %5</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+54"/>
+        <location line="+55"/>
         <source>تعذر فتح الجلسة.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+24"/>
         <source>تعذر إغلاق الجلسة.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -198,7 +1788,13 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+12"/>
+        <source>أُغلقت الجلسة مع %1 مخالفة تدقيق:
+%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+25"/>
         <source>بدء جلسة</source>
         <translation type="unfinished"></translation>
     </message>
@@ -211,7 +1807,7 @@
         <location line="+9"/>
         <location line="+21"/>
         <source>خطأ</source>
-        <translation type="unfinished">Error</translation>
+        <translation>Error</translation>
     </message>
     <message>
         <location line="-21"/>
@@ -233,187 +1829,115 @@
 <context>
     <name>app::ui::CustomersPage</name>
     <message>
-        <location filename="../ui/customers_page.cpp" line="+45"/>
-        <source>عميل جديد</source>
+        <location filename="../ui/customers_page.cpp" line="+64"/>
+        <source>Clients</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>تعديل العميل</source>
+        <location line="+0"/>
+        <source>Suivez les dettes et les remboursements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+7"/>
-        <location line="+238"/>
-        <source>الاسم</source>
-        <translation type="unfinished">Name</translation>
-    </message>
-    <message>
-        <location line="-237"/>
-        <location line="+237"/>
-        <source>الهاتف</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="-179"/>
-        <location line="+157"/>
-        <source>بيع آجل</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="-139"/>
-        <source>اضغط لتغيير سعر/كغ</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>أضف سطر</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>حذف السطر المحدد</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+9"/>
-        <source>المنتج</source>
-        <translation type="unfinished">Product</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>الكمية</source>
-        <translation type="unfinished">Quantity</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>سعر الوحدة</source>
-        <translation type="unfinished">Unit price</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>الإجمالي</source>
-        <translation type="unfinished">Total</translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>الكمية والسعر عشري؟ عدّل في الأسطر قبل الحفظ.</source>
+        <location line="+13"/>
+        <source>Rechercher un nom ou un téléphone...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+16"/>
-        <source>حفظ البيع الآجل</source>
+        <source>Tous</source>
         <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+24"/>
-        <source>الإجمالي: %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <location line="+13"/>
-        <location line="+187"/>
-        <location line="+53"/>
-        <source>خطأ</source>
-        <translation type="unfinished">Error</translation>
-    </message>
-    <message>
-        <location line="-252"/>
-        <source>اختر منتجاً من القائمة</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+13"/>
-        <source>السعر غير صالح</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+52"/>
-        <source>إضافة عميل</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>تعديل</source>
-        <translation type="unfinished">Edit</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <location line="+173"/>
-        <source>سداد</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="-153"/>
-        <source>المطلوب (رصيد)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+19"/>
-        <source>العملاء والرصيد</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+6"/>
-        <source>العملاء</source>
-        <translation type="unfinished">Customers</translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>المبيعات الآجلة وسداد الأرصدة</source>
+        <source>Avec dette</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+81"/>
-        <source>تعذر حفظ العميل</source>
+        <location line="+1"/>
+        <source>Sans dette</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+47"/>
-        <source>المبلغ الذي دفعه العميل الآن:</source>
+        <location line="+15"/>
+        <source>Ajouter</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+6"/>
-        <source>المبلغ غير صالح</source>
+        <location line="+23"/>
+        <source>Nom</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Téléphone</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+11"/>
-        <source>لا يوجد بنود للبيع الآجل</source>
+        <location line="+0"/>
+        <source>Solde</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+8"/>
-        <source>تعذر تسجيل البيع الآجل: %1</source>
+        <location line="+0"/>
+        <source>Dernière opération</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Clients et soldes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+95"/>
+        <source>Total : %1 clients · %2 avec dette · %3 dus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+90"/>
+        <source>Erreur</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Impossible d&apos;enregistrer le client</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>Aucun article à facturer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Vente à crédit impossible : %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+4"/>
-        <source>سُجّل دين: %1</source>
+        <source>Dette enregistrée : %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+12"/>
-        <source>لا توجد جلسة مفتوحة — افتح جلسة الصندوق أولاً</source>
+        <source>Aucune caisse ouverte — ouvrez-la d&apos;abord</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+8"/>
-        <source>تعذر تسجيل السداد: %1</source>
+        <source>Remboursement impossible : %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+4"/>
-        <source>سُجّل سداد: %1</source>
+        <source>Remboursement enregistré : %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>app::ui::ExpensesPage</name>
     <message>
-        <location filename="../ui/expenses_page.cpp" line="+52"/>
+        <location filename="../ui/expenses_page.cpp" line="+39"/>
         <source>المصروفات</source>
         <translation type="unfinished"></translation>
     </message>
@@ -434,37 +1958,37 @@
     </message>
     <message>
         <location line="+8"/>
-        <location line="+134"/>
+        <location line="+135"/>
         <location line="+5"/>
         <source>مصروف جديد</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-136"/>
-        <location line="+153"/>
+        <location line="-137"/>
+        <location line="+154"/>
         <location line="+6"/>
         <source>سحب مالك</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-157"/>
+        <location line="-158"/>
         <source>عكس المحدد</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="+29"/>
         <source>الوقت</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+0"/>
         <source>النوع</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Type</translation>
     </message>
     <message>
         <location line="+0"/>
         <source>المبلغ</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Amount</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -506,7 +2030,7 @@
         <location line="-16"/>
         <location line="+23"/>
         <source>خطأ</source>
-        <translation type="unfinished">Error</translation>
+        <translation>Error</translation>
     </message>
     <message>
         <location line="-23"/>
@@ -552,85 +2076,182 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+4"/>
         <source>أُلغي: %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
+    <name>app::ui::InvoicesPage</name>
+    <message>
+        <location filename="../ui/invoices_page.cpp" line="+23"/>
+        <source>Factures</source>
+        <translation>Invoices</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Factures fournisseurs, ventes et services</source>
+        <translation>Supplier invoices, sales and services</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>بحث بالتاريخ أو الاسم أو الرقم</source>
+        <translation>Search by date, name or number</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+3"/>
+        <source>Date</source>
+        <translation>Date</translation>
+    </message>
+    <message>
+        <location line="-3"/>
+        <source>Fournisseur</source>
+        <translation>Supplier</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <location line="+3"/>
+        <source>Total</source>
+        <translation>Total</translation>
+    </message>
+    <message>
+        <location line="-3"/>
+        <source>Payé</source>
+        <translation>Paid</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Reste</source>
+        <translation>Remaining</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>N° reçu</source>
+        <translation>Receipt No.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Client</source>
+        <translation>Customer</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Type</source>
+        <translation>Type</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Date facture</source>
+        <translation>Invoice date</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Montant</source>
+        <translation>Amount</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Échéance</source>
+        <translation>Due date</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Statut</source>
+        <translation>Status</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Nouvelle Facture Service</source>
+        <translation>New service invoice</translation>
+    </message>
+    <message>
+        <location line="+52"/>
+        <source>زبون نقدي</source>
+        <translation>Cash customer</translation>
+    </message>
+</context>
+<context>
     <name>app::ui::LoginDialog</name>
     <message>
-        <location filename="../ui/login_dialog.cpp" line="+29"/>
+        <location filename="../ui/login_dialog.cpp" line="+328"/>
         <source>تسجيل الدخول — محلي</source>
         <translation>Login — Mahali</translation>
     </message>
     <message>
-        <location line="+12"/>
-        <location line="+141"/>
-        <location line="+12"/>
+        <location line="-174"/>
+        <location line="+175"/>
+        <location line="+10"/>
+        <location line="+7"/>
         <source>محلي</source>
         <translation>Mahali</translation>
     </message>
     <message>
-        <location line="-144"/>
+        <location line="-16"/>
         <source>اختر مستخدمًا وأدخل رمز PIN</source>
         <translation>Select a user and enter the PIN code</translation>
     </message>
     <message>
-        <location line="+23"/>
-        <location line="+55"/>
+        <location line="-141"/>
+        <location line="+43"/>
         <source>رمز PIN (حرفان)</source>
         <translation>PIN code (2 letters)</translation>
     </message>
     <message>
-        <location line="-36"/>
+        <location line="-33"/>
+        <location line="+73"/>
         <source>دخول</source>
         <translation>Login</translation>
     </message>
     <message>
-        <location line="+10"/>
-        <location line="+42"/>
+        <location line="-11"/>
+        <location line="+84"/>
         <source>كلمة الاستعادة</source>
         <translation>Recovery word</translation>
     </message>
     <message>
-        <location line="-28"/>
+        <location line="-127"/>
+        <location line="+120"/>
         <source>إعداد المدير الأول</source>
         <translation>First administrator setup</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="-110"/>
         <source>الاسم</source>
         <translation>Name</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="-2"/>
         <source>مثال: المدير</source>
         <translation>Example: Administrator</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+10"/>
         <source>كلمة الاستعادة (4 أحرف على الأقل)</source>
         <translation>Recovery word (at least 4 letters)</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <location line="+5"/>
+        <location line="+3"/>
         <source>تأكيد كلمة الاستعادة</source>
         <translation>Confirm recovery word</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+4"/>
         <source>إنشاء</source>
         <translation>Create</translation>
     </message>
     <message>
-        <location line="+120"/>
+        <location line="+125"/>
+        <source>لا يوجد مستخدم</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+73"/>
         <source>أدخل حرفين فقط</source>
         <translation>Enter only two letters</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+13"/>
         <source>PIN خاطئ</source>
         <translation>Incorrect PIN</translation>
     </message>
@@ -640,37 +2261,37 @@
         <translation>Enter a name</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+4"/>
         <source>PIN يجب أن يكون حرفين</source>
         <translation>The PIN must be two letters</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+4"/>
         <source>كلمة الاستعادة: 4 أحرف على الأقل</source>
         <translation>Recovery word: at least 4 letters</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+4"/>
         <source>كلمة الاستعادة غير متطابقة</source>
         <translation>Recovery words do not match</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+10"/>
         <source>فشل إنشاء المستخدم</source>
         <translation>Failed to create the user</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+4"/>
         <source>فشل حفظ PIN</source>
         <translation>Failed to save the PIN</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+6"/>
         <source>فشل حفظ كلمة الاستعادة</source>
         <translation>Failed to save the recovery word</translation>
     </message>
     <message>
-        <location line="+48"/>
+        <location line="+45"/>
         <source>كلمة الاستعادة غير صحيحة</source>
         <translation>Incorrect recovery word</translation>
     </message>
@@ -678,17 +2299,17 @@
 <context>
     <name>app::ui::MainWindow</name>
     <message>
-        <location filename="../ui/main_window.cpp" line="+106"/>
+        <location filename="../ui/main_window.cpp" line="+164"/>
         <source>محلي — نظام نقاط البيع والمحاسبة</source>
         <translation>Mahali — point of sale and accounting</translation>
     </message>
     <message>
-        <location line="+258"/>
+        <location line="+667"/>
         <source>حول محلي…</source>
         <translation>About Mahali…</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+7"/>
         <source>حول محلي</source>
         <translation>About Mahali</translation>
     </message>
@@ -698,45 +2319,62 @@
         <translation>&lt;h3&gt;Mahali — point of sale and accounting&lt;/h3&gt;&lt;p&gt;Fast sales, inventory, customer and supplier accounts, cash sessions, expenses, reports and refunds — works offline, in light or dark theme.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Version:&lt;/b&gt; %1&lt;/p&gt;</translation>
     </message>
     <message>
-        <location line="-62"/>
-        <location line="+337"/>
-        <source>المستخدم: %1</source>
-        <translation>User: %1</translation>
-    </message>
-    <message>
-        <location line="-501"/>
-        <location line="+313"/>
+        <location line="+105"/>
         <source>Achats</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Purchases</translation>
     </message>
     <message>
-        <location line="-313"/>
-        <location line="+1"/>
-        <source>Page en construction.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>Occasions</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+37"/>
-        <source>تبديل المستخدم</source>
-        <translation>Switch user</translation>
-    </message>
-    <message>
-        <location line="+106"/>
+        <location line="-373"/>
         <source>Mahali</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+33"/>
+        <source>إظهار/إخفاء القائمة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>Utilisateur</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Changer d&apos;utilisateur</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
         <source>تبديل السمة</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+133"/>
+        <location line="+37"/>
+        <source>Vente rapide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Vente à crédit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Produits</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Stock</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Rapports</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+244"/>
         <source>نقطة البيع</source>
         <translation type="unfinished"></translation>
     </message>
@@ -766,12 +2404,37 @@
         <translation>Suppliers</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+2"/>
+        <source>Factures</source>
+        <translation>Invoices</translation>
+    </message>
+    <message>
+        <location line="+19"/>
         <source>النظام</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+208"/>
+        <location line="+234"/>
+        <source>Session ouverte #%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Aucune session ouverte</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+34"/>
+        <source>تهنئة المناسبة</source>
+        <translation>Occasion greeting</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>حان وقت إعادة الشراء: %1 - تم بيع %2</source>
+        <translation>Time to restock: %1 - %2 sold</translation>
+    </message>
+    <message>
+        <location line="+96"/>
         <source>تحديث متاح: %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -836,7 +2499,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-357"/>
+        <location line="-539"/>
         <source>جلسة الصندوق</source>
         <translation>Cash session</translation>
     </message>
@@ -846,9 +2509,9 @@
         <translation>Today&apos;s sales</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+9"/>
         <source>المناسبات</source>
-        <translation type="unfinished"></translation>
+        <translation>Occasions</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -876,12 +2539,12 @@
         <translation>Audit log</translation>
     </message>
     <message>
-        <location line="-147"/>
+        <location line="-300"/>
         <source>الإعدادات</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location line="+153"/>
+        <location line="+306"/>
         <source>إدارة المستخدمين</source>
         <translation>User management</translation>
     </message>
@@ -895,77 +2558,329 @@
     </message>
 </context>
 <context>
-    <name>app::ui::PosPage</name>
+    <name>app::ui::OccasionsPage</name>
     <message>
-        <location filename="../ui/pos_page.cpp" line="+43"/>
-        <source>Vente rapide</source>
-        <translation type="unfinished"></translation>
+        <location filename="../ui/occasions_page.cpp" line="+23"/>
+        <source>المناسبات</source>
+        <translation>Occasions</translation>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+11"/>
+        <source>إدارة المناسبات والثيمات</source>
+        <translation>Manage occasions and themes</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Nouvelle Occasion</source>
+        <translation>New occasion</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>إدارة العروض</source>
+        <translation>Manage offers</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Activer manuellement</source>
+        <translation>Activate manually</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Mode automatique</source>
+        <translation>Automatic mode</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Quitter le mode occasion</source>
+        <translation>Leave occasion mode</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>تعديل التواريخ</source>
+        <translation>Edit dates</translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>ID</source>
+        <translation>ID</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Nom</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Date de début</source>
+        <translation>Start date</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Date de fin</source>
+        <translation>End date</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Thème</source>
+        <translation>Theme</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Actif</source>
+        <translation>Active</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Actions</source>
+        <translation>Actions</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>Liste des occasions</source>
+        <translation>Occasion list</translation>
+    </message>
+    <message>
+        <location line="+47"/>
+        <location line="+109"/>
+        <source>نعم</source>
+        <translation>Yes</translation>
+    </message>
+    <message>
+        <location line="-109"/>
+        <source>لا</source>
+        <translation>No</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>تعطيل</source>
+        <translation>Deactivate</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>تفعيل</source>
+        <translation>Activate</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>تعديل</source>
+        <translation>Edit</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>manuel</source>
+        <translation>manual</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>désactivé</source>
+        <translation>disabled</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>automatique</source>
+        <translation>automatic</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Mode: %1</source>
+        <translation>Mode: %1</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>الوضع التلقائي: اليوم هو %1</source>
+        <translation>Automatic mode: today is %1</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>تم تفعيل %1 تلقائياً (التاريخ الهجري: %2)</source>
+        <translation>%1 activated automatically (Hijri date: %2)</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>لا توجد مناسبة نشطة حالياً. التاريخ الهجري اليوم: %1</source>
+        <translation>No occasion is active right now. Today&apos;s Hijri date: %1</translation>
+    </message>
+    <message>
+        <location line="+71"/>
+        <location line="+16"/>
+        <location line="+51"/>
+        <location line="+7"/>
+        <location line="+13"/>
+        <location line="+12"/>
+        <source>Erreur</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <location line="-98"/>
+        <source>Impossible de désactiver l&apos;occasion</source>
+        <translation>Could not deactivate the occasion</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Impossible d&apos;activer l&apos;occasion</source>
+        <translation>Could not activate the occasion</translation>
+    </message>
+    <message>
+        <location line="+51"/>
+        <source>لا توجد مناسبة لتعديل تواريخها</source>
+        <translation>No occasion to edit dates for</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Sélectionnez une occasion</source>
+        <translation>Select an occasion</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Impossible de passer en mode automatique</source>
+        <translation>Could not switch to automatic mode</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Impossible de quitter le mode occasion</source>
+        <translation>Could not leave occasion mode</translation>
+    </message>
+</context>
+<context>
+    <name>app::ui::PosPage</name>
+    <message>
+        <location filename="../ui/pos_page.cpp" line="+93"/>
         <source>Code-barres ou nom du produit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-10"/>
-        <source>Session</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+39"/>
+        <location line="+56"/>
+        <location line="+64"/>
         <source>Produit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+0"/>
+        <location line="-64"/>
         <source>Qté</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+0"/>
-        <source>PU</source>
+        <location line="-76"/>
+        <location filename="../ui/printing/receipt.cpp" line="+32"/>
+        <source>كرتونة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+76"/>
+        <source>Code-barres</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+36"/>
+        <source>الوحدة</source>
+        <translation type="unfinished">Unit</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Prix</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Offre</source>
+        <translation>Offer</translation>
+    </message>
+    <message>
+        <location line="+38"/>
+        <location line="+945"/>
+        <source>Scannez un produit ou choisissez-en un dans la liste</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-919"/>
+        <location line="+29"/>
         <source>Total</source>
+        <translation type="unfinished">Total</translation>
+    </message>
+    <message>
+        <location line="-29"/>
+        <source>Poids (g)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-19"/>
+        <location line="+0"/>
+        <source>Prix/kg</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <location line="+3"/>
         <source>Vider</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+1"/>
+        <source>Vider la facture</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+3"/>
         <source>Retirer ligne</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+1"/>
+        <source>Retirer la ligne sélectionnée</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+37"/>
+        <location line="+966"/>
+        <source>Ajustement</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-961"/>
+        <source>Somme à ajouter (+) ou à retirer (-) sur la facture entière</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+24"/>
         <source>Enregistrer la vente</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+123"/>
+        <location line="+4"/>
+        <location line="+1"/>
+        <location line="+834"/>
+        <location line="+170"/>
+        <source>Valider la vente (Entrée)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-955"/>
+        <source>طبع الإيصال</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+331"/>
+        <location line="+68"/>
+        <source>Impossible de chiffrer « %1 »</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-26"/>
         <source>Ajouté : %1 × %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+31"/>
         <source>Ajouté : %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+31"/>
-        <location line="+41"/>
+        <location line="+61"/>
         <source>Impossible d&apos;enregistrer le produit.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-28"/>
+        <location line="+23"/>
         <source>Ajouter à la vente ?</source>
         <translation type="unfinished"></translation>
     </message>
@@ -975,7 +2890,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+74"/>
+        <location line="+79"/>
         <source>Vider le panier</source>
         <translation type="unfinished"></translation>
     </message>
@@ -985,52 +2900,137 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+22"/>
         <source>Quantité</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+12"/>
         <source>Prix unitaire</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+53"/>
-        <source>Session ouverte #%1</source>
+        <location line="+165"/>
+        <location line="+49"/>
+        <source>غرام</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-46"/>
+        <location line="+52"/>
+        <location filename="../ui/printing/receipt.cpp" line="+13"/>
+        <location line="+182"/>
+        <source>قطعة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-49"/>
+        <source>Articles: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Payé : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Reste : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+81"/>
+        <source>Offre : %1 → %2</source>
+        <translation>Offer: %1 → %2</translation>
+    </message>
+    <message>
+        <location line="+79"/>
+        <source>À CRÉDIT : %1 · Solde : %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+3"/>
-        <source>Aucune session ouverte</source>
+        <source>Enregistrer à crédit (Entrée)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+12"/>
-        <source>Articles: %1 | Unités: %2</source>
+        <location line="+143"/>
+        <source>تعذّر العثور على الإيصال</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+66"/>
-        <source>لا يوجد بنود للبيع</source>
-        <translation>No items to sell</translation>
+        <location line="+13"/>
+        <source>تعذّر حفظ الإيصال</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>تعذّر حفظ الإيصال: %1</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+4"/>
+        <source>تم حفظ الإيصال في %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <location line="+1"/>
+        <source>الوزن (غرام)</source>
+        <translation>Weight (g)</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>%1 / كغ</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>وزن غير صالح</source>
+        <translation>Invalid weight</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>تأكيد الوزن</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>هل الوزن %1 غرام صحيح ؟</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-206"/>
         <source>الكمية أو السعر غير صالح في أحد الأسطر</source>
         <translation>Invalid quantity or price in one of the lines</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+10"/>
+        <source>تعديل غير صالح</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
         <source>لا توجد جلسة مفتوحة — افتح جلسة من قسم &quot;جلسة الصندوق&quot; أولاً</source>
         <translation>No open session — open a session from the &quot;Cash session&quot; section first</translation>
     </message>
     <message>
-        <location line="+30"/>
+        <location line="+46"/>
+        <source>تعذر تسجيل الدين: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>تم تسجيل الدين : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+15"/>
         <source>تعذر حفظ البيع: %1</source>
         <translation>Failed to save the sale: %1</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+6"/>
         <source>تم البيع: %1</source>
         <translation>Sale completed: %1</translation>
     </message>
@@ -1038,220 +3038,233 @@
 <context>
     <name>app::ui::ProductsPage</name>
     <message>
-        <location filename="../ui/products_page.cpp" line="+117"/>
-        <source>الباركود</source>
+        <location filename="../ui/products_page.cpp" line="+63"/>
+        <source>Produits</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+0"/>
-        <source>الاسم</source>
-        <translation type="unfinished">Name</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>سعر التكلفة</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
-        <source>سعر البيع</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>الوحدة</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="-76"/>
-        <source>تعديل المخزون — %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>توريد جديد</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>تعديل يدوي</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>تالف / منتهي</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>الكمية (+توريد / -خسارة)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>السبب</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+40"/>
-        <source>بحث بالباركود أو الاسم...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>إضافة منتج</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>تعديل</source>
-        <translation type="unfinished">Edit</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>تعديل المخزون</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+11"/>
-        <source>الكمية</source>
-        <translation type="unfinished">Quantity</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>الحالة</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+19"/>
         <location line="+6"/>
-        <source>المنتجات</source>
-        <translation type="unfinished">Products</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>إدارة الأصناف، الأسعار والمخزون</source>
+        <source>Rechercher un nom, un code-barres...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+35"/>
-        <source>مُفعل</source>
+        <location line="+13"/>
+        <source>Tous</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>موقوف</source>
+        <source>Actifs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+42"/>
-        <location line="+24"/>
-        <location line="+23"/>
-        <source>خطأ</source>
-        <translation type="unfinished">Error</translation>
-    </message>
-    <message>
-        <location line="-46"/>
-        <source>تعذر حفظ المنتج — الباركود مستخدم مسبقاً أو بيانات ناقصة</source>
+        <location line="+1"/>
+        <source>Stock bas</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+24"/>
-        <source>تعذر حفظ التعديل — الباركود مستخدم مسبقاً</source>
+        <location line="+1"/>
+        <source>Stock négatif</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+23"/>
-        <source>الكمية السالبة أكبر من المتوفر (الكثافة %1)</source>
+        <location line="+15"/>
+        <source>Ajouter</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>حذف</source>
+        <translation>Delete</translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>Code-barres</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Nom</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Unité</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Prix rev.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Prix vente</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Qté</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>Catalogue</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+103"/>
+        <source>Total : %1 produits · %2 actifs · %3 stock bas</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+63"/>
+        <location line="+84"/>
+        <location line="+111"/>
+        <location line="+8"/>
+        <source>Erreur</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <location line="-202"/>
+        <source>Impossible d&apos;enregistrer le produit — code-barres déjà utilisé ou données incomplètes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+84"/>
+        <source>Impossible d&apos;enregistrer la modification — code-barres déjà utilisé</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+110"/>
+        <source>Quantité invalide — l&apos;ancien stock a été restauré.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Prix invalide — l&apos;ancienne valeur a été restaurée.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
-    <name>app::ui::QuickAddCard</name>
+    <name>app::ui::PurchasesPage</name>
     <message>
-        <location filename="../ui/quick_items_bar.cpp" line="+70"/>
-        <source>Ajouter un produit</source>
-        <translation type="unfinished"></translation>
+        <location filename="../ui/purchases_page.cpp" line="+55"/>
+        <source>Achats</source>
+        <translation>Purchases</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Factures d&apos;achat enregistrées</source>
+        <translation>Recorded purchase invoices</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Nouvel Achat</source>
+        <translation>New Purchase</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Date</source>
+        <translation>Date</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Fournisseur</source>
+        <translation>Supplier</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>N° facture</source>
+        <translation>Invoice No.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Total</source>
+        <translation>Total</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Achats enregistrés</source>
+        <translation>Recorded purchases</translation>
     </message>
 </context>
 <context>
     <name>app::ui::QuickItemsBar</name>
     <message>
-        <location line="+29"/>
+        <location filename="../ui/quick_items_bar.cpp" line="+91"/>
         <source>بحث سريع</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+19"/>
-        <source>لا منتجات سريعة</source>
+        <location line="+34"/>
+        <location line="+1"/>
+        <source>Ajouter un produit</source>
+        <translation>Add a product</translation>
+    </message>
+</context>
+<context>
+    <name>app::ui::Receipt</name>
+    <message>
+        <location filename="../ui/printing/receipt.cpp" line="-187"/>
+        <source>غرام</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+170"/>
+        <source>Reçu N° : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Client : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>Total : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Ajustement : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Payable : %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>شكراً لتعاملكم معنا</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../ui/printing/receipt_printer.cpp" line="+100"/>
+        <source>تعذّر إنشاء مجلد الإيصالات</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+49"/>
+        <source>الطابعة غير متصلة. تأكد من تشغيلها.</source>
+        <translation>The printer is offline. Make sure it is powered on.</translation>
     </message>
 </context>
 <context>
     <name>app::ui::RefundsPage</name>
     <message>
-        <location filename="../ui/refunds_page.cpp" line="+60"/>
-        <location line="+34"/>
-        <source>الوقت</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="-34"/>
-        <source>المصدر</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
+        <location filename="../ui/refunds_page.cpp" line="-179"/>
         <source>الإجمالي</source>
         <translation type="unfinished">Total</translation>
     </message>
     <message>
-        <location line="+0"/>
-        <source>الحالة</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+7"/>
-        <source>استرداد المبيع</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+9"/>
-        <source>مبيعات اليوم (تُعرض الأصول فقط):</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+8"/>
-        <source>استرداد مبيع</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>العميل</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+0"/>
+        <location line="+36"/>
         <source>المبلغ</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Amount</translation>
     </message>
     <message>
-        <location line="+7"/>
-        <source>استرداد السداد</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+9"/>
-        <source>سدايدات العملاء اليوم:</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+8"/>
-        <source>استرداد سداد عميل</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+12"/>
+        <location line="+37"/>
         <source>الاستردادات</source>
         <translation type="unfinished">Refunds</translation>
     </message>
@@ -1261,38 +3274,59 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+37"/>
-        <source>الحاسوب</source>
+        <location line="-74"/>
+        <location line="+36"/>
+        <source>الساعة</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-36"/>
+        <source>Articles</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>لا يوجد بيع للاسترداد اليوم</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>الزبون</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>لا يوجد سداد للاسترداد اليوم</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>Ventes</source>
+        <translation type="unfinished">Sales</translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>جهاز %1</source>
+        <source>Règlements clients</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+2"/>
-        <source>بيع</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+24"/>
+        <location line="+112"/>
         <source>زبون #%1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+28"/>
-        <location line="+14"/>
+        <location line="+31"/>
+        <location line="+9"/>
         <source>استرداد</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-13"/>
+        <location line="-8"/>
         <source>هل تريد استرداد هذا المبيع وإرجاع البضاعة للرف؟</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+9"/>
         <source>هل تريد استرداد مبلغ هذا السداد للعميل؟</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1308,27 +3342,17 @@
     </message>
     <message>
         <location line="+13"/>
-        <location line="+28"/>
+        <location line="+23"/>
         <source>لا توجد جلسة مفتوحة — افتح جلسة الصندوق أولاً</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-21"/>
+        <location line="-16"/>
         <source>تعذر استرداد المبيع: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+7"/>
-        <source>مبيع #%1 (%2)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>مبيع #%1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="+4"/>
         <source>تم الاسترداد وعادت البضاعة للرف</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1338,12 +3362,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+5"/>
-        <source>سداد #%1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
+        <location line="+4"/>
         <source>تم استرداد السداد</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1351,7 +3370,7 @@
 <context>
     <name>app::ui::ReportsPage</name>
     <message>
-        <location filename="../ui/reports_page.cpp" line="+26"/>
+        <location filename="../ui/reports_page.cpp" line="+41"/>
         <source>بيع</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1372,11 +3391,16 @@
     </message>
     <message>
         <location line="+3"/>
+        <source>سداد مورد</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
         <source>استرداد</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="+91"/>
         <source>اليوم</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1401,7 +3425,72 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+80"/>
+        <source>Zakat (état actuel, indépendant de la période)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Valeur du stock</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Trésorerie en caisse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Créances clients</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Dettes fournisseurs</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Total imposable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Nisab</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Historique de la Zakat</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Année</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Base</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Dû</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Statut</source>
+        <translation type="unfinished">Status</translation>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>Aucun exercice de Zakat enregistré</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
         <source>العملية</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1416,72 +3505,110 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+15"/>
-        <source>إلى:</source>
+        <location line="+204"/>
+        <source>Payée le %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+8"/>
-        <source>الملخص</source>
+        <location line="+0"/>
+        <source>Non payée</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="-189"/>
         <source>تفاصيل العمليات</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+5"/>
-        <source>التقارير</source>
-        <translation type="unfinished">Reports</translation>
+        <location line="-151"/>
+        <source>From:</source>
+        <translation>From:</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>To:</source>
+        <translation>To:</translation>
+    </message>
+    <message>
+        <location line="+42"/>
+        <source>Période sélectionnée</source>
+        <translation>Selected period</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Ventes</source>
+        <translation>Sales</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Nombre d&apos;opérations et net</source>
+        <translation>Transaction count and net</translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>ملخص حركات الصندوق خلال فترة محددة</source>
+        <source>Bénéfice brut</source>
+        <translation>Gross profit</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Bénéfice net</source>
+        <translation>Net profit</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Coût des ventes</source>
+        <translation>Cost of sales</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Dépenses</source>
+        <translation>Expenses</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Retraits</source>
+        <translation>Withdrawals</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Zakat (2,5 %)</source>
+        <translation>Zakat (2.5%)</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Sessions sur la période</source>
+        <translation>Sessions in period</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Fonds de départ</source>
+        <translation>Opening float</translation>
+    </message>
+    <message>
+        <location line="+175"/>
+        <source>Net : %1</source>
+        <translation>Net: %1</translation>
+    </message>
+    <message>
+        <location line="-92"/>
+        <source>Aucune opération sur cette période</source>
+        <translation>No operations in this period</translation>
+    </message>
+    <message>
+        <location line="+111"/>
+        <source>تحذير: تعذّر حساب تكلفة بعض الصفوف. الأرقام المعروضة قد تكون ناقصة.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+72"/>
-        <source>المبيعات: %1 عملية (الصافي: %2)  |  الربح الإجمالي: %3  |  صافي الربح: %4</source>
-        <translation type="unfinished"></translation>
+        <location line="+33"/>
+        <source>Total</source>
+        <translation>Total</translation>
     </message>
-    <message>
-        <location line="+7"/>
-        <source>تكلفة المبيعات: %1  |  المصاريف: %2  |  السحوبات: %3</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+5"/>
-        <source>وعاء الزكاة: %1  |  الزكاة (2.5%): %2   —   جلسات في الفترة: %3 (رأس الفتح: %4)   —   ديون العملاء المستحقة اليوم: %5</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message><source>From:</source><translation>From:</translation></message>
-    <message><source>To:</source><translation>To:</translation></message>
-    <message><source>Période sélectionnée</source><translation>Selected period</translation></message>
-    <message><source>Ventes</source><translation>Sales</translation></message>
-    <message><source>Nombre d'opérations et net</source><translation>Transaction count and net</translation></message>
-    <message><source>Bénéfice brut</source><translation>Gross profit</translation></message>
-    <message><source>Bénéfice net</source><translation>Net profit</translation></message>
-    <message><source>Coût des ventes</source><translation>Cost of sales</translation></message>
-    <message><source>Dépenses</source><translation>Expenses</translation></message>
-    <message><source>Retraits</source><translation>Withdrawals</translation></message>
-    <message><source>État actuel (indépendant de la période)</source><translation>Current state (independent of period)</translation></message>
-    <message><source>Dettes clients dues aujourd'hui</source><translation>Customer debts due today</translation></message>
-    <message><source>Base de la Zakat</source><translation>Zakat base</translation></message>
-    <message><source>Zakat (2,5 %)</source><translation>Zakat (2.5%)</translation></message>
-    <message><source>Sessions sur la période</source><translation>Sessions in period</translation></message>
-    <message><source>Fonds de départ</source><translation>Opening float</translation></message>
-    <message><source>Net : %1</source><translation>Net: %1</translation></message>
-    <message><source>Opération</source><translation>Operation</translation></message>
-    <message><source>Nombre</source><translation>Count</translation></message>
-    <message><source>Somme</source><translation>Amount</translation></message>
-    <message><source>Aucune opération sur cette période</source><translation>No operations in this period</translation></message>
-    <message><source>Total</source><translation>Total</translation></message>
 </context>
 <context>
     <name>app::ui::SalesPage</name>
     <message>
-        <location filename="../ui/sales_page.cpp" line="+34"/>
+        <location filename="../ui/sales_page.cpp" line="+40"/>
         <source>الحاسوب</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1532,22 +3659,29 @@
     </message>
     <message>
         <location line="+0"/>
-        <location line="+114"/>
         <source>الإجمالي</source>
         <translation type="unfinished">Total</translation>
     </message>
     <message>
-        <location line="-114"/>
+        <location line="+0"/>
         <source>الحالة</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Status</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+18"/>
         <source>سجل فواتير اليوم</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+39"/>
+        <location line="+8"/>
+        <location line="+113"/>
+        <location line="+13"/>
+        <location line="+9"/>
+        <source>طبع الإيصال</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-89"/>
         <source>مسترد</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1562,28 +3696,23 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+36"/>
-        <source>تفاصيل البيع #%1 (%2)</source>
+        <location line="+49"/>
+        <source>تعذّر العثور على الإيصال</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+6"/>
-        <source>المنتج</source>
-        <translation type="unfinished">Product</translation>
+        <location line="+14"/>
+        <source>تعذّر حفظ الإيصال</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+0"/>
-        <source>الكمية</source>
-        <translation type="unfinished">Quantity</translation>
+        <location line="+1"/>
+        <source>تعذّر حفظ الإيصال: %1</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+0"/>
-        <source>سعر الوحدة</source>
-        <translation type="unfinished">Unit price</translation>
-    </message>
-    <message>
-        <location line="+18"/>
-        <source>Fermer</source>
+        <location line="+7"/>
+        <source>تم حفظ الإيصال في %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1613,7 +3742,7 @@
 <context>
     <name>app::ui::SettingsPage</name>
     <message>
-        <location filename="../ui/settings_page.cpp" line="+33"/>
+        <location filename="../ui/settings_page.cpp" line="+73"/>
         <source>مثال: دج  أو  DA</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1623,7 +3752,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+7"/>
         <source>فاتح</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1648,12 +3777,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+29"/>
         <source>حفظ الإعدادات</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+21"/>
         <source>اسم المتجر:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1663,7 +3792,17 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+7"/>
+        <source>Un rappel annuel s&apos;affichera à cette date</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>تاريخ الزكاة السنوي:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>السمة:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1678,13 +3817,49 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location line="+6"/>
+        <source>حجم الورق:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>نص أسفل الفاتورة:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>مجلد حفظ الإيصالات:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location line="+2"/>
-        <location line="+89"/>
+        <source>طبع الإيصال تلقائياً بعد كل عملية بيع</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <location line="+165"/>
         <source>Vérifier les mises à jour</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-73"/>
+        <location line="-161"/>
+        <source>نسخ احتياطي الآن</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>استعادة من نسخة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location line="+253"/>
+        <source>تنظيف المنتجات غير المستخدمة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-227"/>
         <source>الإعدادات</source>
         <translation type="unfinished">Settings</translation>
     </message>
@@ -1694,25 +3869,62 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+6"/>
-        <location line="+99"/>
-        <location line="+61"/>
+        <location line="+27"/>
+        <location line="+317"/>
+        <location line="+105"/>
         <source>معاينة: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-151"/>
+        <location line="-413"/>
         <source>طُبّقت السمة الجديدة — احفظ للإبقاء عليها</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+13"/>
         <source>اللغة</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+1"/>
         <source>أعد تشغيل البرنامج لتطبيق اللغة بالكامل</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>حفظ النسخة الاحتياطية</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+16"/>
+        <source>قواعد بيانات SQLite (*.sqlite)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-10"/>
+        <source>تم إنشاء النسخة الاحتياطية: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+74"/>
+        <source>تعذّر إنشاء النسخة الاحتياطية: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-69"/>
+        <source>اختيار نسخة احتياطية</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>ستُستعاد النسخة عند إعادة تشغيل البرنامج</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>تعذّرت الاستعادة: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1747,87 +3959,229 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+105"/>
+        <location line="+42"/>
+        <source>إلغاء</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>فحص المنتجات غير النشطة...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>تم إلغاء فحص المنتجات.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>سيتم حذف %1 منتج غير نشط وغير مستخدم نهائياً.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>سيتم تخطي %1 منتج مستخدم. النسخة الاحتياطية: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>تم إلغاء التنظيف.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>لا توجد منتجات غير مستخدمة للحذف.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>حذف المنتجات...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>تم إلغاء التنظيف بعد حذف %1 منتج.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>تم حذف %1 منتج، وتخطي %2 منتج مستخدم، وتعذّر حذف %3 منتج.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+158"/>
         <source>حُفظت الإعدادات</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>app::ui::StockPage</name>
+    <message>
+        <location filename="../ui/stock_page.cpp" line="+64"/>
+        <source>Stock</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Suivez les quantités en stock</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Rechercher un nom, un code-barres...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Tous</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Stock bas</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Stock négatif</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Épuisé</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+36"/>
+        <source>Qté (g)</source>
+        <translation>Qty (g)</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Nom</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Code-barres</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Unité</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Valeur</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+121"/>
+        <source>Total : %1 produits · Valeur du stock : %2 · %3 en stock bas</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>app::ui::SuppliersPage</name>
     <message>
-        <location filename="../ui/suppliers_page.cpp" line="+32"/>
-        <source>مورد جديد</source>
+        <location filename="../ui/suppliers_page.cpp" line="+74"/>
+        <source>Fournisseurs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>تعديل المورد</source>
+        <source>Fournisseurs et leurs comptes à crédit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+6"/>
-        <source>الاسم</source>
-        <translation type="unfinished">Name</translation>
-    </message>
-    <message>
-        <location line="+39"/>
-        <source>إضافة مورد</source>
+        <source>Rechercher un fournisseur…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+3"/>
-        <source>تعديل</source>
-        <translation type="unfinished">Edit</translation>
-    </message>
-    <message>
-        <location line="+9"/>
-        <source>المورد</source>
+        <location line="+16"/>
+        <source>Tous</source>
         <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+17"/>
-        <location line="+6"/>
-        <source>الموردون</source>
-        <translation type="unfinished">Suppliers</translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>الموردون والحسابات الآجلة عندهم</source>
+        <source>Avec dette</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+46"/>
-        <source>خطأ</source>
-        <translation type="unfinished">Error</translation>
+        <location line="+1"/>
+        <source>Sans dette</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Ajouter</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>Nom</source>
+        <translation>Name</translation>
     </message>
     <message>
         <location line="+0"/>
-        <source>تعذر حفظ المورد</source>
+        <source>Téléphone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Solde</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Factures impayées</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>Fournisseurs et soldes</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+90"/>
+        <source>Total : %1 fournisseurs · %2 avec dette · Solde total : %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+88"/>
+        <source>Erreur</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Impossible d&apos;enregistrer le fournisseur</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>app::ui::UsersPage</name>
     <message>
-        <location filename="../ui/users_page.cpp" line="+34"/>
-        <location line="+89"/>
+        <location filename="../ui/users_page.cpp" line="+35"/>
+        <location line="+90"/>
         <source>إضافة كاشير</source>
         <translation>Add a cashier</translation>
     </message>
     <message>
-        <location line="-89"/>
+        <location line="-90"/>
         <source>تعديل المستخدم</source>
         <translation>Edit user</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+6"/>
         <location line="+26"/>
-        <location line="+74"/>
+        <location line="+77"/>
         <source>الاسم</source>
         <translation>Name</translation>
     </message>
     <message>
-        <location line="-98"/>
+        <location line="-101"/>
         <source>PIN (حرفان)</source>
         <translation>PIN (2 letters)</translation>
     </message>
@@ -1839,24 +4193,23 @@
     </message>
     <message>
         <location line="-1"/>
-        <location line="+73"/>
         <source>PIN</source>
         <translation>PIN</translation>
     </message>
     <message>
-        <location line="-71"/>
-        <location line="+71"/>
+        <location line="+2"/>
+        <location line="+74"/>
         <source>الدور</source>
         <translation>Role</translation>
     </message>
     <message>
-        <location line="-70"/>
-        <location line="+70"/>
+        <location line="-73"/>
+        <location line="+73"/>
         <source>نشط</source>
         <translation>Active</translation>
     </message>
     <message>
-        <location line="-19"/>
+        <location line="-22"/>
         <source>إدارة المستخدمين</source>
         <translation>User management</translation>
     </message>
@@ -1866,22 +4219,22 @@
         <translation>Manage cashier accounts and their permissions</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+21"/>
         <source>إجراءات</source>
         <translation>Actions</translation>
     </message>
     <message>
-        <location line="+68"/>
+        <location line="+95"/>
         <source>تعديل</source>
         <translation>Edit</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+7"/>
         <source>حذف</source>
         <translation>Delete</translation>
     </message>
     <message>
-        <location line="+30"/>
+        <location line="+88"/>
         <location line="+4"/>
         <location line="+35"/>
         <location line="+5"/>
@@ -1934,14 +4287,14 @@
 <context>
     <name>main</name>
     <message>
-        <location filename="../apps/desktop/main.cpp" line="+29"/>
-        <location filename="../apps/screenshot/main.cpp" line="+39"/>
+        <location filename="../apps/desktop/main.cpp" line="+32"/>
+        <location filename="../apps/screenshot/main.cpp" line="+157"/>
         <source>محلي</source>
         <translation>Mahali</translation>
     </message>
     <message>
-        <location line="+24"/>
-        <location filename="../apps/screenshot/main.cpp" line="+11"/>
+        <location line="+43"/>
+        <location filename="../apps/screenshot/main.cpp" line="+15"/>
         <source>محلي — خطأ</source>
         <translation>Mahali — error</translation>
     </message>
@@ -1952,6 +4305,33 @@
 %1</source>
         <translation>Failed to open the database:
 %1</translation>
+    </message>
+    <message>
+        <location line="+72"/>
+        <source>محلي — النسخ الاحتياطي</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>تعذّر إكمال النسخة الاحتياطية اليومية:
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>محلي — الاستعادة</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>تعذّرت استعادة النسخة الاحتياطية:
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../apps/android/qml/main.qml" line="+9"/>
+        <source>Mahali</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 </TS>

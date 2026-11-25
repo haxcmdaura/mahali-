@@ -831,7 +831,8 @@ QToolButton#navItem[active="true"][direction="ltr"] {
    height and a soft fill to separate it from the bar around it. */
 
 
-QLabel#occasionLabel {
+QLabel#occasionLabel,
+QLabel#occasionGreetingLabel {
     background: @ACCENT_SOFT@;
     color: #1d4ed8;
     border-radius: 7px;
@@ -1051,13 +1052,13 @@ QWidget#quickItemsBar QFrame#quickCard:hover {
 /* The add tile is the one card in the strip that is not a product, so it is
    outlined and left unfilled where the products are filled -- a filled tile
    with a plus in it read as a product with no name. */
-QWidget#quickItemsBar QFrame#quickAddCard {
+QWidget#quickItemsBar QPushButton#quickAddButton {
     background: transparent;
     border: 1px dashed @MUTED@;
     border-radius: 7px;
 }
 
-QWidget#quickItemsBar QFrame#quickAddCard:hover {
+QWidget#quickItemsBar QPushButton#quickAddButton:hover {
     background: @ACCENT_SOFT@;
     border: 1px dashed @ACCENT@;
     border-radius: 7px;

@@ -33,12 +33,17 @@ target_sources(mahali-core PRIVATE
     customer.h
     customer_transaction.h
     format_utils.h
+    hijri_utils.cpp
+    hijri_utils.h
     customer_transaction_item.h
     device.h
     expense.h
+    line_total.h
     owner_drawing.h
     payment.h
     product.h
+    product_name_matcher.cpp
+    product_name_matcher.h
     profit_loss_calculator.cpp
     profit_loss_calculator.h
     purchase.h
@@ -54,6 +59,7 @@ target_sources(mahali-core PRIVATE
     supplier_return.h
     supplier_return_item.h
     occasion.h
+    occasion_offer.h
     sync_operation.h
     sync_operation_codec.cpp
     sync_operation_codec.h
@@ -67,6 +73,7 @@ target_sources(mahali-core PRIVATE
     user.h
     version.cpp
     version.h
+    weight_parser.h
     zakat_calculator.cpp
     zakat_calculator.h)
 

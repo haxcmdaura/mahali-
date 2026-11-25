@@ -27,6 +27,8 @@ struct Sale {
     // never set on a reversal row — a reversal is not a new sale, it is a
     // reference to the sale it undoes, and that sale still owns the number.
     QString receiptNumber;
+    // NULL for a walk-in cash sale; set when the sale is attached to a customer.
+    std::optional<int> customerId;
 };
 
 } // namespace app::core

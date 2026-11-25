@@ -6,10 +6,12 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QCoreApplication>
+#include <QDateEdit>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QFrame>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QIcon>
@@ -17,6 +19,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QObject>
 #include <QPushButton>
 #include <QSet>
 #include <QSpinBox>
@@ -24,6 +27,9 @@
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QVBoxLayout>
+#include <algorithm>
+#include <limits>
+#include <optional>
 
 #include "core/payment.h"
 #include "core/customer_transaction.h"
@@ -35,6 +41,7 @@
 #include "data/payment_repository.h"
 #include "data/payment_service.h"
 #include "data/product_repository.h"
+#include "data/sale_rules.h"
 #include "data/sale_service.h"
 #include "format_utils.h"
 #include "widgets/ui_helpers.h"
@@ -199,14 +206,29 @@ bool collectDebtItems(QWidget* parent, app::data::Database& db, QVector<core::Sa
             }
             unitPrice = *overridePrice;
         }
+        const QString unitKind = product->soldByWeight
+            ? data::toString(data::UnitKind::Weight)
+            : data::toString(data::UnitKind::Piece);
+        core::SaleItem preview;
+        preview.quantity = qty->value();
+        preview.unitKind = unitKind;
+        preview.unitPriceCents = unitPrice;
+        const auto lineTotal = data::totalCentsFor({preview});
+        if (!lineTotal) {
+            QMessageBox::warning(&dialog, QCoreApplication::translate("CustomerDialog", "Erreur"),
+                                 QCoreApplication::translate("CustomerDialog",
+                                                            "Montant invalide"));
+            return;
+        }
         const int row = table->rowCount();
         table->insertRow(row);
         auto* nameItem = new QTableWidgetItem(product->name);
         nameItem->setData(Qt::UserRole, productId);
+        nameItem->setData(Qt::UserRole + 1, unitKind);
         table->setItem(row, 0, nameItem);
         table->setItem(row, 1, new QTableWidgetItem(QString::number(qty->value())));
         table->setItem(row, 2, new QTableWidgetItem(formatMoney(unitPrice)));
-        table->setItem(row, 3, new QTableWidgetItem(formatMoney(unitPrice * qty->value())));
+        table->setItem(row, 3, new QTableWidgetItem(formatMoney(*lineTotal)));
         price->clear();
         refreshTotal();
     });
@@ -235,6 +257,10 @@ bool collectDebtItems(QWidget* parent, app::data::Database& db, QVector<core::Sa
         core::SaleItem item;
         item.productId = table->item(i, 0)->data(Qt::UserRole).toInt();
         item.quantity = quantity;
+        item.unitKind = table->item(i, 0)->data(Qt::UserRole + 1).toString();
+        if (item.unitKind.isEmpty()) {
+            item.unitKind = data::toString(data::UnitKind::Piece);
+        }
         item.unitPriceCents = *unitPrice;
         out->append(item);
     }
@@ -257,7 +283,8 @@ std::optional<core::Customer> showCustomerInfoDialog(QWidget* parent, app::data:
     auto* phone = new QLineEdit(initial.phone);
 
     app::data::CustomerRepository repo(db);
-    auto* balance = new QLabel(formatMoney(repo.balanceCentsFor(initial.id)));
+    const auto initialBalanceOpt = repo.balanceCentsFor(initial.id);
+    auto* balance = new QLabel(initialBalanceOpt.has_value() ? formatMoney(*initialBalanceOpt) : QStringLiteral("تعذّرت قراءة الرصيد"));
     auto* opening = new QLineEdit(initial.openingBalanceCents > 0
                                       ? formatMoney(initial.openingBalanceCents)
                                       : QString());
@@ -617,8 +644,12 @@ bool showCustomerCardDialog(QWidget* parent, app::data::Database& db, const core
     // Every tab re-reads the database instead of trusting the customer the card
     // was opened with, so a debt taken in tab 2 shows up in tab 4 at once.
     const auto reload = [&]() {
-        const long long balance = repo.balanceCentsFor(customer.id);
-        balanceValue->setText(formatMoney(balance));
+        const auto balanceOpt2 = repo.balanceCentsFor(customer.id);
+        if (!balanceOpt2.has_value()) {
+            balanceValue->setText(QStringLiteral("تعذّرت قراءة الرصيد"));
+        } else {
+            balanceValue->setText(formatMoney(*balanceOpt2));
+        }
         openingValue->setText(formatMoney(customer.openingBalanceCents));
         activeValue->setText(customer.active ? QCoreApplication::translate("CustomerDialog", "Actif")
                                              : QCoreApplication::translate("CustomerDialog",
@@ -691,7 +722,12 @@ bool showCustomerCardDialog(QWidget* parent, app::data::Database& db, const core
         }
     });
     QObject::connect(settleButton, &QPushButton::clicked, &dialog, [&]() {
-        if (showSettleDebtDialog(&dialog, db, customer.id, repo.balanceCentsFor(customer.id))) {
+        const auto balanceOptSettle = repo.balanceCentsFor(customer.id);
+        if (!balanceOptSettle.has_value()) {
+            QMessageBox::warning(&dialog, QCoreApplication::translate("CustomerDialog", "Erreur"), QStringLiteral("تعذّرت قراءة الرصيد"));
+            return;
+        }
+        if (showSettleDebtDialog(&dialog, db, customer.id, *balanceOptSettle)) {
             changed = true;
             reload();
         }
@@ -721,7 +757,13 @@ bool showCustomerCardDialog(QWidget* parent, app::data::Database& db, const core
         reload();
     });
     QObject::connect(deleteButton, &QPushButton::clicked, &dialog, [&]() {
-        const long long balance = repo.balanceCentsFor(customer.id);
+        const auto balanceOptDel = repo.balanceCentsFor(customer.id);
+        if (!balanceOptDel.has_value()) {
+            QMessageBox::warning(&dialog, QCoreApplication::translate("CustomerDialog", "Erreur"),
+                                 QStringLiteral("تعذّرت قراءة الرصيد"));
+            return;
+        }
+        const long long balance = *balanceOptDel;
         // A customer who still owes money cannot be deleted: the ledger line
         // recording that debt would go with them and the amount would stop
         // existing as far as any report is concerned.

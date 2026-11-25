@@ -44,6 +44,10 @@ struct DailyReport {
     // The day asked for, as "YYYY-MM-DD", echoed back so a caller can label a
     // report without having to remember which day it built.
     QString dayIso;
+    // False means at least one query failed and the figures below are partial.
+    // A caller must not print a partial day as if it were the whole day.
+    bool ok = true;
+    QString error;
     long long salesTotalCents = 0;
     // What the sold goods cost at the moment they were sold, taken from the cost
     // frozen on each line. Recomputing from today's average cost would restate

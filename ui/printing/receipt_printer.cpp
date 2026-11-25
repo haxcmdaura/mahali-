@@ -52,6 +52,22 @@ void configurePrinterForPaper(QPrinter& printer, ReceiptPaper paper)
     printer.setDocName(QStringLiteral("Mahali receipt"));
 }
 
+bool isPrinterAvailable(const QPrinterInfo& printer,
+                        const QList<QPrinterInfo>& availablePrinters)
+{
+    if (printer.isNull() || printer.printerName().isEmpty()) {
+        return false;
+    }
+    for (const QPrinterInfo& candidate : availablePrinters) {
+        if (candidate.printerName() != printer.printerName()) {
+            continue;
+        }
+        const QPrinter::PrinterState state = candidate.state();
+        return state != QPrinter::Error && state != QPrinter::Aborted;
+    }
+    return false;
+}
+
 void printReceiptToPrinter(QTextDocument* doc, QPrinter& printer)
 {
     // QTextDocument::print takes a QPrinter* and is the only place in the
@@ -62,7 +78,8 @@ void printReceiptToPrinter(QTextDocument* doc, QPrinter& printer)
 }
 
 QString printAndSaveReceipt(QTextDocument* doc, ReceiptPaper paper,
-                            app::data::Database& db, QString* error)
+                            app::data::Database& db, QString* error,
+                            bool printPaper)
 {
     if (error) {
         error->clear();
@@ -126,8 +143,21 @@ QString printAndSaveReceipt(QTextDocument* doc, ReceiptPaper paper,
 
     printReceiptToPrinter(doc, printer);
 
-    if (!QPrinterInfo::defaultPrinter().isNull()) {
+    if (!printPaper) {
+        return path;
+    }
+
+    const QPrinterInfo selectedPrinter = QPrinterInfo::defaultPrinter();
+    if (!selectedPrinter.isNull()) {
+        if (!isPrinterAvailable(selectedPrinter, QPrinterInfo::availablePrinters())) {
+            if (error) {
+                *error = QCoreApplication::translate(
+                    "app::ui::Receipt", "الطابعة غير متصلة. تأكد من تشغيلها.");
+            }
+            return QString();
+        }
         QPrinter paperPrinter(QPrinter::HighResolution);
+        paperPrinter.setPrinterName(selectedPrinter.printerName());
         configurePrinterForPaper(paperPrinter, paper);
         if (paper == ReceiptPaper::Thermal58 || paper == ReceiptPaper::Thermal80) {
             const QSizeF docSize = doc->pageSize();

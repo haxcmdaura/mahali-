@@ -16,7 +16,7 @@ namespace {
 // The release the installer is published from. The zip is Mahali-Setup.zip, the
 // same artefact the Windows workflow uploads.
 const char* kLatestReleaseUrl =
-    "https://api.github.com/repos/heaxheax15-pixel/mahali/releases/latest";
+    "https://api.github.com/repos/haxcmdaura/mahali-/releases/latest";
 
 // GitHub rejects API calls without a User-Agent, and answers with a different
 // payload shape unless the API version is pinned.

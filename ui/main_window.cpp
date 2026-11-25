@@ -27,6 +27,7 @@
 #include <QStyle>
 #include <QToolButton>
 #include <QTimer>
+#include <QStringList>
 #include <QThread>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -39,6 +40,7 @@
 #include "core/zakat_notifier.h"
 #include "dialogs/zakat_dialog.h"
 #include "data/cash_session_repository.h"
+#include "data/date_utils.h"
 #include "core/update_checker.h"
 #include "core/update_downloader.h"
 #include "core/update_installer.h"
@@ -47,11 +49,15 @@
 #include "customers_page.h"
 #include "data/occasion_repository.h"
 #include "data/occasion_service.h"
+#include "data/quick_item_service.h"
 #include "data/setting_repository.h"
 #include "expenses_page.h"
+#include "invoices_page.h"
 #include "login_dialog.h"
+#include "occasions_page.h"
 #include "pos_page.h"
 #include "products_page.h"
+#include "purchases_page.h"
 #include "refunds_page.h"
 #include "reports_page.h"
 #include "sales_page.h"
@@ -90,30 +96,8 @@ constexpr int Settings = 13;
 // an index of their own; slipping a page in between them would silently repoint
 // every button built after it at the wrong page.
 constexpr int Stock = 14;
+constexpr int Invoices = 15;
 } // namespace page
-
-// A page that is on the roadmap but not written yet. It exists so its sidebar
-// entry leads somewhere and says so, rather than to a button that does nothing
-// when clicked.
-QWidget* makeStubPage(const QString& title, const QString& body)
-{
-    auto* page = new QWidget;
-    auto* layout = new QVBoxLayout(page);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(8);
-    layout->addStretch(1);
-
-    auto* heading = new QLabel(title);
-    heading->setObjectName(QStringLiteral("pageHeaderTitle"));
-    heading->setAlignment(Qt::AlignCenter);
-    auto* note = new QLabel(body);
-    note->setObjectName(QStringLiteral("hint"));
-    note->setAlignment(Qt::AlignCenter);
-    layout->addWidget(heading);
-    layout->addWidget(note);
-    layout->addStretch(1);
-    return page;
-}
 
 // One of the quick square buttons in the top bar: one letter, nothing else.
 //
@@ -228,27 +212,26 @@ MainWindow::MainWindow(app::data::Database& db, ServerController& controller, QW
          [](QWidget* w) { qobject_cast<AuditLogPage*>(w)->refresh(); }},
         {[this] { return static_cast<QWidget*>(new UsersPage(m_db)); },
          [](QWidget* w) { qobject_cast<UsersPage*>(w)->refresh(); }},
-        // Two placeholders so the navigation has somewhere to land for the pages
-        // that do not exist yet. They are real pages in the stack, so clicking the
-        // entry shows an honest "not built yet" instead of doing nothing. Both are
-        // four widgets, so they are built like the rest rather than kept eager.
-        {[this] { return makeStubPage(tr("Achats"), tr("Page en construction.")); },
-         nullptr},
-        {[this] { return makeStubPage(tr("Occasions"), tr("Page en construction.")); },
-         nullptr},
+        {[this] { return static_cast<QWidget*>(new PurchasesPage(m_db)); },
+         [](QWidget* w) { qobject_cast<PurchasesPage*>(w)->refresh(); }},
+        {[this] { return static_cast<QWidget*>(new OccasionsPage(m_db)); },
+         [](QWidget* w) { qobject_cast<OccasionsPage*>(w)->refresh(); }},
         {[this] {
              auto* page = new SettingsPage(m_db);
              // The settings page can change the theme without going through the
              // toggle, so the icons have to be told about that route too. Wired
              // here rather than in the constructor because the page does not
              // exist until it is opened.
-             connect(page, &SettingsPage::themeChanged, this, &MainWindow::refreshThemeIcons);
+             connect(page, &SettingsPage::themeChanged, this,
+                     [this]() { refreshOccasionTheme(true); });
              return static_cast<QWidget*>(page);
          },
          [](QWidget* w) { qobject_cast<SettingsPage*>(w)->refresh(); }},
         // The stock page is one of the pages the top bar puts a square button for.
         {[this] { return static_cast<QWidget*>(new StockPage(m_db)); },
          [](QWidget* w) { qobject_cast<StockPage*>(w)->refresh(); }},
+        {[this] { return static_cast<QWidget*>(new InvoicesPage(m_db)); },
+         [](QWidget* w) { qobject_cast<InvoicesPage*>(w)->refresh(); }},
     };
 
     // An empty widget per index until the page is opened. The stack keeps the
@@ -261,8 +244,8 @@ MainWindow::MainWindow(app::data::Database& db, ServerController& controller, QW
     // Index guards rather than trust: the stack and the page:: constants above
     // are written side by side, and a mismatch should fail loudly here rather
     // than show the wrong page to someone trying to take money.
-    Q_ASSERT(m_pages->count() == page::Stock + 1);
-    Q_ASSERT(m_pageFactories.size() == page::Stock + 1);
+    Q_ASSERT(m_pages->count() == page::Invoices + 1);
+    Q_ASSERT(m_pageFactories.size() == page::Invoices + 1);
 
     auto* central = new QWidget;
     // The root is vertical: the top bar spans the full width, the update bar
@@ -330,6 +313,14 @@ MainWindow::MainWindow(app::data::Database& db, ServerController& controller, QW
             showZakatDialog();
         }
     });
+
+    QTimer::singleShot(0, this, [this]() { maybeShowOccasionGreeting(); });
+
+    QTimer::singleShot(4000, this, [this]() { checkQuickItemRestocks(); });
+    auto* restockTimer = new QTimer(this);
+    restockTimer->setInterval(24 * 60 * 60 * 1000);
+    connect(restockTimer, &QTimer::timeout, this, &MainWindow::checkQuickItemRestocks);
+    restockTimer->start();
 
     // Built up front but idle: the download only starts when the user asks for
     // it, and a bar is only ever shown when a newer release exists.
@@ -429,6 +420,11 @@ ExpensesPage* MainWindow::expensesPage()
     return qobject_cast<ExpensesPage*>(ensurePage(page::Expenses));
 }
 
+OccasionsPage* MainWindow::occasionsPage()
+{
+    return qobject_cast<OccasionsPage*>(ensurePage(page::Occasions));
+}
+
 ReportsPage* MainWindow::reportsPage()
 {
     return qobject_cast<ReportsPage*>(ensurePage(page::Reports));
@@ -458,7 +454,8 @@ void MainWindow::onPageChanged(int row)
 {
     static const char* const pageNames[] = {
         "pos", "products", "customers", "suppliers", "cash-session", "sales", "expenses",
-        "reports", "refunds", "audit-log", "users", "purchases", "occasions", "settings", "stock"};
+        "reports", "refunds", "audit-log", "users", "purchases", "occasions", "settings", "stock",
+        "invoices"};
     // The page is built before it is shown, so the operator never sees a
     // placeholder, and the re-read below lands on the widget now in the stack.
     const bool measureUi = qEnvironmentVariableIsSet("MAHALI_UI_PERF");
@@ -613,6 +610,8 @@ QWidget* MainWindow::buildTopBar()
     // one page that must never be more than one click away.
     m_occasionLabel = new QLabel;
     m_occasionLabel->setObjectName(QStringLiteral("occasionLabel"));
+    m_greetingLabel = new QLabel;
+    m_greetingLabel->setObjectName(QStringLiteral("occasionGreetingLabel"));
     // Filled now so a shop that opens mid-occasion says so before the operator
     // has done anything. Refreshed again on activate/deactivate.
     refreshOccasionLabel();
@@ -732,6 +731,7 @@ QWidget* MainWindow::buildTopBar()
     layout->addWidget(quickNavGroup);
     layout->addWidget(m_sidebarToggle);
     layout->addWidget(m_occasionLabel);
+    layout->addWidget(m_greetingLabel);
     layout->addWidget(m_sessionLabel);
     layout->addStretch(1);
     layout->addWidget(m_userMenu);
@@ -942,6 +942,7 @@ void MainWindow::buildNavForRole(const QString& role)
                            {Icon::People, tr("العملاء"), page::Customers},
                            {Icon::Truck, tr("الموردون"), page::Suppliers},
                            {Icon::Truck, tr("Achats"), page::Purchases},
+                           {Icon::Receipt, tr("Factures"), page::Invoices},
                            {Icon::Sun, tr("المناسبات"), page::Occasions},
                        });
 
@@ -1022,7 +1023,7 @@ void MainWindow::refreshThemeIcons()
         // along, so the brand now shows the shop it is a till for. The colour is
         // set here rather than in the stylesheet because the accent is a theme
         // value, and a pixmap keeps the colour it was painted with: a theme
-        // switch has to repaint it, exactly as QuickAddCard's glyph does.
+        // switch has to repaint it, as it does every theme-coloured glyph.
         m_brandIcon->setPixmap(appIcon(Icon::Shop, accent, 28).pixmap(28, 28));
     }
     if (m_settingsBtn) {
@@ -1074,16 +1075,17 @@ void MainWindow::refreshThemeIcons()
 
 void MainWindow::onThemeToggleClicked()
 {
-    const QString next = activeTheme() == QStringLiteral("dark") ? QStringLiteral("light")
-                                                                : QStringLiteral("dark");
-    applyTheme(next, *qApp);
+    data::SettingRepository settings(m_db);
+    const QString current =
+        settings.value(QStringLiteral("theme")).value_or(QStringLiteral("light"));
+    const QString next = current == QStringLiteral("dark") ? QStringLiteral("light")
+                                                           : QStringLiteral("dark");
     // Stored so the choice survives a restart; the settings page's own selector
     // reads the same key, so the two cannot disagree.
-    data::SettingRepository settings(m_db);
     settings.set(QStringLiteral("theme"), next);
-    // The stylesheet has already been swapped; this redraws the pixmaps, which
-    // the new stylesheet could not have reached on its own.
-    refreshThemeIcons();
+    // A running occasion owns the visible theme; the preference above is what
+    // comes back when the occasion ends.
+    refreshOccasionTheme();
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event)
@@ -1135,6 +1137,8 @@ void MainWindow::rebuildNav()
 // disagree with the setting.
 void MainWindow::refreshOccasionLabel()
 {
+    refreshOccasionTheme();
+
     if (!m_occasionLabel) {
         return;
     }
@@ -1150,10 +1154,38 @@ void MainWindow::refreshOccasionLabel()
         text += occasion->name;
         m_occasionLabel->setText(text);
         m_occasionLabel->setVisible(true);
+
+        const QString greeting = occasionGreeting(occasion->themeKey, occasion->name);
+        if (m_greetingLabel) {
+            m_greetingLabel->setText(greeting);
+            m_greetingLabel->setVisible(!greeting.isEmpty());
+        }
     } else {
         m_occasionLabel->clear();
         m_occasionLabel->setVisible(false);
+        if (m_greetingLabel) {
+            m_greetingLabel->clear();
+            m_greetingLabel->setVisible(false);
+        }
     }
+}
+
+void MainWindow::refreshOccasionTheme(bool preserveManualPreview)
+{
+    data::OccasionRepository occasions(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, occasions, settings);
+
+    const std::optional<core::Occasion> occasion = service.current();
+    const QString candidate = occasion.has_value() ? occasion->themeKey : QString();
+    const bool known = isCustomThemeKey(candidate) || candidate == QStringLiteral("light")
+        || candidate == QStringLiteral("dark");
+    if (known) {
+        applyTheme(candidate, *qApp);
+    } else if (!preserveManualPreview) {
+        applyTheme(settings.value(QStringLiteral("theme")).value_or(QStringLiteral("light")), *qApp);
+    }
+    refreshThemeIcons();
 }
 
 void MainWindow::refreshSessionLabel()
@@ -1170,6 +1202,78 @@ void MainWindow::refreshSessionLabel()
 QString MainWindow::occasionLabelText() const
 {
     return m_occasionLabel ? m_occasionLabel->text() : QString();
+}
+
+void MainWindow::maybeShowOccasionGreeting()
+{
+    if (m_greetingCheckedThisSession) {
+        return;
+    }
+    m_greetingCheckedThisSession = true;
+
+    data::OccasionRepository occasions(m_db);
+    data::SettingRepository settings(m_db);
+    data::OccasionService service(m_db, occasions, settings);
+
+    const std::optional<core::Occasion> occasion = service.current();
+    if (!occasion) {
+        return;
+    }
+
+    const QString greeting = occasionGreeting(occasion->themeKey, occasion->name);
+    if (greeting.isEmpty()) {
+        return;
+    }
+
+    const QString key = QStringLiteral("last_occasion_greeting_%1").arg(occasion->id);
+    if (settings.value(key).has_value()) {
+        return;
+    }
+
+    auto* dialog = new QMessageBox(QMessageBox::Information, tr("تهنئة المناسبة"),
+                                   greeting, QMessageBox::Ok, this);
+    dialog->setObjectName(QStringLiteral("occasionGreetingDialog"));
+    connect(dialog, &QDialog::finished, this,
+            [this, key, dialog](int) {
+                data::SettingRepository dialogSettings(m_db);
+                dialogSettings.set(key, data::nowIso());
+                dialog->deleteLater();
+            });
+    dialog->open();
+    dialog->raise();
+    dialog->activateWindow();
+}
+
+void MainWindow::checkQuickItemRestocks()
+{
+    data::QuickItemService service(m_db);
+    const QVector<data::DueRestock> due = service.getDueRestocks();
+    if (due.isEmpty()) {
+        return;
+    }
+
+    QStringList lines;
+    for (const data::DueRestock& item : due) {
+        lines << tr("حان وقت إعادة الشراء: %1 - تم بيع %2")
+                     .arg(item.productName)
+                     .arg(item.quantitySold);
+    }
+
+    auto* toast = new QLabel(lines.join(QLatin1Char('\n')), this);
+    toast->setObjectName(QStringLiteral("restockToast"));
+    toast->setWordWrap(true);
+    toast->setAlignment(Qt::AlignCenter);
+    toast->setStyleSheet(QStringLiteral(
+        "QLabel#restockToast { background-color: #b45309; color: #ffffff; "
+        "border-radius: 8px; padding: 10px 16px; font-weight: 600; }"));
+    toast->adjustSize();
+    toast->move((width() - toast->width()) / 2, height() - toast->height() - 40);
+    toast->show();
+    toast->raise();
+    QTimer::singleShot(6000, toast, [toast]() {
+        toast->hide();
+        toast->deleteLater();
+    });
 }
 
 bool MainWindow::activateOccasion(int occasionId)
@@ -1191,7 +1295,7 @@ void MainWindow::deactivateOccasion()
     data::SettingRepository settings(m_db);
     data::OccasionService service(m_db, occasions, settings);
 
-    service.deactivate();
+    service.disable();
     refreshOccasionLabel();
 }
 

@@ -1,12 +1,20 @@
 #include <QtTest/QtTest>
 
 #include <QApplication>
+#include <QCryptographicHash>
+#include <QDir>
+#include <QElapsedTimer>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 #include <QTemporaryDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QList>
+#include <QMap>
+#include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QVariant>
 #include <QMessageLogContext>
 #include <QRegularExpression>
 #include <QTime>
@@ -46,8 +54,12 @@
 #include "daily_report_service.h"
 #include "setting_repository.h"
 #include "zakat_history_repository.h"
+#include "service_invoice_repository.h"
 #include "occasion_repository.h"
 #include "occasion_service.h"
+#include "occasion_offer_repository.h"
+#include "quick_item_service.h"
+#include "core/hijri_utils.h"
 #include "core/i18n.h"
 #include "core/zakat_notifier.h"
 #include "sync_outbox_repository.h"
@@ -73,10 +85,17 @@ class DataLayerTest : public QObject
 private slots:
     void initTestCase();
     void schemaContainsAllTables();
+    void backupTo_copies_rows_and_schema_version();
+    void backupTo_refuses_existing_destination();
+    void opening_corrupt_database_throws_quick_check_error();
+    void begin_write_transaction_commits_and_rolls_back();
+    void begin_write_transaction_blocks_another_writer();
     void productSaveAndFind();
     void product_visibility_filter();
     void product_repository_round_trips_package_fields();
     void quick_items_roundtrip();
+    void quick_items_require_explicit_flag();
+    void quick_item_restock_due_reports_sold_and_resets_date();
     void two_products_without_barcode();
     void barcode_with_value_still_unique();
     void normalize_barcode_azerty();
@@ -95,6 +114,7 @@ private slots:
     void customerTransactionAndItems();
     void sale_with_adjustment();
     void customer_debt_with_adjustment();
+    void customer_debt_refuses_insufficient_stock_without_writing_anything();
     void sale_without_adjustment_unchanged();
     void adjustment_migration_adds_the_column_to_a_legacy_ledger();
     void product_packages_migration_adds_columns_to_a_legacy_ledger();
@@ -113,6 +133,11 @@ private slots:
     void audit_row_rolls_back_with_the_movement_it_describes();
     void recordSale_rolls_back_when_the_price_override_audit_cannot_be_written();
     void migration_skips_the_index_when_the_ledger_holds_a_duplicate();
+    void migration_failure_does_not_stamp_the_schema_version();
+    void migration_is_atomic_and_backs_up_before_upgrading();
+    void migration_does_not_start_when_pre_migration_backup_fails();
+    void newer_schema_is_refused_without_touching_the_file();
+    void migrated_v1_schema_matches_a_fresh_install();
     void cash_movements_carry_correct_reference();
     void close_validation_detects_violations();
     void cash_reference_migration_keeps_legacy_null_and_adds_index();
@@ -144,6 +169,7 @@ private slots:
     void report_leaves_cogs_overflow_flag_false_on_clean_input();
     void should_notify_does_not_claim_year();
     void zakat_history_roundtrip();
+    void service_invoice_roundtrip();
     void appendOnlyGuard();
     void journalModeMatchesDatabaseRole();
     void pruneOnlyExpiredAcknowledgedOutboxRows();
@@ -179,6 +205,16 @@ private slots:
     void supplier_returns_schema_exists();
     void occasion_roundtrip();
     void occasion_service_activate_deactivate();
+    void occasion_service_activate_reactivates_inactive();
+    void occasion_mode_state_machine();
+    void occasion_current_uses_system_date_and_latest_start();
+    void hijri_calendar_known_dates_and_ranges();
+    void occasion_service_auto_uses_hijri_calendar();
+    void occasion_offer_schema_v17_exists();
+    void occasion_offer_repository_roundtrip();
+    void occasion_offer_price_overrides_sale_price();
+    void occasion_offer_discount_percent_applies_to_sale_price();
+    void occasion_offer_bonus_pieces_increase_pieces_consumed();
     void findBetween_includes_boundary_days();
     void receipt_number_migration_adds_columns_and_backfills();
     void receipt_number_mints_sequentially_within_a_year();
@@ -190,11 +226,25 @@ private slots:
     void stockValueCents_divides_weight_products_by_a_thousand();
     void stockValueCents_zero_when_only_an_empty_weight_product();
     void daily_report_uses_grams_for_a_weight_line();
+    void daily_report_uses_pieces_for_a_package_line();
+    void update_average_cost_refuses_overflow();
     void sync_key_mints_random_on_absent();
     void sync_key_keeps_existing_value();
     void sync_key_remints_on_empty_value();
+    void old_customers_schema_without_opening_balance_cents();
     void resolve_sale_items_warns_on_pieces_consumed_drift();
     void resolve_sale_items_silent_when_claim_matches();
+    void resolve_sale_items_rejects_unknown_unit();
+    void resolve_sale_items_rejects_piece_for_a_weight_product();
+    void resolve_sale_items_rejects_weight_for_a_normal_product();
+    void resolve_sale_items_rejects_package_for_a_weight_product();
+    void resolve_sale_items_rejects_stock_shared_by_duplicate_lines();
+    void resolve_sale_items_accepts_duplicate_lines_that_fit_together();
+    void resolve_sale_items_allow_oversold_ignores_aggregate_stock();
+    void resolve_sale_items_skips_stock_check_for_no_barcode();
+    void resolve_sale_items_sums_pieces_across_mixed_units();
+    void record_customer_debt_rejects_piece_for_weight_product();
+    void record_customer_debt_rejects_duplicate_lines_over_stock();
 
 private:
     QTemporaryDir m_dir;
@@ -240,6 +290,197 @@ void DataLayerTest::schemaContainsAllTables()
     QVERIFY(trigger.exec(
         QStringLiteral("SELECT name FROM sqlite_master WHERE type='trigger' AND name='trg_stock_after_insert'")));
     QVERIFY(trigger.next());
+}
+
+void DataLayerTest::backupTo_copies_rows_and_schema_version()
+{
+    const QString sourcePath = m_dir.filePath(QStringLiteral("backup-source.sqlite"));
+    const QString backupPath = m_dir.filePath(QStringLiteral("backup-copy.sqlite"));
+    QFile::remove(sourcePath);
+    QFile::remove(backupPath);
+
+    data::Database source(sourcePath);
+    data::ProductRepository products(source);
+
+    core::Product product;
+    product.name = QStringLiteral("Backup product");
+    product.costPriceCents = 100;
+    product.salePriceCents = 150;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10, QStringLiteral("purchase"));
+
+    data::CashSessionRepository sessions(source);
+    const int sessionId = sessions.open(1000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    const data::SaleRecordResult sale =
+        data::SaleService(source).recordSale({item}, sessionId, "desktop", false);
+    QVERIFY2(sale.ok, qPrintable(sale.error));
+
+    QVERIFY2(source.backupTo(backupPath), qPrintable(source.lastError()));
+    QVERIFY(QFileInfo::exists(backupPath));
+
+    data::Database copy(backupPath);
+    const auto countRows = [](data::Database& db, const QString& table) {
+        QSqlQuery query(db.handle());
+        if (!query.exec(QStringLiteral("SELECT COUNT(*) FROM %1").arg(table)) || !query.next()) {
+            return -1LL;
+        }
+        return query.value(0).toLongLong();
+    };
+
+    for (const QString& table : {QStringLiteral("products"), QStringLiteral("sales"),
+                                 QStringLiteral("stock_movements")}) {
+        QCOMPARE(countRows(copy, table), countRows(source, table));
+    }
+    QCOMPARE(data::readSchemaVersion(copy.handle()), data::readSchemaVersion(source.handle()));
+    QCOMPARE(data::readSchemaVersion(copy.handle()), data::kSchemaVersion);
+}
+
+void DataLayerTest::backupTo_refuses_existing_destination()
+{
+    const QString destinationPath = m_dir.filePath(QStringLiteral("backup-existing.sqlite"));
+    QFile destination(destinationPath);
+    QVERIFY(destination.open(QIODevice::WriteOnly));
+    const QByteArray original = QByteArrayLiteral("keep me");
+    QCOMPARE(destination.write(original), original.size());
+    destination.close();
+
+    QVERIFY(!m_db->backupTo(destinationPath));
+    QVERIFY(!m_db->lastError().isEmpty());
+
+    QVERIFY(destination.open(QIODevice::ReadOnly));
+    QCOMPARE(destination.readAll(), original);
+}
+
+void DataLayerTest::opening_corrupt_database_throws_quick_check_error()
+{
+    const QString path = m_dir.filePath(QStringLiteral("corrupt-open.sqlite"));
+    QFile::remove(path);
+
+    qint64 pageSize = 0;
+    qint64 pageCount = 0;
+    {
+        data::Database valid(path);
+        QSqlQuery insert(valid.handle());
+        QVERIFY(insert.prepare(QStringLiteral("INSERT INTO products (name) VALUES (?)")));
+        for (int i = 0; i < 200; ++i) {
+            insert.bindValue(0, QString(1000, QLatin1Char('x')) + QString::number(i));
+            QVERIFY(insert.exec());
+        }
+
+        QSqlQuery pageSizeQuery(valid.handle());
+        QVERIFY(pageSizeQuery.exec(QStringLiteral("PRAGMA page_size")));
+        QVERIFY(pageSizeQuery.next());
+        pageSize = pageSizeQuery.value(0).toLongLong();
+
+        QSqlQuery pageCountQuery(valid.handle());
+        QVERIFY(pageCountQuery.exec(QStringLiteral("PRAGMA page_count")));
+        QVERIFY(pageCountQuery.next());
+        pageCount = pageCountQuery.value(0).toLongLong();
+    }
+    QVERIFY(pageSize > 0);
+    QVERIFY(pageCount > 1);
+
+    bool healthyOpened = true;
+    try {
+        data::Database healthy(path);
+    } catch (const std::exception&) {
+        healthyOpened = false;
+    }
+    QVERIFY2(healthyOpened, "a healthy database failed to open");
+
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadWrite));
+    QVERIFY(file.seek((pageCount - 1) * pageSize));
+    const QByteArray garbage(512, '\xA5');
+    QCOMPARE(file.write(garbage), garbage.size());
+    file.close();
+
+    bool threw = false;
+    QString message;
+    try {
+        data::Database corrupt(path);
+    } catch (const std::exception& e) {
+        threw = true;
+        message = QString::fromUtf8(e.what());
+    }
+    QVERIFY2(threw, "a corrupt database opened without an integrity error");
+    QVERIFY2(message.contains(QStringLiteral("quick_check"), Qt::CaseInsensitive),
+             qPrintable(message));
+}
+
+void DataLayerTest::begin_write_transaction_commits_and_rolls_back()
+{
+    const QString path = m_dir.filePath(QStringLiteral("begin-write-commit.sqlite"));
+    QFile::remove(path);
+    data::Database db(path, data::DatabaseMode::Server);
+    QVERIFY2(db.lastError().isEmpty(), qPrintable(db.lastError()));
+
+    QVERIFY2(db.beginWriteTransaction(), qPrintable(db.lastError()));
+    QSqlQuery insert(db.handle());
+    QVERIFY(insert.exec(
+        QStringLiteral("INSERT INTO settings (key, value) VALUES ('t13_commit', 'kept')")));
+    QVERIFY2(db.commit(), qPrintable(db.lastError()));
+
+    QSqlQuery afterCommit(db.handle());
+    QVERIFY(afterCommit.exec(
+        QStringLiteral("SELECT COUNT(*) FROM settings WHERE key = 't13_commit'")));
+    QVERIFY(afterCommit.next());
+    QCOMPARE(afterCommit.value(0).toInt(), 1);
+
+    QVERIFY2(db.beginWriteTransaction(), qPrintable(db.lastError()));
+    QSqlQuery insertThenRollback(db.handle());
+    QVERIFY(insertThenRollback.exec(
+        QStringLiteral("INSERT INTO settings (key, value) VALUES ('t13_rollback', 'gone')")));
+    QVERIFY2(db.rollback(), qPrintable(db.lastError()));
+
+    QSqlQuery afterRollback(db.handle());
+    QVERIFY(afterRollback.exec(
+        QStringLiteral("SELECT COUNT(*) FROM settings WHERE key = 't13_rollback'")));
+    QVERIFY(afterRollback.next());
+    QCOMPARE(afterRollback.value(0).toInt(), 0);
+}
+
+void DataLayerTest::begin_write_transaction_blocks_another_writer()
+{
+    const QString path = m_dir.filePath(QStringLiteral("begin-write-lock.sqlite"));
+    QFile::remove(path);
+    data::Database first(path, data::DatabaseMode::Server);
+    QVERIFY2(first.lastError().isEmpty(), qPrintable(first.lastError()));
+    data::Database second(path, data::DatabaseMode::Server);
+    QVERIFY2(second.lastError().isEmpty(), qPrintable(second.lastError()));
+
+    QVERIFY2(first.beginWriteTransaction(), qPrintable(first.lastError()));
+    QSqlQuery held(first.handle());
+    QVERIFY(held.exec(
+        QStringLiteral("INSERT INTO settings (key, value) VALUES ('t13_lock', 'first')")));
+
+    QElapsedTimer timer;
+    timer.start();
+    QVERIFY(!second.beginWriteTransaction());
+    const qint64 waited = timer.elapsed();
+    QVERIFY2(waited >= 4000, qPrintable(QStringLiteral("gave up after %1 ms").arg(waited)));
+    QVERIFY2(second.lastError().contains(QStringLiteral("locked"), Qt::CaseInsensitive),
+             qPrintable(second.lastError()));
+    QVERIFY2(!second.lastError().contains(QStringLiteral("snapshot"), Qt::CaseInsensitive),
+             qPrintable(second.lastError()));
+
+    QVERIFY2(first.commit(), qPrintable(first.lastError()));
+    QVERIFY2(second.beginWriteTransaction(), qPrintable(second.lastError()));
+    QSqlQuery secondWrite(second.handle());
+    QVERIFY(secondWrite.exec(
+        QStringLiteral("UPDATE settings SET value = 'second' WHERE key = 't13_lock'")));
+    QVERIFY2(second.commit(), qPrintable(second.lastError()));
+
+    QSqlQuery stored(second.handle());
+    QVERIFY(stored.exec(QStringLiteral("SELECT value FROM settings WHERE key = 't13_lock'")));
+    QVERIFY(stored.next());
+    QCOMPARE(stored.value(0).toString(), QStringLiteral("second"));
 }
 
 void DataLayerTest::productSaveAndFind()
@@ -452,12 +693,14 @@ void DataLayerTest::quick_items_roundtrip()
     core::Product bread;
     bread.barcode = QString();  // null -> "no barcode"
     bread.name = QStringLiteral("خبز");
+    bread.isQuickItem = true;
     const int breadId = repo.save(bread);
     QVERIFY(breadId > 0);
 
     core::Product water;
     water.barcode = QString();
     water.name = QStringLiteral("ماء");
+    water.isQuickItem = true;
     const int waterId = repo.save(water);
     QVERIFY(waterId > 0);
 
@@ -488,6 +731,86 @@ void DataLayerTest::quick_items_roundtrip()
     repo.setActive(waterId, false);
     QCOMPARE(repo.findQuickItems().size(), std::size_t(1));
     QCOMPARE(repo.findQuickItems().front().id, breadId);
+}
+
+void DataLayerTest::quick_items_require_explicit_flag()
+{
+    const QString path = m_dir.filePath(QStringLiteral("quick_items_explicit.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository repo(db);
+
+    core::Product explicitQuick;
+    explicitQuick.barcode = QString();
+    explicitQuick.name = QStringLiteral("خبز");
+    explicitQuick.isQuickItem = true;
+    explicitQuick.restockDays = 3;
+    const int quickId = repo.save(explicitQuick);
+    QVERIFY(quickId > 0);
+
+    const auto stored = repo.findById(quickId);
+    QVERIFY(stored.has_value());
+    QVERIFY2(stored->isQuickItem, "the explicit quick-item flag must round-trip");
+    QCOMPARE(stored->restockDays, 3);
+    QCOMPARE(stored->lastRestockedAt, QDate::currentDate().toString(Qt::ISODate));
+
+    core::Product plainNoBarcode;
+    plainNoBarcode.barcode = QString();
+    plainNoBarcode.name = QStringLiteral("منتج بلا باركود");
+    plainNoBarcode.isQuickItem = false;
+    const int plainId = repo.save(plainNoBarcode);
+    QVERIFY(plainId > 0);
+
+    const auto quick = repo.findQuickItems();
+    QCOMPARE(quick.size(), std::size_t(1));
+    QCOMPARE(quick.front().id, quickId);
+    for (const core::Product& product : quick) {
+        QVERIFY(product.id != plainId);
+    }
+}
+
+void DataLayerTest::quick_item_restock_due_reports_sold_and_resets_date()
+{
+    const QString path = m_dir.filePath(QStringLiteral("quick_item_restocks.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+
+    data::ProductRepository repo(db);
+    core::Product bread;
+    bread.barcode = QString();
+    bread.name = QStringLiteral("خبز");
+    bread.salePriceCents = 100;
+    bread.costPriceCents = 50;
+    bread.isQuickItem = true;
+    bread.restockDays = 3;
+    bread.lastRestockedAt = QDate::currentDate().addDays(-4).toString(Qt::ISODate);
+    const int productId = repo.save(bread);
+    QVERIFY(productId > 0);
+
+    data::CashSessionRepository sessions(db);
+    const int sessionId = sessions.open(100000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 2;
+    item.unitKind = QStringLiteral("piece");
+    item.unitPriceCents = 100;
+    const data::SaleRecordResult result =
+        data::SaleService(db).recordSale({item}, sessionId, QStringLiteral("dev"),
+                                         /*allowOversold=*/false);
+    QVERIFY2(result.ok, qPrintable(result.error));
+
+    data::QuickItemService service(db);
+    const QVector<data::DueRestock> due = service.getDueRestocks();
+    QCOMPARE(due.size(), 1);
+    QCOMPARE(due.first().productName, QStringLiteral("خبز"));
+    QCOMPARE(due.first().quantitySold, 2LL);
+
+    const auto stored = repo.findById(productId);
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->lastRestockedAt, QDate::currentDate().toString(Qt::ISODate));
+    QVERIFY(service.getDueRestocks().isEmpty());
 }
 
 void DataLayerTest::two_products_without_barcode()
@@ -718,11 +1041,13 @@ void DataLayerTest::legacy_products_migration()
     core::Product first;
     first.barcode = QString();
     first.name = QStringLiteral("خبز");
+    first.isQuickItem = true;
     const int firstId = repo.save(first);
     QVERIFY(firstId > 0);
     core::Product second;
     second.barcode = QString();
     second.name = QStringLiteral("ماء");
+    second.isQuickItem = true;
     const int secondId = repo.save(second);
     QVERIFY(secondId > 0);
     QCOMPARE(repo.findQuickItems().size(), std::size_t(2));
@@ -1178,7 +1503,67 @@ void DataLayerTest::customer_debt_with_adjustment()
 
     // What the customer is said to owe is the charged amount, not the line sum:
     // an invoice that adds up to less than the balance is not an invoice.
-    QCOMPARE(customers.balanceCentsFor(customerId), 150LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 150LL); };
+}
+
+// A credit sale must not be written when the shelf cannot cover it. The stock
+// check lives inside resolveSaleItems, so the sale has to be opened before that
+// call: a refusal after the check still has to leave nothing behind, and a
+// concurrent write must not be able to slip in between the read and the write.
+void DataLayerTest::customer_debt_refuses_insufficient_stock_without_writing_anything()
+{
+    const QString path = m_dir.filePath(QStringLiteral("debt_insufficient_stock.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.barcode = QStringLiteral("6130000000663");
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 1200;
+    product.costPriceCents = 1000;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 1, QStringLiteral("opening"));
+
+    core::Customer customer;
+    customer.name = QStringLiteral("زبون-نقص");
+    data::CustomerRepository customers(db);
+    const int customerId = customers.save(customer);
+    QVERIFY(customerId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 2;
+    item.unitPriceCents = 1200;
+
+    const auto rows = [&db](const QString& table) {
+        QSqlQuery query(db.handle());
+        if (!query.exec(QStringLiteral("SELECT COUNT(*) FROM %1").arg(table)) || !query.next()) {
+            return -1LL;
+        }
+        return query.value(0).toLongLong();
+    };
+    QCOMPARE(rows(QStringLiteral("stock_movements")), 1LL);
+
+    const data::SaleRecordResult refused =
+        data::SaleService(db).recordCustomerDebt(customerId, {item}, QStringLiteral("dev"),
+                                                 /*allowOversold=*/false);
+    QVERIFY(!refused.ok);
+    QVERIFY2(refused.error.contains(QStringLiteral("insufficient stock")),
+             qPrintable(refused.error));
+    QCOMPARE(refused.saleId, 0);
+    QCOMPARE(refused.totalCents, 0LL);
+    QCOMPARE(refused.cogsCents, 0LL);
+
+    QCOMPARE(rows(QStringLiteral("customer_transactions")), 0LL);
+    QCOMPARE(rows(QStringLiteral("customer_transaction_items")), 0LL);
+    QCOMPARE(rows(QStringLiteral("stock_movements")), 1LL);
+    QCOMPARE(rows(QStringLiteral("audit_log")), 0LL);
+    const auto stored = products.findById(productId);
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->quantity, 1LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 0LL); };
 }
 
 // Every caller that existed before the adjustment parameter does still compile and
@@ -1472,7 +1857,7 @@ void DataLayerTest::product_packages_migration_adds_columns_to_a_legacy_ledger()
         // assertion true whatever the stamp was and stop it testing anything. The
         // figure moves with every new migration, which is the whole point: a bump
         // that forgot to actually stamp this database would leave it one short.
-        QCOMPARE(data::readSchemaVersion(migratedDb), 16);
+        QCOMPARE(data::readSchemaVersion(migratedDb), 20);
         migratedDb.close();
     }
     QSqlDatabase::removeDatabase(connectionName);
@@ -1541,7 +1926,7 @@ void DataLayerTest::migration_14_backfills_pieces_per_package_from_package_size(
 
         // Pinned to the literal for the same reason as the package migration test:
         // it must move with each new migration, or it stops testing the stamp.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 16);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 20);
 
         // A second run changes nothing. The first run moved row 1's new column off
         // the default, so the guard's WHERE clause no longer matches it, and the two
@@ -1558,7 +1943,7 @@ void DataLayerTest::migration_14_backfills_pieces_per_package_from_package_size(
         }
         QVERIFY(!again.next());
         // Still stamped after the second, idempotent run.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 16);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 20);
 
         legacyDb.close();
     }
@@ -1637,7 +2022,7 @@ void DataLayerTest::weight_products_migration_drops_the_package_fields()
 
         // Pinned to the literal for the same reason as the other migration tests:
         // it must move with each new migration, or it stops testing the stamp.
-        QCOMPARE(data::readSchemaVersion(legacyDb), 16);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 20);
 
         // A second run changes nothing. Row 1 no longer matches the guard because
         // its values are already the defaults, and the rows it does not match were
@@ -1653,7 +2038,7 @@ void DataLayerTest::weight_products_migration_drops_the_package_fields()
         QCOMPARE(again.value(1).toString(), QString());
         QCOMPARE(again.value(2).toInt(), 1);
         QCOMPARE(again.value(3).toInt(), 0);
-        QCOMPARE(data::readSchemaVersion(legacyDb), 16);
+        QCOMPARE(data::readSchemaVersion(legacyDb), 20);
 
         legacyDb.close();
     }
@@ -1724,7 +2109,7 @@ void DataLayerTest::reverse_customer_debt_offsets_the_ledger_and_returns_stock()
     DebtFixture f(m_dir.filePath(QStringLiteral("reverse_customer_debt.sqlite")));
     QVERIFY(f.transactionId > 0);
     const long long stockBefore = f.stock();
-    QCOMPARE(data::CustomerRepository(f.db).balanceCentsFor(f.customerId), 14000LL);
+    { auto _v = data::CustomerRepository(f.db).balanceCentsFor(f.customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 14000LL); }
 
     data::SaleService sales(f.db);
     const data::SaleReverseResult result = sales.reverseCustomerDebt(f.transactionId);
@@ -1732,7 +2117,7 @@ void DataLayerTest::reverse_customer_debt_offsets_the_ledger_and_returns_stock()
 
     // The debt is gone, and it is gone because of a negative row against the
     // original rather than because the original was edited away.
-    QCOMPARE(data::CustomerRepository(f.db).balanceCentsFor(f.customerId), 0LL);
+    { auto _v = data::CustomerRepository(f.db).balanceCentsFor(f.customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 0LL); }
     const auto txs = data::CustomerTransactionRepository(f.db).findByCustomerId(f.customerId);
     QCOMPARE(txs.size(), std::size_t(2));
     QCOMPARE(txs[1].amountCents, -14000LL);
@@ -1786,7 +2171,7 @@ void DataLayerTest::reverse_customer_debt_refuses_a_second_reversal()
     QVERIFY2(!second.error.isEmpty(), "a refusal has to say why");
 
     // Nothing moved the second time.
-    QCOMPARE(data::CustomerRepository(f.db).balanceCentsFor(f.customerId), 0LL);
+    { auto _v = data::CustomerRepository(f.db).balanceCentsFor(f.customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 0LL); }
     QCOMPARE(f.stock(), stockAfterFirst);
     QCOMPARE(data::CustomerTransactionRepository(f.db)
                  .findByCustomerId(f.customerId)
@@ -1812,7 +2197,7 @@ void DataLayerTest::reverse_customer_debt_refuses_a_payment_row()
     QVERIFY(!result.ok);
 
     // Untouched: the repayment still stands.
-    QCOMPARE(data::CustomerRepository(f.db).balanceCentsFor(f.customerId), 9000LL);
+    { auto _v = data::CustomerRepository(f.db).balanceCentsFor(f.customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 9000LL); }
     QCOMPARE(transactions.findByCustomerId(f.customerId).size(), std::size_t(2));
 }
 
@@ -1829,7 +2214,7 @@ void DataLayerTest::reverse_customer_debt_refuses_a_missing_sale()
                  .findByCustomerId(f.customerId)
                  .size(),
              std::size_t(1));
-    QCOMPARE(data::CustomerRepository(f.db).balanceCentsFor(f.customerId), 14000LL);
+    { auto _v = data::CustomerRepository(f.db).balanceCentsFor(f.customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 14000LL); }
 }
 
 // A reversal puts back what the sale took, so it needs the sale to have recorded
@@ -2065,6 +2450,10 @@ void DataLayerTest::migration_skips_the_index_when_the_ledger_holds_a_duplicate(
         QCOMPARE(present, i != 0);
     }
 
+    // The allowed warning is not a failed migration: the skipped index still
+    // leaves the database stamped at the version this build applied.
+    QCOMPARE(data::readSchemaVersion(db.handle()), data::kSchemaVersion);
+
     // And the ordinary work still goes through on the ledger whose index is off,
     // which is the state the warning describes.
     QSqlQuery ordinary(db.handle());
@@ -2072,6 +2461,408 @@ void DataLayerTest::migration_skips_the_index_when_the_ledger_holds_a_duplicate(
     QVERIFY(ordinary.exec(QString::fromLatin1(kReversalTables[0].originalInsert)));
 }
 
+
+void DataLayerTest::migration_failure_does_not_stamp_the_schema_version()
+{
+    const QString path = m_dir.filePath(QStringLiteral("migration_failure.sqlite"));
+    const QString connection = QStringLiteral("migration-failure");
+
+    {
+        QSqlDatabase legacy = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        legacy.setDatabaseName(path);
+        QVERIFY(legacy.open());
+        QSqlQuery create(legacy);
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " sold_by_weight INTEGER NOT NULL DEFAULT 0, package_barcode TEXT,"
+            " package_name TEXT NOT NULL DEFAULT '',"
+            " pieces_per_package INTEGER NOT NULL DEFAULT 1,"
+            " package_cost_cents INTEGER NOT NULL DEFAULT 0)")));
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TRIGGER fail_weight_cleanup BEFORE UPDATE ON products"
+            " BEGIN SELECT RAISE(ABORT, 'injected migration failure'); END")));
+        QVERIFY(create.exec(QStringLiteral(
+            "INSERT INTO products (sold_by_weight, package_barcode, package_name,"
+            " pieces_per_package, package_cost_cents)"
+            " VALUES (1, '5c', 'carton', 5, 500)")));
+        QVERIFY(create.exec(QStringLiteral("PRAGMA user_version = 15")));
+        legacy.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+    db.setDatabaseName(path);
+    QVERIFY(db.open());
+
+    bool threw = false;
+    try {
+        data::runSchemaMigrations(db);
+    } catch (const std::runtime_error& error) {
+        threw = true;
+        const QString message = QString::fromUtf8(error.what());
+        QVERIFY2(message.contains(QStringLiteral("16")), qPrintable(message));
+        QVERIFY2(message.contains(QStringLiteral("weight"), Qt::CaseInsensitive),
+                 qPrintable(message));
+    }
+    QVERIFY2(threw, "a failing migration must abort instead of stamping the schema version");
+    QCOMPARE(data::readSchemaVersion(db), 15);
+    {
+        QSqlQuery row(db);
+        QVERIFY(row.exec(QStringLiteral("SELECT package_barcode FROM products")));
+        QVERIFY(row.next());
+        QCOMPARE(row.value(0).toString(), QStringLiteral("5c"));
+    }
+    db.close();
+    QSqlDatabase::removeDatabase(connection);
+}
+
+void DataLayerTest::migration_is_atomic_and_backs_up_before_upgrading()
+{
+    const QString path = m_dir.filePath(QStringLiteral("atomic_migration.sqlite"));
+    QFile::remove(path);
+    const QString connection = QStringLiteral("atomic-migration");
+    {
+        QSqlDatabase legacy = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        legacy.setDatabaseName(path);
+        QVERIFY(legacy.open());
+        QSqlQuery create(legacy);
+        // The shape before cartons: products has no package columns yet, and
+        // sale_items has neither unit_kind nor pieces_consumed.
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " barcode TEXT UNIQUE, name TEXT NOT NULL,"
+            " cost_price_cents INTEGER NOT NULL DEFAULT 0,"
+            " sale_price_cents INTEGER NOT NULL DEFAULT 0,"
+            " quantity INTEGER NOT NULL DEFAULT 0,"
+            " unit TEXT NOT NULL DEFAULT '',"
+            " package_size INTEGER NOT NULL DEFAULT 1,"
+            " active INTEGER NOT NULL DEFAULT 1,"
+            " sold_by_weight INTEGER NOT NULL DEFAULT 0)")));
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE sale_items (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " sale_id INTEGER NOT NULL, product_id INTEGER NOT NULL,"
+            " quantity INTEGER NOT NULL, unit_price_cents INTEGER NOT NULL,"
+            " unit_cost_cents INTEGER NOT NULL,"
+            " reversed_id INTEGER NOT NULL DEFAULT 0)")));
+        // Still before migration 12, so the adjustment column has to be added by
+        // the migration that completes before 13 fails.
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE sales (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " created_at TEXT NOT NULL, total_cents INTEGER NOT NULL,"
+            " device_id TEXT NOT NULL, oversold INTEGER NOT NULL DEFAULT 0,"
+            " reversed_sale_id INTEGER NOT NULL DEFAULT 0)")));
+        QVERIFY(create.exec(QStringLiteral(
+            "INSERT INTO products (id, name, quantity) VALUES (1, 'Cola', 10)")));
+        QVERIFY(create.exec(QStringLiteral(
+            "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price_cents,"
+            " unit_cost_cents) VALUES (1, 1, 2, 100, 50)")));
+        // Migration 13 adds the line columns and then backfills them; aborting
+        // the backfill is what leaves the earlier ALTERs uncommitted.
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TRIGGER fail_sale_item_backfill BEFORE UPDATE ON sale_items"
+            " BEGIN SELECT RAISE(ABORT, 'injected backfill failure'); END")));
+        QVERIFY(create.exec(QStringLiteral("PRAGMA user_version = 11")));
+        legacy.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    bool threw = false;
+    try {
+        data::Database db(path);
+    } catch (const std::runtime_error& error) {
+        threw = true;
+        const QString message = QString::fromUtf8(error.what());
+        QVERIFY2(message.contains(QStringLiteral("13")), qPrintable(message));
+        QVERIFY2(message.contains(QStringLiteral("product packages"), Qt::CaseInsensitive),
+                 qPrintable(message));
+    }
+    QVERIFY2(threw, "the injected migration failure must abort opening the database");
+
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        check.setDatabaseName(path);
+        QVERIFY(check.open());
+        QCOMPARE(data::readSchemaVersion(check), 12);
+        {
+            QSqlQuery columns(check);
+            QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(sales)")));
+            bool hasAdjustment = false;
+            while (columns.next()) {
+                hasAdjustment = hasAdjustment
+                                || columns.value(1).toString()
+                                       == QStringLiteral("adjustment_cents");
+            }
+            QVERIFY2(hasAdjustment, "migration 12 did not commit before 13 failed");
+        }
+        {
+            QSqlQuery columns(check);
+            QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(products)")));
+            bool hasPackageName = false;
+            while (columns.next()) {
+                hasPackageName = hasPackageName
+                                 || columns.value(1).toString()
+                                        == QStringLiteral("package_name");
+            }
+            QVERIFY2(!hasPackageName, "a failed migration left its products ALTER committed");
+        }
+        {
+            QSqlQuery columns(check);
+            QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(sale_items)")));
+            bool hasPiecesConsumed = false;
+            while (columns.next()) {
+                hasPiecesConsumed = hasPiecesConsumed
+                                    || columns.value(1).toString()
+                                           == QStringLiteral("pieces_consumed");
+            }
+            QVERIFY2(!hasPiecesConsumed,
+                     "a failed migration left its sale_items ALTER committed");
+        }
+        check.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    const QDir backupDirectory(
+        QFileInfo(path).absoluteDir().filePath(QStringLiteral("backups")));
+    const QStringList backups =
+        backupDirectory.entryList(QStringList() << QStringLiteral("pre-migration-v11-*.sqlite"),
+                                  QDir::Files);
+    QCOMPARE(backups.size(), 1);
+    const QString backupPath = backupDirectory.filePath(backups.first());
+    {
+        QSqlDatabase backup = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        backup.setDatabaseName(backupPath);
+        backup.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+        QVERIFY(backup.open());
+        QCOMPARE(data::readSchemaVersion(backup), 11);
+        QSqlQuery columns(backup);
+        QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(products)")));
+        bool hasPackageName = false;
+        while (columns.next()) {
+            hasPackageName = hasPackageName
+                             || columns.value(1).toString() == QStringLiteral("package_name");
+        }
+        QVERIFY2(!hasPackageName, "the pre-migration backup is not the old schema");
+        backup.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+}
+
+void DataLayerTest::migration_does_not_start_when_pre_migration_backup_fails()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    const QString path = work.filePath(QStringLiteral("blocked_migration_backup.sqlite"));
+    const QString connection = QStringLiteral("blocked-migration-backup");
+    {
+        QSqlDatabase legacy = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        legacy.setDatabaseName(path);
+        QVERIFY(legacy.open());
+        QSqlQuery create(legacy);
+        QVERIFY(create.exec(QStringLiteral(
+            "CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            " barcode TEXT UNIQUE, name TEXT NOT NULL,"
+            " cost_price_cents INTEGER NOT NULL DEFAULT 0,"
+            " sale_price_cents INTEGER NOT NULL DEFAULT 0,"
+            " quantity INTEGER NOT NULL DEFAULT 0,"
+            " unit TEXT NOT NULL DEFAULT '',"
+            " package_size INTEGER NOT NULL DEFAULT 1,"
+            " active INTEGER NOT NULL DEFAULT 1,"
+            " sold_by_weight INTEGER NOT NULL DEFAULT 0)")));
+        QVERIFY(create.exec(QStringLiteral("PRAGMA user_version = 12")));
+        legacy.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    // A file where the backup directory has to go makes mkpath fail without
+    // depending on filesystem permissions.
+    QFile blocker(QFileInfo(path).absoluteDir().filePath(QStringLiteral("backups")));
+    QVERIFY(blocker.open(QIODevice::WriteOnly));
+    blocker.close();
+
+    bool threw = false;
+    try {
+        data::Database db(path);
+    } catch (const std::runtime_error& error) {
+        threw = true;
+        const QString message = QString::fromUtf8(error.what());
+        QVERIFY2(message.contains(QStringLiteral("pre-migration backup"), Qt::CaseInsensitive),
+                 qPrintable(message));
+    }
+    QVERIFY2(threw, "a failed pre-migration backup must stop the upgrade");
+
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        check.setDatabaseName(path);
+        QVERIFY(check.open());
+        QCOMPARE(data::readSchemaVersion(check), 12);
+        QSqlQuery columns(check);
+        QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(products)")));
+        bool hasPackageName = false;
+        while (columns.next()) {
+            hasPackageName = hasPackageName
+                             || columns.value(1).toString() == QStringLiteral("package_name");
+        }
+        QVERIFY2(!hasPackageName, "a migration ran despite the failed backup");
+        check.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+}
+
+void DataLayerTest::newer_schema_is_refused_without_touching_the_file()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    const QString path = work.filePath(QStringLiteral("newer_schema.sqlite"));
+    {
+        data::Database db(path);
+        QSqlQuery stamp(db.handle());
+        QVERIFY(stamp.exec(
+            QStringLiteral("PRAGMA user_version = %1").arg(data::kSchemaVersion + 1)));
+    }
+
+    const auto digest = [](const QString& filePath) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly)) {
+            return QByteArray();
+        }
+        return QCryptographicHash::hash(file.readAll(), QCryptographicHash::Sha256).toHex();
+    };
+    const QByteArray before = digest(path);
+    QVERIFY(!before.isEmpty());
+
+    bool threw = false;
+    try {
+        data::Database db(path);
+    } catch (const std::runtime_error& error) {
+        threw = true;
+        const QString message = QString::fromUtf8(error.what());
+        QVERIFY2(message.contains(QStringLiteral("newer"), Qt::CaseInsensitive),
+                 qPrintable(message));
+        QVERIFY2(message.contains(QStringLiteral("أحدث")), qPrintable(message));
+    }
+    QVERIFY2(threw, "a database from a newer schema must not open");
+    QCOMPARE(digest(path), before);
+}
+
+void DataLayerTest::migrated_v1_schema_matches_a_fresh_install()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    const QString legacyPath = work.filePath(QStringLiteral("v1-schema.sqlite"));
+    const QString freshPath = work.filePath(QStringLiteral("fresh-schema.sqlite"));
+
+    const QString connection = QStringLiteral("v1-schema-fixture");
+    {
+        QSqlDatabase legacy = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        legacy.setDatabaseName(legacyPath);
+        QVERIFY(legacy.open());
+
+        QFile fixture(QStringLiteral(MAHALI_TEST_FIXTURES_DIR "/schema_v1.sql"));
+        QVERIFY2(fixture.open(QIODevice::ReadOnly | QIODevice::Text),
+                 qPrintable(fixture.fileName()));
+        const QStringList lines =
+            QString::fromUtf8(fixture.readAll()).split(QLatin1Char('\n'));
+        int statements = 0;
+        for (const QString& line : lines) {
+            const QString sql = line.trimmed();
+            if (sql.isEmpty() || sql.startsWith(QLatin1String("--"))) {
+                continue;
+            }
+            QSqlQuery statement(legacy);
+            QVERIFY2(statement.exec(sql),
+                     qPrintable(QStringLiteral("v1 fixture failed: %1 (%2)")
+                                    .arg(sql, statement.lastError().text())));
+            ++statements;
+        }
+        QVERIFY2(statements > 0, "the v1 fixture must execute at least one statement");
+
+        QSqlQuery version(legacy);
+        QVERIFY(version.exec(QStringLiteral("PRAGMA user_version")));
+        QVERIFY(version.next());
+        QCOMPARE(version.value(0).toInt(), 1);
+        legacy.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+
+    data::Database migrated(legacyPath);
+    QCOMPARE(data::readSchemaVersion(migrated.handle()), data::kSchemaVersion);
+
+    data::Database fresh(freshPath);
+    QCOMPARE(data::readSchemaVersion(fresh.handle()), data::kSchemaVersion);
+
+    const auto objects = [](const QSqlDatabase& db) {
+        QStringList found;
+        QSqlQuery query(db);
+        if (!query.exec(QStringLiteral(
+                "SELECT type, name FROM sqlite_master "
+                "WHERE type IN ('table', 'index', 'trigger') "
+                "AND name NOT LIKE 'sqlite_%' ORDER BY type, name"))) {
+            return QStringList{
+                QStringLiteral("objects query failed: %1").arg(query.lastError().text())};
+        }
+        while (query.next()) {
+            found << QStringLiteral("%1:%2")
+                         .arg(query.value(0).toString(), query.value(1).toString());
+        }
+        return found;
+    };
+
+    const auto definitions = [](const QSqlDatabase& db) {
+        QStringList found;
+        QSqlQuery query(db);
+        if (!query.exec(QStringLiteral(
+                "SELECT type, name, sql FROM sqlite_master "
+                "WHERE type IN ('index', 'trigger') "
+                "AND name NOT LIKE 'sqlite_%' ORDER BY type, name"))) {
+            return QStringList{
+                QStringLiteral("definitions query failed: %1").arg(query.lastError().text())};
+        }
+        while (query.next()) {
+            found << QStringLiteral("%1:%2:%3")
+                         .arg(query.value(0).toString(), query.value(1).toString(),
+                              query.value(2).toString().simplified());
+        }
+        return found;
+    };
+
+    const auto columns = [](const QSqlDatabase& db) {
+        QStringList found;
+        QSqlQuery tables(db);
+        if (!tables.exec(QStringLiteral(
+                "SELECT name FROM sqlite_master "
+                "WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"))) {
+            return QStringList{
+                QStringLiteral("tables query failed: %1").arg(tables.lastError().text())};
+        }
+        while (tables.next()) {
+            const QString table = tables.value(0).toString();
+            QSqlQuery info(db);
+            if (!info.exec(QStringLiteral("PRAGMA table_info(%1)").arg(table))) {
+                return QStringList{QStringLiteral("table_info failed for %1: %2")
+                                       .arg(table, info.lastError().text())};
+            }
+            QMap<QString, QString> byName;
+            while (info.next()) {
+                const QString defaultValue =
+                    info.value(4).isNull() ? QStringLiteral("<null>")
+                                           : info.value(4).toString();
+                byName.insert(
+                    info.value(1).toString(),
+                    QStringLiteral("type=%1 notnull=%2 default=%3")
+                        .arg(info.value(2).toString(),
+                             QString::number(info.value(3).toInt()), defaultValue));
+            }
+            for (auto it = byName.cbegin(); it != byName.cend(); ++it) {
+                found << QStringLiteral("%1.%2 %3").arg(table, it.key(), it.value());
+            }
+        }
+        return found;
+    };
+
+    QCOMPARE(objects(migrated.handle()), objects(fresh.handle()));
+    QCOMPARE(definitions(migrated.handle()), definitions(fresh.handle()));
+    QCOMPARE(columns(migrated.handle()), columns(fresh.handle()));
+}
 
 void DataLayerTest::audit_row_is_written_by_the_service_not_the_caller()
 {
@@ -2211,7 +3002,7 @@ void DataLayerTest::customer_balance_uses_opening_and_transactions()
 
     // The opening figure has to come back on its own before anything is
     // recorded against the account, or a carried-in balance is silently lost.
-    QCOMPARE(customers.balanceCentsFor(customerId), 10000LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 10000LL); };
 
     data::CustomerTransactionRepository transactions(db);
     core::CustomerTransaction debt;
@@ -2220,14 +3011,14 @@ void DataLayerTest::customer_balance_uses_opening_and_transactions()
     QVERIFY(transactions.insert(debt) > 0);
 
     // 10000 opening + 50000 credit, still nothing paid off.
-    QCOMPARE(customers.balanceCentsFor(customerId), 60000LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 60000LL); };
 
     data::PaymentRepository payments(db);
     core::Payment payment;
     payment.customerId = customerId;
     payment.amountCents = 20000;
     QVERIFY(payments.insert(payment) > 0);
-    QCOMPARE(customers.balanceCentsFor(customerId), 40000LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 40000LL); };
 
     // A reversal is written as a negative row against the original, which is
     // what reversed_transaction_id / reversed_id are for. Summing the raw
@@ -2239,14 +3030,14 @@ void DataLayerTest::customer_balance_uses_opening_and_transactions()
     reversal.amountCents = -50000;
     reversal.reversedTransactionId = 1;
     QVERIFY(transactions.insert(reversal) > 0);
-    QCOMPARE(customers.balanceCentsFor(customerId), -10000LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, -10000LL); };
 
     core::Payment refund;
     refund.customerId = customerId;
     refund.amountCents = -20000;
     refund.reversedId = 1;
     QVERIFY(payments.insert(refund) > 0);
-    QCOMPARE(customers.balanceCentsFor(customerId), 10000LL);
+    { auto _v = customers.balanceCentsFor(customerId); QVERIFY(_v.has_value()); QCOMPARE(*_v, 10000LL); };
 }
 
 void DataLayerTest::customer_active_filter()
@@ -3315,6 +4106,51 @@ void DataLayerTest::should_notify_does_not_claim_year()
     settings.remove(QStringLiteral("zakat_date"));
     settings.remove(QStringLiteral("zakat_notified_year"));
     QVERIFY(!core::shouldNotifyZakat(*m_db));
+}
+
+void DataLayerTest::service_invoice_roundtrip()
+{
+    const QString path = m_dir.filePath(QStringLiteral("service_invoices.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ServiceInvoiceRepository repo(db);
+
+    core::ServiceInvoice invoice;
+    invoice.type = QStringLiteral("electricity");
+    invoice.invoiceDate = QStringLiteral("2026-11-01");
+    invoice.amountCents = 123456;
+    invoice.dueDate = QStringLiteral("2026-11-15");
+    invoice.status = QStringLiteral("unpaid");
+    invoice.notes = QStringLiteral("فاتورة الكهرباء");
+    const int invoiceId = repo.save(invoice);
+    QVERIFY2(invoiceId > 0, qPrintable(db.lastError()));
+
+    const auto stored = repo.findById(invoiceId);
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->type, QStringLiteral("electricity"));
+    QCOMPARE(stored->invoiceDate, QStringLiteral("2026-11-01"));
+    QCOMPARE(stored->amountCents, 123456LL);
+    QCOMPARE(stored->dueDate, QStringLiteral("2026-11-15"));
+    QCOMPARE(stored->status, QStringLiteral("unpaid"));
+    QCOMPARE(stored->notes, QStringLiteral("فاتورة الكهرباء"));
+
+    core::ServiceInvoice edited = *stored;
+    edited.status = QStringLiteral("paid");
+    edited.notes.clear();
+    QCOMPARE(repo.save(edited), invoiceId);
+
+    const auto afterUpdate = repo.findById(invoiceId);
+    QVERIFY(afterUpdate.has_value());
+    QCOMPARE(afterUpdate->status, QStringLiteral("paid"));
+    QVERIFY(afterUpdate->notes.isEmpty());
+
+    const auto all = repo.findAll();
+    QCOMPARE(all.size(), std::size_t(1));
+    QCOMPARE(all.front().id, invoiceId);
+
+    QVERIFY(repo.remove(invoiceId));
+    QVERIFY(!repo.findById(invoiceId).has_value());
+    QVERIFY(repo.findAll().empty());
 }
 
 void DataLayerTest::zakat_history_roundtrip()
@@ -4779,6 +5615,7 @@ void DataLayerTest::occasion_roundtrip()
     o.icon = QStringLiteral("☀️");
     o.active = true;
     o.createdAt = data::nowIso();
+    o.themeKey = QStringLiteral("summer");
     const int id = occasions.insert(o);
     QVERIFY2(id > 0, qPrintable(m_db->lastError()));
 
@@ -4791,15 +5628,18 @@ void DataLayerTest::occasion_roundtrip()
     QCOMPARE(stored->icon, o.icon);
     QCOMPARE(stored->active, true);
     QCOMPARE(stored->createdAt, o.createdAt);
+    QCOMPARE(stored->themeKey, o.themeKey);
 
     core::Occasion edited = *stored;
     edited.name = QStringLiteral("تخفيضات الخريف");
     edited.icon = QStringLiteral("🍂");
+    edited.themeKey = QStringLiteral("autumn");
     QVERIFY(occasions.update(edited));
     const auto afterUpdate = occasions.findById(id);
     QVERIFY(afterUpdate.has_value());
     QCOMPARE(afterUpdate->name, QStringLiteral("تخفيضات الخريف"));
     QCOMPARE(afterUpdate->icon, QStringLiteral("🍂"));
+    QCOMPARE(afterUpdate->themeKey, QStringLiteral("autumn"));
 
     // setActive is how an occasion is retired without losing its history, so the
     // two lists have to agree with each other about the row that was switched
@@ -4830,19 +5670,495 @@ void DataLayerTest::occasion_service_activate_deactivate()
     const int id = occasions.insert(occasionFixture(QStringLiteral("رمضان")));
     QVERIFY(id > 0);
 
-    QVERIFY(!service.current().has_value());
+    const std::optional<core::Occasion> automatic = service.current();
+    QVERIFY(automatic.has_value());
+    QCOMPARE(automatic->id, id);
 
     QVERIFY(service.activate(id));
-    const std::optional<core::Occasion> current = service.current();
-    QVERIFY(current.has_value());
-    QCOMPARE(current->id, id);
+    QCOMPARE(service.mode(), QStringLiteral("manual"));
+    const std::optional<core::Occasion> manual = service.current();
+    QVERIFY(manual.has_value());
+    QCOMPARE(manual->id, id);
+    QCOMPARE(settings.value(QStringLiteral("active_occasion_id")).value_or(QString()),
+             QString::number(id));
 
-    service.deactivate();
+    QVERIFY(service.disable());
+    QCOMPARE(service.mode(), QStringLiteral("disabled"));
+    QVERIFY(!settings.value(QStringLiteral("active_occasion_id")).has_value());
     QVERIFY(!service.current().has_value());
 
-    // The setting is dropped, not emptied, so an absent occasion is told from
-    // one stored as an empty value.
-    QVERIFY(!settings.value(QStringLiteral("active_occasion_id")).has_value());
+    QVERIFY(service.setAutoMode());
+    QCOMPARE(service.mode(), QStringLiteral("auto"));
+    const std::optional<core::Occasion> backToAuto = service.current();
+    QVERIFY(backToAuto.has_value());
+    QCOMPARE(backToAuto->id, id);
+}
+
+void DataLayerTest::occasion_service_activate_reactivates_inactive()
+{
+    data::OccasionRepository occasions(*m_db);
+    data::SettingRepository settings(*m_db);
+    data::OccasionService service(*m_db, occasions, settings);
+
+    const int id = occasions.insert(occasionFixture(QStringLiteral("مناسبة معطلة")));
+    QVERIFY(id > 0);
+    QVERIFY(occasions.setActive(id, false));
+    QVERIFY(!occasions.findById(id)->active);
+
+    QVERIFY2(service.activate(id),
+             "activating an occasion that exists but is inactive must succeed");
+    QCOMPARE(service.mode(), QStringLiteral("manual"));
+    QVERIFY2(occasions.findById(id)->active, "activation must mark the occasion active");
+    QCOMPARE(settings.value(QStringLiteral("active_occasion_id")).value_or(QString()),
+             QString::number(id));
+}
+
+void DataLayerTest::occasion_mode_state_machine()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    data::Database db(work.filePath(QStringLiteral("occasion-mode.sqlite")));
+
+    data::OccasionRepository occasions(db);
+    data::SettingRepository settings(db);
+    data::OccasionService service(db, occasions, settings);
+
+    const QDate today = QDate::currentDate();
+    const auto insertOccasion = [&occasions](const QString& name,
+                                             const QDate& start,
+                                             const QDate& end) {
+        core::Occasion o;
+        o.name = name;
+        o.startsAt = start.toString(Qt::ISODate) + QStringLiteral("T00:00:00.000");
+        o.endsAt = end.toString(Qt::ISODate) + QStringLiteral("T23:59:59.999");
+        o.createdAt = data::nowIso();
+        o.active = true;
+        return occasions.insert(o);
+    };
+
+    const int autoId = insertOccasion(QStringLiteral("تلقائي"), today.addDays(-1), today.addDays(1));
+    QVERIFY(autoId > 0);
+    settings.set(QStringLiteral("occasion_mode"), QStringLiteral("auto"));
+    const auto automatic = service.current();
+    QVERIFY2(automatic.has_value(), "auto mode must follow the date window");
+    QCOMPARE(automatic->id, autoId);
+
+    const int manualId = insertOccasion(QStringLiteral("يدوي"), today.addDays(-30), today.addDays(-20));
+    QVERIFY(manualId > 0);
+    settings.set(QStringLiteral("active_occasion_id"), QString::number(manualId));
+    settings.set(QStringLiteral("occasion_mode"), QStringLiteral("manual"));
+    const auto manual = service.current();
+    QVERIFY2(manual.has_value(), "manual mode must return the forced occasion");
+    QCOMPARE(manual->id, manualId);
+
+    settings.set(QStringLiteral("occasion_mode"), QStringLiteral("disabled"));
+    QVERIFY2(!service.current().has_value(), "disabled mode must return no occasion");
+
+    QVERIFY(service.setAutoMode());
+    QCOMPARE(service.mode(), QStringLiteral("auto"));
+    QVERIFY(service.current().has_value());
+    QCOMPARE(service.current()->id, autoId);
+
+    QVERIFY(service.activate(manualId));
+    QCOMPARE(service.mode(), QStringLiteral("manual"));
+    QVERIFY(service.current().has_value());
+    QCOMPARE(service.current()->id, manualId);
+
+    QVERIFY(service.disable());
+    QCOMPARE(service.mode(), QStringLiteral("disabled"));
+    QVERIFY(!service.current().has_value());
+}
+
+void DataLayerTest::occasion_current_uses_system_date_and_latest_start()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    data::Database db(work.filePath(QStringLiteral("occasion-current.sqlite")));
+    {
+        data::OccasionRepository occasions(db);
+        data::SettingRepository settings(db);
+        data::OccasionService service(db, occasions, settings);
+
+        const QDate todayDate = QDate::currentDate();
+        const QString today = todayDate.toString(Qt::ISODate);
+        const QString yesterday = todayDate.addDays(-1).toString(Qt::ISODate);
+        const QString tomorrow = todayDate.addDays(1).toString(Qt::ISODate);
+
+        const auto insertOccasion = [&occasions](const QString& name,
+                                                 const QString& startsAt,
+                                                 const QString& endsAt) {
+            core::Occasion o;
+            o.name = name;
+            o.startsAt = startsAt;
+            o.endsAt = endsAt;
+            o.active = true;
+            o.createdAt = data::nowIso();
+            return occasions.insert(o);
+        };
+
+        const int pastId = insertOccasion(QStringLiteral("past"),
+                                          yesterday + QStringLiteral("T00:00:00.000"),
+                                          yesterday + QStringLiteral("T23:59:59.999"));
+        const int earlierId = insertOccasion(QStringLiteral("earlier"),
+                                             today + QStringLiteral("T00:00:00.000"),
+                                             today + QStringLiteral("T11:59:59.999"));
+        const int laterId = insertOccasion(QStringLiteral("later"),
+                                           today + QStringLiteral("T12:00:00.000"),
+                                           today + QStringLiteral("T23:59:59.999"));
+        const int futureId = insertOccasion(QStringLiteral("future"),
+                                            tomorrow + QStringLiteral("T00:00:00.000"),
+                                            tomorrow + QStringLiteral("T23:59:59.999"));
+        QVERIFY(pastId > 0);
+        QVERIFY(earlierId > 0);
+        QVERIFY(laterId > 0);
+        QVERIFY(futureId > 0);
+
+        const std::optional<core::Occasion> current = service.current();
+        QVERIFY(current.has_value());
+        QCOMPARE(current->id, laterId);
+
+        QVERIFY(service.activate(earlierId));
+        const std::optional<core::Occasion> manual = service.current();
+        QVERIFY(manual.has_value());
+        QCOMPARE(manual->id, earlierId);
+
+        QVERIFY(service.disable());
+        QVERIFY(!service.current().has_value());
+
+        QVERIFY(service.activate(pastId));
+        const std::optional<core::Occasion> forcedPast = service.current();
+        QVERIFY(forcedPast.has_value());
+        QCOMPARE(forcedPast->id, pastId);
+
+        QVERIFY(service.setAutoMode());
+        const std::optional<core::Occasion> backToAuto = service.current();
+        QVERIFY(backToAuto.has_value());
+        QCOMPARE(backToAuto->id, laterId);
+    }
+}
+
+void DataLayerTest::hijri_calendar_known_dates_and_ranges()
+{
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 3, 10)), QString());
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 3, 11)), QStringLiteral("ramadan"));
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 4, 9)), QStringLiteral("ramadan"));
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 4, 10)), QStringLiteral("fitr"));
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 4, 11)), QString());
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 6, 16)), QString());
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 6, 17)), QStringLiteral("adha"));
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 6, 20)), QStringLiteral("adha"));
+    QCOMPARE(core::getCurrentHijriOccasion(QDate(2024, 6, 21)), QString());
+
+    QCOMPARE(core::hijriOccasionStart(1445, QStringLiteral("ramadan")).value_or(QDate()),
+             QDate(2024, 3, 11));
+    QCOMPARE(core::hijriOccasionEnd(1445, QStringLiteral("ramadan")).value_or(QDate()),
+             QDate(2024, 4, 9));
+    QCOMPARE(core::hijriOccasionStart(1445, QStringLiteral("fitr")).value_or(QDate()),
+             QDate(2024, 4, 10));
+    QCOMPARE(core::hijriOccasionEnd(1445, QStringLiteral("fitr")).value_or(QDate()),
+             QDate(2024, 4, 10));
+    QCOMPARE(core::hijriOccasionStart(1445, QStringLiteral("adha")).value_or(QDate()),
+             QDate(2024, 6, 17));
+    QCOMPARE(core::hijriOccasionEnd(1445, QStringLiteral("adha")).value_or(QDate()),
+             QDate(2024, 6, 20));
+    QVERIFY(!core::hijriOccasionStart(1445, QStringLiteral("unknown")).has_value());
+    QVERIFY(!core::hijriOccasionEnd(1445, QStringLiteral("unknown")).has_value());
+}
+
+void DataLayerTest::occasion_service_auto_uses_hijri_calendar()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    {
+        data::Database db(work.filePath(QStringLiteral("occasion-hijri.sqlite")));
+        data::OccasionRepository occasions(db);
+        data::SettingRepository settings(db);
+        data::OccasionService service(db, occasions, settings);
+        settings.set(QStringLiteral("occasion_mode"), QStringLiteral("auto"));
+
+        const auto insertThemed = [&occasions](const QString& key) {
+            core::Occasion o;
+            o.name = key;
+            o.startsAt = QStringLiteral("2020-01-01T00:00:00.000");
+            o.endsAt = QStringLiteral("2020-01-31T23:59:59.999");
+            o.active = true;
+            o.createdAt = data::nowIso();
+            o.themeKey = key;
+            return occasions.insert(o);
+        };
+
+        const int ramadanId = insertThemed(QStringLiteral("ramadan"));
+        const int fitrId = insertThemed(QStringLiteral("fitr"));
+        const int adhaId = insertThemed(QStringLiteral("adha"));
+        QVERIFY(ramadanId > 0);
+        QVERIFY(fitrId > 0);
+        QVERIFY(adhaId > 0);
+
+        QCOMPARE(service.mode(), QStringLiteral("auto"));
+        const std::optional<core::Occasion> onRamadan = service.current(QDate(2024, 3, 11));
+        QVERIFY2(onRamadan.has_value(), "auto mode must follow the Hijri calendar");
+        QCOMPARE(onRamadan->id, ramadanId);
+
+        const std::optional<core::Occasion> onFitr = service.current(QDate(2024, 4, 10));
+        QVERIFY2(onFitr.has_value(), "auto mode must find Eid al-Fitr");
+        QCOMPARE(onFitr->id, fitrId);
+
+        const std::optional<core::Occasion> onAdha = service.current(QDate(2024, 6, 17));
+        QVERIFY2(onAdha.has_value(), "auto mode must find Eid al-Adha");
+        QCOMPARE(onAdha->id, adhaId);
+
+        QVERIFY(!service.current(QDate(2024, 4, 11)).has_value());
+    }
+}
+
+void DataLayerTest::occasion_offer_schema_v17_exists()
+{
+    QSqlQuery columns(m_db->handle());
+    QVERIFY(columns.exec(QStringLiteral("PRAGMA table_info(occasions)")));
+    bool hasThemeKey = false;
+    while (columns.next()) {
+        if (columns.value(1).toString() != QLatin1StringView("theme_key")) {
+            continue;
+        }
+        hasThemeKey = true;
+        QCOMPARE(columns.value(2).toString(), QLatin1StringView("TEXT"));
+        QCOMPARE(columns.value(3).toInt(), 0);
+    }
+    QVERIFY2(hasThemeKey, "missing occasions.theme_key");
+
+    QSqlQuery tables(m_db->handle());
+    QVERIFY(tables.exec(QStringLiteral(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='occasion_offers'")));
+    QVERIFY2(tables.next(), "missing occasion_offers table");
+
+    QSqlQuery offerColumns(m_db->handle());
+    QVERIFY(offerColumns.exec(QStringLiteral("PRAGMA table_info(occasion_offers)")));
+    QMap<QString, QString> types;
+    QMap<QString, int> notNull;
+    while (offerColumns.next()) {
+        const QString name = offerColumns.value(1).toString();
+        types.insert(name, offerColumns.value(2).toString());
+        notNull.insert(name, offerColumns.value(3).toInt());
+    }
+    QCOMPARE(types.value(QStringLiteral("id")), QLatin1StringView("INTEGER"));
+    QCOMPARE(types.value(QStringLiteral("occasion_id")), QLatin1StringView("INTEGER"));
+    QCOMPARE(notNull.value(QStringLiteral("occasion_id")), 1);
+    QCOMPARE(types.value(QStringLiteral("product_id")), QLatin1StringView("INTEGER"));
+    QCOMPARE(notNull.value(QStringLiteral("product_id")), 1);
+    QCOMPARE(types.value(QStringLiteral("offer_price_cents")), QLatin1StringView("INTEGER"));
+    QCOMPARE(notNull.value(QStringLiteral("offer_price_cents")), 0);
+    QCOMPARE(types.value(QStringLiteral("discount_percent")), QLatin1StringView("INTEGER"));
+    QCOMPARE(notNull.value(QStringLiteral("discount_percent")), 0);
+    QCOMPARE(types.value(QStringLiteral("bonus_pieces")), QLatin1StringView("INTEGER"));
+    QCOMPARE(notNull.value(QStringLiteral("bonus_pieces")), 0);
+    QCOMPARE(data::readSchemaVersion(m_db->handle()), data::kSchemaVersion);
+}
+
+void DataLayerTest::occasion_offer_repository_roundtrip()
+{
+    data::OccasionRepository occasions(*m_db);
+    data::ProductRepository products(*m_db);
+    data::OccasionOfferRepository offers(*m_db);
+
+    const int occasionId = occasions.insert(occasionFixture(QStringLiteral("عرض المتجر")));
+    QVERIFY(occasionId > 0);
+
+    core::Product product;
+    product.barcode = QStringLiteral("6130000000999");
+    product.name = QStringLiteral("منتج العرض");
+    product.costPriceCents = 500;
+    product.salePriceCents = 1200;
+    const int productId = products.save(product);
+    QVERIFY2(productId > 0, qPrintable(m_db->lastError()));
+
+    core::OccasionOffer offer;
+    offer.occasionId = occasionId;
+    offer.productId = productId;
+    offer.offerPriceCents = 900;
+    offer.discountPercent = 25;
+    offer.bonusPieces = 2;
+    const int offerId = offers.insert(offer);
+    QVERIFY2(offerId > 0, qPrintable(m_db->lastError()));
+
+    const QVector<core::OccasionOffer> stored = offers.findByOccasionId(occasionId);
+    QCOMPARE(stored.size(), 1);
+    const core::OccasionOffer& read = stored.first();
+    QCOMPARE(read.id, offerId);
+    QCOMPARE(read.occasionId, occasionId);
+    QCOMPARE(read.productId, productId);
+    QCOMPARE(read.offerPriceCents.value_or(0), 900LL);
+    QCOMPARE(read.discountPercent.value_or(0), 25LL);
+    QCOMPARE(read.bonusPieces, 2LL);
+
+    QVERIFY(offers.remove(offerId));
+    QVERIFY(offers.findByOccasionId(occasionId).isEmpty());
+}
+
+void DataLayerTest::occasion_offer_price_overrides_sale_price()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    data::Database db(work.filePath(QStringLiteral("occasion-offer-price.sqlite")));
+
+    data::ProductRepository products(db);
+    core::Product product;
+    product.barcode = QStringLiteral("611000000001");
+    product.name = QStringLiteral("حليب");
+    product.salePriceCents = 10000;
+    product.costPriceCents = 6000;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 20, QStringLiteral("purchase"));
+
+    data::OccasionRepository occasions(db);
+    const int occasionId = occasions.insert(occasionFixture(QStringLiteral("عرض السعر")));
+    QVERIFY(occasionId > 0);
+
+    QSqlQuery offer(db.handle());
+    QVERIFY(offer.prepare(QStringLiteral(
+        "INSERT INTO occasion_offers (occasion_id, product_id, offer_price_cents, discount_percent, "
+        "bonus_pieces) VALUES (?, ?, ?, ?, ?)")));
+    offer.addBindValue(occasionId);
+    offer.addBindValue(productId);
+    offer.addBindValue(7000);
+    offer.addBindValue(QVariant());
+    offer.addBindValue(QVariant());
+    QVERIFY2(offer.exec(), qPrintable(db.lastError()));
+    offer.finish();
+
+    data::CashSessionRepository sessions(db);
+    const int sessionId = sessions.open(5000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    item.unitPriceCents = 10000;
+    item.unitKind = QStringLiteral("piece");
+
+    data::SaleService service(db);
+    const data::SaleRecordResult result = service.recordSale({item}, sessionId, QStringLiteral("TEST"),
+                                                             /*allowOversold=*/false);
+    QVERIFY2(result.ok, qPrintable(result.error));
+    QCOMPARE(result.totalCents, 7000LL);
+
+    QSqlQuery row(db.handle());
+    QVERIFY(row.exec(QStringLiteral("SELECT unit_price_cents FROM sale_items")));
+    QVERIFY(row.next());
+    QCOMPARE(row.value(0).toLongLong(), 7000LL);
+    row.finish();
+}
+
+void DataLayerTest::occasion_offer_discount_percent_applies_to_sale_price()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    data::Database db(work.filePath(QStringLiteral("occasion-offer-discount.sqlite")));
+
+    data::ProductRepository products(db);
+    core::Product product;
+    product.barcode = QStringLiteral("611000000002");
+    product.name = QStringLiteral("زيت");
+    product.salePriceCents = 10000;
+    product.costPriceCents = 6000;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 20, QStringLiteral("purchase"));
+
+    data::OccasionRepository occasions(db);
+    const int occasionId = occasions.insert(occasionFixture(QStringLiteral("خصم 25")));
+    QVERIFY(occasionId > 0);
+
+    QSqlQuery offer(db.handle());
+    QVERIFY(offer.prepare(QStringLiteral(
+        "INSERT INTO occasion_offers (occasion_id, product_id, offer_price_cents, discount_percent, "
+        "bonus_pieces) VALUES (?, ?, ?, ?, ?)")));
+    offer.addBindValue(occasionId);
+    offer.addBindValue(productId);
+    offer.addBindValue(QVariant());
+    offer.addBindValue(25);
+    offer.addBindValue(QVariant());
+    QVERIFY2(offer.exec(), qPrintable(db.lastError()));
+    offer.finish();
+
+    data::CashSessionRepository sessions(db);
+    const int sessionId = sessions.open(5000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    item.unitPriceCents = 10000;
+    item.unitKind = QStringLiteral("piece");
+
+    data::SaleService service(db);
+    const data::SaleRecordResult result = service.recordSale({item}, sessionId, QStringLiteral("TEST"),
+                                                             /*allowOversold=*/false);
+    QVERIFY2(result.ok, qPrintable(result.error));
+    QCOMPARE(result.totalCents, 7500LL);
+
+    QSqlQuery row(db.handle());
+    QVERIFY(row.exec(QStringLiteral("SELECT unit_price_cents FROM sale_items")));
+    QVERIFY(row.next());
+    QCOMPARE(row.value(0).toLongLong(), 7500LL);
+    row.finish();
+}
+
+void DataLayerTest::occasion_offer_bonus_pieces_increase_pieces_consumed()
+{
+    QTemporaryDir work;
+    QVERIFY(work.isValid());
+    data::Database db(work.filePath(QStringLiteral("occasion-offer-bonus.sqlite")));
+
+    data::ProductRepository products(db);
+    core::Product product;
+    product.barcode = QStringLiteral("611000000003");
+    product.name = QStringLiteral("شاي");
+    product.salePriceCents = 10000;
+    product.costPriceCents = 6000;
+    product.piecesPerPackage = 12;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 40, QStringLiteral("purchase"));
+
+    data::OccasionRepository occasions(db);
+    const int occasionId = occasions.insert(occasionFixture(QStringLiteral("عرض الهدية")));
+    QVERIFY(occasionId > 0);
+
+    QSqlQuery offer(db.handle());
+    QVERIFY(offer.prepare(QStringLiteral(
+        "INSERT INTO occasion_offers (occasion_id, product_id, offer_price_cents, discount_percent, "
+        "bonus_pieces) VALUES (?, ?, ?, ?, ?)")));
+    offer.addBindValue(occasionId);
+    offer.addBindValue(productId);
+    offer.addBindValue(QVariant());
+    offer.addBindValue(QVariant());
+    offer.addBindValue(2);
+    QVERIFY2(offer.exec(), qPrintable(db.lastError()));
+    offer.finish();
+
+    data::CashSessionRepository sessions(db);
+    const int sessionId = sessions.open(5000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    item.unitPriceCents = 120000;
+    item.unitKind = QStringLiteral("package");
+
+    data::SaleService service(db);
+    const data::SaleRecordResult result = service.recordSale({item}, sessionId, QStringLiteral("TEST"),
+                                                             /*allowOversold=*/false);
+    QVERIFY2(result.ok, qPrintable(result.error));
+    QCOMPARE(result.totalCents, 120000LL);
+
+    QSqlQuery row(db.handle());
+    QVERIFY(row.exec(QStringLiteral("SELECT quantity, pieces_consumed FROM sale_items")));
+    QVERIFY(row.next());
+    QCOMPARE(row.value(0).toLongLong(), 1LL);
+    QCOMPARE(row.value(1).toLongLong(), 14LL);
+    row.finish();
 }
 
 void DataLayerTest::findBetween_includes_boundary_days()
@@ -5530,6 +6846,285 @@ void DataLayerTest::resolve_sale_items_silent_when_claim_matches()
     }
 }
 
+void DataLayerTest::resolve_sale_items_rejects_unknown_unit()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_unknown_unit.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 100;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 100, QStringLiteral("purchase"));
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    item.unitKind = QStringLiteral("kg");
+    item.unitPriceCents = 100;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {item}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("unknown unit")), qPrintable(error));
+}
+
+void DataLayerTest::resolve_sale_items_rejects_piece_for_a_weight_product()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_weight_piece.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("لوز");
+    product.salePriceCents = 120000;
+    product.soldByWeight = true;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10000, QStringLiteral("purchase"));
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 250;
+    item.unitKind = QStringLiteral("piece");
+    item.unitPriceCents = 120000;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {item}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("sold by weight")), qPrintable(error));
+}
+
+void DataLayerTest::resolve_sale_items_rejects_weight_for_a_normal_product()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_weight_normal.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 100;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 100, QStringLiteral("purchase"));
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 250;
+    item.unitKind = QStringLiteral("weight");
+    item.unitPriceCents = 100000;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {item}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("not sold by weight")), qPrintable(error));
+}
+
+void DataLayerTest::resolve_sale_items_rejects_package_for_a_weight_product()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_weight_package.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("لوز");
+    product.salePriceCents = 120000;
+    product.soldByWeight = true;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10000, QStringLiteral("purchase"));
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1;
+    item.unitKind = QStringLiteral("package");
+    item.unitPriceCents = 120000;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {item}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("sold by weight")), qPrintable(error));
+}
+
+void DataLayerTest::resolve_sale_items_rejects_stock_shared_by_duplicate_lines()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_duplicate_reject.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.barcode = QStringLiteral("6130000000666");
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 100;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10, QStringLiteral("purchase"));
+
+    core::SaleItem first;
+    first.productId = productId;
+    first.quantity = 6;
+    first.unitKind = QStringLiteral("piece");
+    first.unitPriceCents = 100;
+    core::SaleItem second = first;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {first, second}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("insufficient stock")), qPrintable(error));
+}
+
+void DataLayerTest::resolve_sale_items_accepts_duplicate_lines_that_fit_together()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_duplicate_fit.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 100;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10, QStringLiteral("purchase"));
+
+    core::SaleItem first;
+    first.productId = productId;
+    first.quantity = 5;
+    first.unitKind = QStringLiteral("piece");
+    first.unitPriceCents = 100;
+    core::SaleItem second = first;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {first, second}, /*allowOversold=*/false, &error);
+    QVERIFY2(!resolved.isEmpty(), qPrintable(error));
+    QCOMPARE(resolved.size(), 2);
+    QCOMPARE(resolved[0].piecesConsumed, 5LL);
+    QCOMPARE(resolved[1].piecesConsumed, 5LL);
+}
+
+void DataLayerTest::resolve_sale_items_allow_oversold_ignores_aggregate_stock()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_duplicate_oversold.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("سكر");
+    product.salePriceCents = 100;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10, QStringLiteral("purchase"));
+
+    core::SaleItem first;
+    first.productId = productId;
+    first.quantity = 6;
+    first.unitKind = QStringLiteral("piece");
+    first.unitPriceCents = 100;
+    core::SaleItem second = first;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {first, second}, /*allowOversold=*/true, &error);
+    QVERIFY2(!resolved.isEmpty(), qPrintable(error));
+    QCOMPARE(resolved.size(), 2);
+}
+
+void DataLayerTest::resolve_sale_items_skips_stock_check_for_no_barcode()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_no_barcode_stock.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product quick;
+    quick.barcode = QString();
+    quick.name = QStringLiteral("خبز");
+    quick.salePriceCents = 100;
+    const int quickId = products.save(quick);
+    QVERIFY(quickId > 0);
+
+    core::Product scanned;
+    scanned.barcode = QStringLiteral("6130000000777");
+    scanned.name = QStringLiteral("حليب");
+    scanned.salePriceCents = 100;
+    const int scannedId = products.save(scanned);
+    QVERIFY(scannedId > 0);
+
+    core::SaleItem quickItem;
+    quickItem.productId = quickId;
+    quickItem.quantity = 2;
+    quickItem.unitKind = QStringLiteral("piece");
+    quickItem.unitPriceCents = 100;
+
+    QString quickError;
+    const QVector<core::SaleItem> quickResolved =
+        data::resolveSaleItems(products, {quickItem}, /*allowOversold=*/false, &quickError);
+    QVERIFY2(!quickResolved.isEmpty(), qPrintable(quickError));
+    QCOMPARE(quickResolved.size(), 1);
+    QCOMPARE(quickResolved.first().piecesConsumed, 2LL);
+
+    core::SaleItem barcodeItem;
+    barcodeItem.productId = scannedId;
+    barcodeItem.quantity = 1;
+    barcodeItem.unitKind = QStringLiteral("piece");
+    barcodeItem.unitPriceCents = 100;
+
+    QString barcodeError;
+    const QVector<core::SaleItem> barcodeResolved =
+        data::resolveSaleItems(products, {barcodeItem}, /*allowOversold=*/false, &barcodeError);
+    QVERIFY(barcodeResolved.isEmpty());
+    QVERIFY2(barcodeError.contains(QStringLiteral("insufficient stock")),
+             qPrintable(barcodeError));
+}
+
+void DataLayerTest::resolve_sale_items_sums_pieces_across_mixed_units()
+{
+    const QString path = m_dir.filePath(QStringLiteral("resolve_duplicate_mixed.sqlite"));
+    QFile::remove(path);
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.barcode = QStringLiteral("6130000000665");
+    product.name = QStringLiteral("بسكويت");
+    product.salePriceCents = 60;
+    product.piecesPerPackage = 6;
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, 10, QStringLiteral("purchase"));
+
+    core::SaleItem pieces;
+    pieces.productId = productId;
+    pieces.quantity = 5;
+    pieces.unitKind = QStringLiteral("piece");
+    pieces.unitPriceCents = 60;
+    core::SaleItem package;
+    package.productId = productId;
+    package.quantity = 1;
+    package.unitKind = QStringLiteral("package");
+    package.unitPriceCents = 0;
+
+    QString error;
+    const QVector<core::SaleItem> resolved =
+        data::resolveSaleItems(products, {pieces, package}, /*allowOversold=*/false, &error);
+    QVERIFY(resolved.isEmpty());
+    QVERIFY2(error.contains(QStringLiteral("insufficient stock")), qPrintable(error));
+}
+
 #include "tst_data.moc"
 void DataLayerTest::totalCentsFor_divides_weight_quantity_by_a_thousand()
 {
@@ -5729,6 +7324,83 @@ void DataLayerTest::daily_report_uses_grams_for_a_weight_line()
     QCOMPARE(report.topProducts.front().revenueCents, 30000LL);
 }
 
+void DataLayerTest::daily_report_uses_pieces_for_a_package_line()
+{
+    const QString path = m_dir.filePath(QStringLiteral("daily_package.sqlite"));
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product carton;
+    carton.barcode = QStringLiteral("P003");
+    carton.name = QStringLiteral("حليب علبة");
+    carton.salePriceCents = 3000;
+    carton.costPriceCents = 100;
+    carton.piecesPerPackage = 12;
+    const int productId = products.save(carton);
+    QVERIFY(productId > 0);
+    products.adjustStock(productId, +120, QStringLiteral("opening"));
+
+    data::CashSessionRepository sessions(db);
+    const int sessionId = sessions.open(5000);
+    QVERIFY(sessionId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 2;
+    item.unitKind = QStringLiteral("package");
+    item.unitPriceCents = 3000;
+
+    data::SaleService saleService(db);
+    const data::SaleRecordResult sold = saleService.recordSale({item}, sessionId, QStringLiteral("dev"), false);
+    QVERIFY2(sold.ok, qPrintable(sold.error));
+
+    data::SaleRepository sales(db);
+    data::ExpenseRepository expenses(db);
+    data::OwnerDrawingRepository drawings(db);
+    data::CustomerTransactionRepository customerTx(db);
+    const data::DailyReport report = data::DailyReportService(
+        db, sales, expenses, drawings, customerTx, sessions)
+        .forDay(QDate::currentDate().toString(Qt::ISODate));
+
+    QVERIFY2(report.ok, qPrintable(report.error));
+    // Two cartons at 30.00 is 60.00. Costing them as two pieces would report
+    // 2.00 of goods; the shelf lost 24 pieces, so the cost is 24.00.
+    QCOMPARE(report.salesTotalCents, 6000LL);
+    QCOMPARE(report.cogsTotalCents, 2400LL);
+    QCOMPARE(report.grossProfitCents, 3600LL);
+}
+
+void DataLayerTest::update_average_cost_refuses_overflow()
+{
+    const QString path = m_dir.filePath(QStringLiteral("average_cost_overflow.sqlite"));
+    data::Database db(path);
+    data::ProductRepository products(db);
+
+    core::Product product;
+    product.name = QStringLiteral("زيت");
+    const int productId = products.save(product);
+    QVERIFY(productId > 0);
+
+    // oldQty * oldCost is the first product the average is built from. A wrapped
+    // product here is not a wrong average, it is a plausible wrong cost for every
+    // piece still on the shelf.
+    QVERIFY(products.updateAverageCost(productId, std::numeric_limits<long long>::max(), 2,
+                                       1, 0)
+            == false);
+    QVERIFY(!db.lastError().isEmpty());
+    const auto afterFirst = products.findById(productId);
+    QVERIFY(afterFirst.has_value());
+    QCOMPARE(afterFirst->costPriceCents, 0LL);
+
+    // The new purchase's own product can overflow even when the old one fits.
+    QVERIFY(products.updateAverageCost(productId, 1, 1,
+                                       std::numeric_limits<long long>::max(), 2)
+            == false);
+    const auto afterSecond = products.findById(productId);
+    QVERIFY(afterSecond.has_value());
+    QCOMPARE(afterSecond->costPriceCents, 0LL);
+}
+
 void DataLayerTest::sync_key_mints_random_on_absent()
 {
     data::Database db(m_dir.filePath(QStringLiteral("sync-key-absent.sqlite")));
@@ -5788,4 +7460,94 @@ void DataLayerTest::sync_key_remints_on_empty_value()
     QCOMPARE(data::SyncKey::ensure(db), key);
     QCOMPARE(settings.value(QStringLiteral("sync_hmac_key")),
              QString::fromLatin1(key));
+}
+
+void DataLayerTest::old_customers_schema_without_opening_balance_cents()
+{
+    const QString dbPath = m_dir.filePath(QStringLiteral("old-customers-no-opening.sqlite"));
+    {
+        QSqlDatabase setup = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("old_cust_setup"));
+        setup.setDatabaseName(dbPath);
+        QVERIFY(setup.open());
+        QSqlQuery q(setup);
+        QVERIFY(q.exec(QStringLiteral("CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL DEFAULT '')")));
+        QVERIFY(q.exec(QStringLiteral("CREATE TABLE customer_transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER NOT NULL, amount_cents INTEGER NOT NULL, adjustment_cents INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, reversed_transaction_id INTEGER NOT NULL DEFAULT 0, receipt_number TEXT)")));
+        QVERIFY(q.exec(QStringLiteral("INSERT INTO customers (name, phone) VALUES ('Ali', '123')")));
+        setup.close();
+    }
+    QSqlDatabase::removeDatabase(QStringLiteral("old_cust_setup"));
+
+    data::Database db(dbPath);
+    QVERIFY2(db.lastError().isEmpty(), qPrintable(db.lastError()));
+
+    data::CustomerRepository customers(db);
+    const auto customer = customers.findById(1);
+    QVERIFY(customer.has_value());
+    QCOMPARE(customer->openingBalanceCents, 0LL);
+
+    const auto balanceOpt = customers.balanceCentsFor(1);
+    QVERIFY(balanceOpt.has_value());
+    QCOMPARE(*balanceOpt, 0LL);
+}
+
+void DataLayerTest::record_customer_debt_rejects_piece_for_weight_product()
+{
+    AdjustmentFixture f(m_dir.filePath(QStringLiteral("debt_piece_for_weight.sqlite")));
+    core::Customer customer;
+    customer.name = QStringLiteral("زبون-ذ");
+    data::CustomerRepository customers(f.db);
+    const int customerId = customers.save(customer);
+    QVERIFY(customerId > 0);
+
+    core::Product product;
+    product.name = QStringLiteral("طماطم");
+    product.salePriceCents = 3000;
+    product.costPriceCents = 1000;
+    product.quantity = 10000;
+    product.unit = QStringLiteral("kg");
+    product.active = true;
+    product.soldByWeight = true;
+    const int productId = data::ProductRepository(f.db).save(product);
+    QVERIFY(productId > 0);
+
+    core::SaleItem item;
+    item.productId = productId;
+    item.quantity = 1000;
+    item.unitPriceCents = 3000;
+    item.unitKind = QStringLiteral("piece");
+    QVector<core::SaleItem> items{item};
+    const auto result = data::SaleService(f.db).recordCustomerDebt(customerId, items, QStringLiteral("dev"), false);
+    QVERIFY(!result.ok);
+    QVERIFY(!result.error.isEmpty());
+}
+
+void DataLayerTest::record_customer_debt_rejects_duplicate_lines_over_stock()
+{
+    AdjustmentFixture f(m_dir.filePath(QStringLiteral("debt_dup_over_stock.sqlite")));
+    data::ProductRepository products(f.db);
+    auto product = products.findById(f.productId);
+    QVERIFY(product.has_value());
+    product->barcode = QStringLiteral("6130000000664");
+    QCOMPARE(products.save(*product), f.productId);
+
+    core::Customer customer;
+    customer.name = QStringLiteral("زبون-ر");
+    data::CustomerRepository customers(f.db);
+    const int customerId = customers.save(customer);
+    QVERIFY(customerId > 0);
+
+    core::SaleItem a;
+    a.productId = f.productId;
+    a.quantity = 6;
+    a.unitPriceCents = 100;
+    a.unitKind = QStringLiteral("piece");
+    core::SaleItem b;
+    b.productId = f.productId;
+    b.quantity = 6;
+    b.unitPriceCents = 100;
+    b.unitKind = QStringLiteral("piece");
+    QVector<core::SaleItem> items2{a, b};
+    const auto result = data::SaleService(f.db).recordCustomerDebt(customerId, items2, QStringLiteral("dev"), false);
+    QVERIFY(!result.ok);
+    QVERIFY(!result.error.isEmpty());
 }

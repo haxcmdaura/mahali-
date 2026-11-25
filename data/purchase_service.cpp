@@ -3,13 +3,59 @@
 #include <QDateTime>
 #include <QMap>
 #include <QSqlQuery>
+#include <limits>
 
 #include "date_utils.h"
 #include "cash_drawer.h"
 #include "audit_log_repository.h"
 #include "core/cash_movement.h"
+#include "core/line_total.h"
+#include "core/purchase_item.h"
+#include "sale_rules.h"
 
 namespace app::data {
+
+PurchaseLineResult makePurchaseItem(const core::Product& product, long long quantity,
+                                    long long unitPriceCents)
+{
+    PurchaseLineResult result;
+    if (quantity <= 0) {
+        result.error = QStringLiteral("quantity must be positive");
+        return result;
+    }
+    if (unitPriceCents < 0) {
+        result.error = QStringLiteral("unit price must be non-negative");
+        return result;
+    }
+
+    // The product is the authority on the unit: a weight product's price is per
+    // kilogram and its quantity is already grams, so the shared function divides
+    // the thousand out exactly as the sale path does.
+    const UnitKind kind = product.soldByWeight ? UnitKind::Weight : UnitKind::Piece;
+    const std::optional<long long> total = core::lineTotalCents(quantity, unitPriceCents, kind);
+    if (!total.has_value()) {
+        result.error = QStringLiteral("line total overflows");
+        return result;
+    }
+
+    core::PurchaseItem item;
+    item.productId = product.id;
+    item.description = product.name;
+    item.quantity = quantity;
+    item.unit = product.soldByWeight
+        ? QStringLiteral("kg")
+        : (product.unit.isEmpty() ? QStringLiteral("piece") : product.unit);
+    item.unitPriceCents = unitPriceCents;
+    item.totalCents = *total;
+    item.unitKind = toString(kind);
+    // Purchases cannot use the package unit yet, so the pieces received are the
+    // quantity. Storing it now keeps the column truthful for when they can.
+    item.piecesReceived = quantity;
+
+    result.item = item;
+    result.ok = true;
+    return result;
+}
 
 PurchaseService::PurchaseService(Database& db, PurchaseRepository& purchases, PurchaseItemRepository& items,
                                  ProductRepository& products, StockMovementRepository& stockMovements,
@@ -73,11 +119,69 @@ PurchaseResult PurchaseService::recordPurchase(const core::Purchase& purchase,
             result.error = QStringLiteral("quantity must be positive");
             return result;
         }
+        if (item.unitPriceCents < 0) {
+            result.error = QStringLiteral("unit price must be non-negative");
+            return result;
+        }
+        QString unitKind = item.unitKind.isEmpty() ? QStringLiteral("piece") : item.unitKind;
+        const std::optional<UnitKind> parsedKind = fromString(unitKind);
+        if (!parsedKind.has_value()) {
+            result.error = QStringLiteral("unknown unit '%1'").arg(unitKind);
+            return result;
+        }
+        if (*parsedKind == UnitKind::Package) {
+            result.error = QStringLiteral("purchase lines cannot use the package unit");
+            return result;
+        }
+        if (item.productId.has_value()) {
+            const auto product = m_products.findById(*item.productId);
+            if (product.has_value()) {
+                if (product->soldByWeight && *parsedKind != UnitKind::Weight) {
+                    result.error =
+                        QStringLiteral("product %1 is sold by weight and must use the weight unit").arg(product->name);
+                    return result;
+                }
+                if (!product->soldByWeight && *parsedKind == UnitKind::Weight) {
+                    result.error = QStringLiteral("product %1 is not sold by weight and cannot use the weight unit")
+                                       .arg(product->name);
+                    return result;
+                }
+            }
+        }
+        // A weight line stores grams at a per-kilogram price. The shared
+        // function divides the thousand out, so a purchase and a sale agree to
+        // the cent, and returns nullopt when the multiplication cannot fit.
+        const std::optional<long long> expectedTotal =
+            core::lineTotalCents(item.quantity, item.unitPriceCents, *parsedKind);
+        if (!expectedTotal.has_value()) {
+            result.error = QStringLiteral("line total overflows");
+            return result;
+        }
+        if (*expectedTotal != item.totalCents) {
+            result.error = QStringLiteral("line total mismatch");
+            return result;
+        }
+        if (!detail::sumFits(subtotalCents, item.totalCents)) {
+            result.error = QStringLiteral("subtotal overflow");
+            return result;
+        }
         subtotalCents += item.totalCents;
     }
     // The VAT is the caller's, not the lines': it is charged on the invoice as a
     // whole rather than on any one line, so it cannot be worked out here and is
     // taken as it was given.
+    if (purchase.vatCents < 0) {
+        result.error = QStringLiteral("vat cannot be negative");
+        return result;
+    }
+    if (purchase.paidCents < 0) {
+        result.error = QStringLiteral("paid amount cannot be negative");
+        return result;
+    }
+    if (!detail::sumFits(subtotalCents, purchase.vatCents)) {
+        result.error = QStringLiteral("total overflow");
+        return result;
+    }
     const long long vatCents = purchase.vatCents;
     const long long totalCents = subtotalCents + vatCents;
     // Paying more than the invoice is worth would leave the supplier in credit
@@ -126,7 +230,7 @@ PurchaseResult PurchaseService::recordPurchase(const core::Purchase& purchase,
     }
 
     // B.
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         result.error = stepError(m_db, QStringLiteral("opening the transaction"));
         return result;
     }
@@ -154,6 +258,9 @@ PurchaseResult PurchaseService::recordPurchase(const core::Purchase& purchase,
     QVector<core::PurchaseItem> lines = items;
     for (core::PurchaseItem& line : lines) {
         line.purchaseId = purchaseId;
+        if (line.piecesReceived <= 0) {
+            line.piecesReceived = line.quantity;
+        }
     }
     for (const core::PurchaseItem& line : lines) {
         if (m_items.insert(line) == 0) {
@@ -295,6 +402,24 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
         return result;
     }
 
+    if (!m_db.beginWriteTransaction()) {
+        result.error = stepError(m_db, QStringLiteral("opening the transaction"));
+        return result;
+    }
+
+    // Re-read inside the transaction to avoid TOCTOU between check and write.
+    const auto originalTx = m_purchases.findById(purchaseId);
+    if (!originalTx.has_value()) {
+        m_db.rollback();
+        result.error = QStringLiteral("purchase not found");
+        return result;
+    }
+    if (originalTx->reversedId != 0) {
+        m_db.rollback();
+        result.error = QStringLiteral("already voided");
+        return result;
+    }
+
     // 1) Guard: a line on this invoice cannot be voided once the goods have
     // moved again. stock_movements.id is monotonic, so the last movement this
     // purchase made for a product is the cut-off: anything above it is a later
@@ -306,7 +431,7 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
     const QString purchaseReference = QStringLiteral("Purchase #%1").arg(purchaseId);
     QMap<int, long long> quantitiesByProduct;
     for (const core::PurchaseItem& originalItem : originalItems) {
-        if (!original->addToStock || !originalItem.productId.has_value() || *originalItem.productId <= 0) {
+        if (!originalTx->addToStock || !originalItem.productId.has_value() || *originalItem.productId <= 0) {
             continue;
         }
         quantitiesByProduct[*originalItem.productId] += originalItem.quantity;
@@ -322,6 +447,7 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
         own.addBindValue(productId);
         own.addBindValue(purchaseReference);
         if (!own.exec()) {
+            m_db.rollback();
             result.error = stepError(m_db, QStringLiteral("finding the purchase stock movement"));
             return result;
         }
@@ -338,10 +464,12 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
         later.addBindValue(productId);
         later.addBindValue(lastOwnMovementId);
         if (!later.exec()) {
+            m_db.rollback();
             result.error = stepError(m_db, QStringLiteral("checking later stock movements"));
             return result;
         }
         if (later.next()) {
+            m_db.rollback();
             result.error = QStringLiteral(
                 "cannot void: product %1 has moved stock since this purchase").arg(productId);
             return result;
@@ -349,6 +477,7 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
 
         const auto product = m_products.findById(productId);
         if (!product.has_value() || product->quantity < it.value()) {
+            m_db.rollback();
             result.error = QStringLiteral(
                 "cannot void: product %1 does not have enough stock to reverse this purchase").arg(productId);
             return result;
@@ -362,24 +491,22 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
         if (sp.reversedId != 0 || sp.isPurchaseInitialPayment) {
             continue;
         }
+        m_db.rollback();
         result.error = QStringLiteral(
             "cannot void: this invoice has a later payment of %1")
                            .arg(QString::number(sp.amountCents / 100.0, 'f', 2));
         return result;
     }
 
-    if (!m_db.beginTransaction()) {
-        result.error = stepError(m_db, QStringLiteral("opening the transaction"));
-        return result;
-    }
+    const core::Purchase originalPurchase = *originalTx;
 
     // The supplier's balance is the sum of purchase totals (including voids).
     // A negative header restores it exactly.
-    core::Purchase reversal = *original;
+    core::Purchase reversal = originalPurchase;
     reversal.id = 0;
-    reversal.totalCents = -original->totalCents;
-    reversal.subtotalCents = -original->subtotalCents;
-    reversal.vatCents = -original->vatCents;
+    reversal.totalCents = -originalPurchase.totalCents;
+    reversal.subtotalCents = -originalPurchase.subtotalCents;
+    reversal.vatCents = -originalPurchase.vatCents;
     reversal.paidCents = 0;
     reversal.reversedId = purchaseId;
     if (reversal.purchasedAt.isEmpty()) {
@@ -416,7 +543,7 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
             // changing a running average retroactively would make the ledger
             // disagree with the stock on the shelf, which is what the audit
             // catches.
-            if (original->addToStock && originalItem.productId.has_value() && *originalItem.productId > 0) {
+            if (originalPurchase.addToStock && originalItem.productId.has_value() && *originalItem.productId > 0) {
                 const int productId = *originalItem.productId;
                 core::StockMovement movement;
                 movement.productId = productId;
@@ -445,7 +572,7 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
 
     // If the original had a cash payment, that payment must be reversed too: the
     // money returns to the drawer, and the supplier payment row is cancelled.
-    if (original->paidCents > 0 && core::isCashPayment(original->method)) {
+    if (originalPurchase.paidCents > 0 && core::isCashPayment(originalPurchase.method)) {
         if (supplierPayments.empty()) {
             m_db.rollback();
             result.error = QStringLiteral("the cash payment for this purchase could not be found");
@@ -470,11 +597,11 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
         // supplier_payment_reversal row will be written with the same method and
         // a positive cash movement back into the drawer.
         core::SupplierPayment paymentReversal;
-        paymentReversal.supplierId = original->supplierId;
+        paymentReversal.supplierId = originalPurchase.supplierId;
         paymentReversal.purchaseId = purchaseId;
-        paymentReversal.amountCents = -original->paidCents;
+        paymentReversal.amountCents = -originalPurchase.paidCents;
         paymentReversal.paidAt = nowIso();
-        paymentReversal.method = original->method;
+        paymentReversal.method = originalPurchase.method;
         paymentReversal.note = QStringLiteral("reversal of payment for Purchase #%1").arg(purchaseId);
         paymentReversal.createdAt = nowIso();
         paymentReversal.reversedId = paymentId;
@@ -500,7 +627,7 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
         }
         QString movementError;
         const std::optional<int> movementId = cashDrawer::recordMoneyIn(
-            m_db, session->id, core::cashMovementType::kSupplierPaymentReversal, original->paidCents,
+            m_db, session->id, core::cashMovementType::kSupplierPaymentReversal, originalPurchase.paidCents,
             QStringLiteral("Void of Purchase #%1").arg(purchaseId),
             QStringLiteral("the reversal of payment for purchase #%1").arg(purchaseId),
             QStringLiteral("purchase"), purchaseId, &movementError);
@@ -514,7 +641,7 @@ PurchaseResult PurchaseService::voidPurchase(int purchaseId, std::optional<int> 
     // Audit the void inside the same transaction.
     AuditLogRepository audit(m_db);
     if (audit.record(QStringLiteral("purchase_void"),
-                     QStringLiteral("purchase %1, supplier %2").arg(reversalId).arg(original->supplierId))
+                     QStringLiteral("purchase %1, supplier %2").arg(reversalId).arg(originalPurchase.supplierId))
         == 0) {
         m_db.rollback();
         result.error = m_db.lastError().isEmpty()

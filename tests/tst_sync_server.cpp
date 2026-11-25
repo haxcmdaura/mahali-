@@ -7,10 +7,12 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QSqlQuery>
 #include <QHostAddress>
 #include <QEventLoop>
 
 #include "data/cash_movement_repository.h"
+#include "data/date_utils.h"
 #include "data/cash_session_repository.h"
 #include "data/audit_log_repository.h"
 #include "data/customer_repository.h"
@@ -48,6 +50,8 @@ private slots:
     void invalidLegacyNumberIsReturnedAsOperationError();
     void sync_audit_actor_uses_device_id();
     void processJsonReplayAlreadyApplied();
+    void occurredAtIsPreserved();
+    void invalidOccurredAtIsRefused();
     void httpPostAppliesBatch();
     void productsGetRequiresKey();
     void productsGetWithKeyReturnsCatalog();
@@ -564,6 +568,50 @@ void SyncServerTest::processJsonReplayAlreadyApplied()
     QCOMPARE(txs.findByCustomerId(m_customerId).size(), 1);
     data::StockMovementRepository movements(db);
     QCOMPARE(movements.sumByProductId(m_productId), 99);
+}
+
+void SyncServerTest::occurredAtIsPreserved()
+{
+    data::Database db(m_dbPath, data::DatabaseMode::Server);
+    network::SyncProcessor processor(db);
+
+    QDateTime businessTime = QDateTime::fromString(
+        QStringLiteral("2026-01-02T03:04:05.000Z"), Qt::ISODateWithMs);
+    QVERIFY(businessTime.isValid());
+
+    QJsonObject op = saleOp(91, m_deviceId, m_productId, 1, 12000);
+    op.insert(QStringLiteral("occurredAt"), businessTime.toString(Qt::ISODateWithMs));
+    const network::SyncBatchResult result = processor.processJson(QJsonArray{op});
+    QCOMPARE(result.errors.size(), 0);
+    QCOMPARE(result.applied.size(), 1);
+
+    QSqlQuery query(db.handle());
+    QVERIFY(query.exec(QStringLiteral("SELECT created_at FROM sales WHERE id = %1")
+                           .arg(result.applied[0].entityId)));
+    QVERIFY(query.next());
+    const auto stored = data::fromIso(query.value(0).toString());
+    QVERIFY(stored.has_value());
+    // The instant, not the text: the receiver converts UTC to its own local time.
+    QCOMPARE(stored->toUTC(), businessTime.toUTC());
+}
+
+void SyncServerTest::invalidOccurredAtIsRefused()
+{
+    data::Database db(m_dbPath, data::DatabaseMode::Server);
+    network::SyncProcessor processor(db);
+
+    QJsonObject op = saleOp(92, m_deviceId, m_productId, 1, 12000);
+    op.insert(QStringLiteral("occurredAt"), QStringLiteral("yesterday-ish"));
+    const network::SyncBatchResult result = processor.processJson(QJsonArray{op});
+    QCOMPARE(result.applied.size(), 0);
+    QCOMPARE(result.errors.size(), 1);
+    QVERIFY2(result.errors[0].message.contains(QStringLiteral("occurredAt")),
+             qPrintable(result.errors[0].message));
+
+    QSqlQuery query(db.handle());
+    QVERIFY(query.exec(QStringLiteral("SELECT COUNT(*) FROM sales")));
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 0);
 }
 
 void SyncServerTest::httpPostAppliesBatch()

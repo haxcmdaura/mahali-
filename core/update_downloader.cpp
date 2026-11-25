@@ -16,7 +16,7 @@ namespace {
 // The asset uploaded by the Windows release workflow. The "latest" alias
 // resolves server-side, so a new release needs no change in this code.
 const char* kDownloadUrl =
-    "https://github.com/heaxheax15-pixel/mahali/releases/latest/download/Mahali-Setup.zip";
+    "https://github.com/haxcmdaura/mahali-/releases/latest/download/Mahali-Setup.zip";
 
 const char* kArchiveName = "Mahali-Setup.zip";
 

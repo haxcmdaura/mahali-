@@ -20,6 +20,7 @@ struct Occasion {
     // purpose: an occasion can be available all year and still be off today.
     bool active = true;
     QString createdAt;
+    QString themeKey;
 };
 
 } // namespace app::core

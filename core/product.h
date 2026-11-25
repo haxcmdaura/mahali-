@@ -37,6 +37,13 @@ struct Product {
     // division rounds, and the remainder it drops is what a shelf price has to be
     // checked against — a rounded cost cannot be audited afterwards.
     long long packageCostCents = 0;
+    // Whether this product was deliberately added to the quick-items bar. A blank
+    // barcode alone no longer puts a product there.
+    bool isQuickItem = false;
+    // How many days a quick item is expected to last before the owner restocks it.
+    int restockDays = 1;
+    // ISO date of the last restock cycle reset. Empty on rows that predate it.
+    QString lastRestockedAt;
 };
 
 } // namespace app::core

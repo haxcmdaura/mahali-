@@ -257,12 +257,19 @@ void SupplierReportTest::period_report_with_purchases_and_payments()
     QVERIFY(addPurchase(f.purchases, supplierId, 50000, data::toIso(march)) > 0);
     QVERIFY(addPayment(f.payments, supplierId, 20000, std::nullopt, data::toIso(april)) > 0);
 
-    const QString marchFrom = march.date().toString(Qt::ISODate) + QStringLiteral("T00:00:00.000");
-    const QString marchTo = march.date().addDays(march.date().daysInMonth() - 1).toString(Qt::ISODate)
-                            + QStringLiteral("T23:59:59.999");
-    const QString aprilFrom = april.date().toString(Qt::ISODate) + QStringLiteral("T00:00:00.000");
-    const QString aprilTo = april.date().addDays(april.date().daysInMonth() - 1).toString(Qt::ISODate)
-                            + QStringLiteral("T23:59:59.999");
+    // The first and last day of the month, not "today plus daysInMonth": on the
+    // 31st, two months back can land on another 31st, and adding 30 days walks
+    // into the following month.
+    const QDate marchFirst(march.date().year(), march.date().month(), 1);
+    const QDate aprilFirst(april.date().year(), april.date().month(), 1);
+    const QString marchFrom = marchFirst.toString(Qt::ISODate) + QStringLiteral("T00:00:00.000");
+    const QString marchTo =
+        QDate(marchFirst.year(), marchFirst.month(), marchFirst.daysInMonth()).toString(Qt::ISODate)
+        + QStringLiteral("T23:59:59.999");
+    const QString aprilFrom = aprilFirst.toString(Qt::ISODate) + QStringLiteral("T00:00:00.000");
+    const QString aprilTo =
+        QDate(aprilFirst.year(), aprilFirst.month(), aprilFirst.daysInMonth()).toString(Qt::ISODate)
+        + QStringLiteral("T23:59:59.999");
 
     const data::SupplierPeriodReport inMarch = f.service.periodReport(supplierId, marchFrom, marchTo);
     QCOMPARE(inMarch.supplierId, supplierId);
@@ -280,8 +287,9 @@ void SupplierReportTest::period_report_with_purchases_and_payments()
     // The same month asked for by plain dates, which is how an operator would
     // type it, has to give the same answer. The upper bound has to reach the last
     // moment of the day or a transaction on the final day drops out.
-    const QString marchDay = march.date().toString(Qt::ISODate);
-    const QString lastDayOfMarch = march.date().addDays(march.date().daysInMonth() - 1).toString(Qt::ISODate);
+    const QString marchDay = marchFirst.toString(Qt::ISODate);
+    const QString lastDayOfMarch =
+        QDate(marchFirst.year(), marchFirst.month(), marchFirst.daysInMonth()).toString(Qt::ISODate);
     const data::SupplierPeriodReport byPlainDates =
         f.service.periodReport(supplierId, marchDay, lastDayOfMarch);
     QCOMPARE(byPlainDates.purchasesCents, 50000LL);

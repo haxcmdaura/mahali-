@@ -7,6 +7,7 @@
 #include <QStringList>
 
 #include <functional>
+#include <stdexcept>
 #include <vector>
 
 namespace app::data {
@@ -26,17 +27,22 @@ QStringList tableColumns(const QSqlDatabase& db, const QString& table)
     return columns;
 }
 
-// Runs one statement, reporting rather than throwing. Every migration goes
-// through here so that a refusal ends up in the log with its own text attached
-// instead of as a bare false that the caller has to remember to check.
-bool run(const QSqlDatabase& db, const QString& sql, const QString& what)
+[[noreturn]] void fail(const QString& what, const QString& reason)
+{
+    const QString message = QStringLiteral("%1: %2").arg(what, reason);
+    qWarning() << "schema migration:" << message;
+    throw std::runtime_error(message.toStdString());
+}
+
+// Runs one statement. Every migration goes through here so a failure stops the
+// sequence instead of being logged and then stamped over.
+void run(const QSqlDatabase& db, const QString& sql, const QString& what)
 {
     QSqlQuery query(db);
     if (query.exec(sql)) {
-        return true;
+        return;
     }
-    qWarning() << "schema migration:" << what << "failed:" << query.lastError().text() << "---" << sql;
-    return false;
+    fail(what, QStringLiteral("%1 --- %2").arg(query.lastError().text(), sql));
 }
 
 // ---------------------------------------------------------------------------
@@ -61,24 +67,19 @@ void migrateSupplierPaymentMethod(const QSqlDatabase& db)
         return;
     }
     if (!tableColumns(db, QStringLiteral("supplier_payments")).contains(QStringLiteral("method"))) {
-        if (!run(db,
-                 QStringLiteral("ALTER TABLE supplier_payments "
-                                "ADD COLUMN method TEXT NOT NULL DEFAULT 'cash'"),
-                 QStringLiteral("add supplier_payments.method"))) {
-            return;
-        }
+        run(db,
+            QStringLiteral("ALTER TABLE supplier_payments "
+                           "ADD COLUMN method TEXT NOT NULL DEFAULT 'cash'"),
+            QStringLiteral("add supplier_payments.method"));
     }
 
     // A row that predates the column reads as NULL or blank if something wrote it
     // directly; normalise those to 'cash' too, so every row carries a method a
     // reader can switch on without a fallback.
-    QSqlQuery fix(db);
-    if (fix.exec(QStringLiteral("UPDATE supplier_payments SET method = 'cash' "
-                                "WHERE method IS NULL OR method = ''"))) {
-        return;
-    }
-    qWarning() << "schema migration: normalising supplier_payments.method failed:"
-               << fix.lastError().text();
+    run(db,
+        QStringLiteral("UPDATE supplier_payments SET method = 'cash' "
+                       "WHERE method IS NULL OR method = ''"),
+        QStringLiteral("normalise supplier_payments.method"));
 }
 
 // ---------------------------------------------------------------------------
@@ -92,12 +93,10 @@ void migrateSupplierPaymentReversal(const QSqlDatabase& db)
         return;
     }
     if (!tableColumns(db, QStringLiteral("supplier_payments")).contains(QStringLiteral("reversed_id"))) {
-        if (!run(db,
-                 QStringLiteral("ALTER TABLE supplier_payments "
-                                "ADD COLUMN reversed_id INTEGER NOT NULL DEFAULT 0"),
-                 QStringLiteral("add supplier_payments.reversed_id"))) {
-            return;
-        }
+        run(db,
+            QStringLiteral("ALTER TABLE supplier_payments "
+                           "ADD COLUMN reversed_id INTEGER NOT NULL DEFAULT 0"),
+            QStringLiteral("add supplier_payments.reversed_id"));
     }
 }
 
@@ -154,9 +153,8 @@ QStringList duplicatedReversalTargets(const QSqlDatabase& db, const PartialUniqu
                       .arg(QLatin1StringView(spec.column), QLatin1StringView(spec.table),
                            QLatin1StringView(spec.column)));
     if (!query.exec()) {
-        qWarning() << "schema migration: could not check" << spec.table << "for duplicate reversals:"
-                   << query.lastError().text();
-        return targets;
+        fail(QStringLiteral("check %1 for duplicate reversals").arg(QLatin1StringView(spec.table)),
+             query.lastError().text());
     }
     while (query.next()) {
         targets << query.value(0).toString();
@@ -278,12 +276,10 @@ void migratePurchaseMethod(const QSqlDatabase& db)
         return;
     }
     if (!tableColumns(db, QStringLiteral("purchases")).contains(QStringLiteral("method"))) {
-        if (!run(db,
-                 QStringLiteral("ALTER TABLE purchases "
-                                "ADD COLUMN method TEXT NOT NULL DEFAULT 'cash'"),
-                 QStringLiteral("add purchases.method"))) {
-            return;
-        }
+        run(db,
+            QStringLiteral("ALTER TABLE purchases "
+                           "ADD COLUMN method TEXT NOT NULL DEFAULT 'cash'"),
+            QStringLiteral("add purchases.method"));
     }
 }
 
@@ -296,12 +292,10 @@ void migratePurchaseReversedId(const QSqlDatabase& db)
         return;
     }
     if (!tableColumns(db, QStringLiteral("purchases")).contains(QStringLiteral("reversed_id"))) {
-        if (!run(db,
-                 QStringLiteral("ALTER TABLE purchases "
-                                "ADD COLUMN reversed_id INTEGER NOT NULL DEFAULT 0"),
-                 QStringLiteral("add purchases.reversed_id"))) {
-            return;
-        }
+        run(db,
+            QStringLiteral("ALTER TABLE purchases "
+                           "ADD COLUMN reversed_id INTEGER NOT NULL DEFAULT 0"),
+            QStringLiteral("add purchases.reversed_id"));
     }
 }
 
@@ -313,12 +307,10 @@ void migratePurchaseItemReversedId(const QSqlDatabase& db)
         return;
     }
     if (!tableColumns(db, QStringLiteral("purchase_items")).contains(QStringLiteral("reversed_id"))) {
-        if (!run(db,
-                 QStringLiteral("ALTER TABLE purchase_items "
-                                "ADD COLUMN reversed_id INTEGER NOT NULL DEFAULT 0"),
-                 QStringLiteral("add purchase_items.reversed_id"))) {
-            return;
-        }
+        run(db,
+            QStringLiteral("ALTER TABLE purchase_items "
+                           "ADD COLUMN reversed_id INTEGER NOT NULL DEFAULT 0"),
+            QStringLiteral("add purchase_items.reversed_id"));
     }
 }
 
@@ -331,20 +323,16 @@ void migrateCashMovementReference(const QSqlDatabase& db)
         return;
     }
     if (!tableColumns(db, QStringLiteral("cash_movements")).contains(QStringLiteral("ref_type"))) {
-        if (!run(db,
-                 QStringLiteral("ALTER TABLE cash_movements "
-                                "ADD COLUMN ref_type TEXT"),
-                 QStringLiteral("add cash_movements.ref_type"))) {
-            return;
-        }
+        run(db,
+            QStringLiteral("ALTER TABLE cash_movements "
+                           "ADD COLUMN ref_type TEXT"),
+            QStringLiteral("add cash_movements.ref_type"));
     }
     if (!tableColumns(db, QStringLiteral("cash_movements")).contains(QStringLiteral("ref_id"))) {
-        if (!run(db,
-                 QStringLiteral("ALTER TABLE cash_movements "
-                                "ADD COLUMN ref_id INTEGER"),
-                 QStringLiteral("add cash_movements.ref_id"))) {
-            return;
-        }
+        run(db,
+            QStringLiteral("ALTER TABLE cash_movements "
+                           "ADD COLUMN ref_id INTEGER"),
+            QStringLiteral("add cash_movements.ref_id"));
     }
     // No backfill: old rows keep NULL. They will be reported as "unreferenced"
     // at close so the operator knows which historical movements lack a trace.
@@ -372,12 +360,10 @@ void migratePurchaseInitialPaymentMarker(const QSqlDatabase& db)
             QStringLiteral("is_purchase_initial_payment"))) {
         return;
     }
-    if (!run(db,
+    run(db,
         QStringLiteral("ALTER TABLE supplier_payments "
                        "ADD COLUMN is_purchase_initial_payment INTEGER NOT NULL DEFAULT 0"),
-        QStringLiteral("add supplier_payments.is_purchase_initial_payment"))) {
-        return;
-    }
+        QStringLiteral("add supplier_payments.is_purchase_initial_payment"));
     run(db,
         QStringLiteral(
             "UPDATE supplier_payments SET is_purchase_initial_payment = 1 "
@@ -434,12 +420,10 @@ void migrateSaleAdjustment(const QSqlDatabase& db)
         if (tableColumns(db, table).contains(QStringLiteral("adjustment_cents"))) {
             continue;
         }
-        if (!run(db,
-                 QStringLiteral("ALTER TABLE %1 ADD COLUMN adjustment_cents INTEGER NOT NULL DEFAULT 0")
-                     .arg(QLatin1StringView(spec.table)),
-                 QStringLiteral("add %1.adjustment_cents").arg(QLatin1StringView(spec.table)))) {
-            continue;
-        }
+        run(db,
+            QStringLiteral("ALTER TABLE %1 ADD COLUMN adjustment_cents INTEGER NOT NULL DEFAULT 0")
+                .arg(QLatin1StringView(spec.table)),
+            QStringLiteral("add %1.adjustment_cents").arg(QLatin1StringView(spec.table)));
     }
 }
 
@@ -593,12 +577,10 @@ void migrateProductPackages(const QSqlDatabase& db)
         if (!tableColumns(db, table).contains(column)) {
             continue;
         }
-        QSqlQuery fix(db);
-        if (fix.exec(QStringLiteral("UPDATE %1 SET %2 = quantity WHERE %2 = 0")
-                         .arg(QString::fromUtf8(spec.table), QString::fromUtf8(spec.column)))) {
-            continue;
-        }
-        qWarning() << "schema migration:" << spec.what << "failed:" << fix.lastError().text();
+        run(db,
+            QStringLiteral("UPDATE %1 SET %2 = quantity WHERE %2 = 0")
+                .arg(QString::fromUtf8(spec.table), QString::fromUtf8(spec.column)),
+            QString::fromLatin1(spec.what));
     }
 }
 
@@ -681,31 +663,36 @@ void migrateReceiptNumbering(const QSqlDatabase& db)
         if (tableColumns(db, table).contains(QString::fromLatin1(spec.column))) {
             continue;
         }
-        if (!run(db,
-                 QStringLiteral("ALTER TABLE %1 ADD COLUMN %2 %3")
-                     .arg(QString::fromUtf8(spec.table), QString::fromUtf8(spec.column),
-                          QString::fromUtf8(spec.type)),
-                 QString::fromLatin1(spec.what))) {
-            continue;
-        }
+        run(db,
+            QStringLiteral("ALTER TABLE %1 ADD COLUMN %2 %3")
+                .arg(QString::fromUtf8(spec.table), QString::fromUtf8(spec.column),
+                     QString::fromUtf8(spec.type)),
+            QString::fromLatin1(spec.what));
     }
 
     // The prefix exists because two tills can mint the same number otherwise, and
     // the prefix is what keeps them apart after a sync. Seeded with INSERT OR
-    // IGNORE so a shop that has already chosen a letter keeps it.
-    run(db,
-        QStringLiteral("INSERT OR IGNORE INTO settings(key, value) VALUES ('device_prefix', 'A')"),
-        QStringLiteral("seed settings.device_prefix"));
+    // IGNORE so a shop that has already chosen a letter keeps it. A partial
+    // database without settings has no prefix to seed; it falls back to A below.
+    const QStringList settingColumns = tableColumns(db, QStringLiteral("settings"));
+    if (settingColumns.contains(QStringLiteral("key"))
+        && settingColumns.contains(QStringLiteral("value"))) {
+        run(db,
+            QStringLiteral("INSERT OR IGNORE INTO settings(key, value) VALUES ('device_prefix', 'A')"),
+            QStringLiteral("seed settings.device_prefix"));
+    }
 
     // Already numbered is already done: an existing receipt_sequences row means
     // this migration (or a fresh install) has issued numbers, and replaying the
     // backfill would renumber rows a customer may already hold. Checked before
     // the backfill rather than after, so the common second open does nothing.
     QSqlQuery counted(db);
-    if (!counted.exec(QStringLiteral("SELECT COUNT(*) FROM receipt_sequences")) || !counted.next()) {
-        qWarning() << "schema migration: could not read receipt_sequences:"
-                   << counted.lastError().text();
-        return;
+    if (!counted.exec(QStringLiteral("SELECT COUNT(*) FROM receipt_sequences"))) {
+        fail(QStringLiteral("read receipt_sequences"), counted.lastError().text());
+    }
+    if (!counted.next()) {
+        fail(QStringLiteral("read receipt_sequences"),
+             QStringLiteral("SELECT COUNT(*) returned no row"));
     }
     if (counted.value(0).toInt() > 0) {
         return;
@@ -718,15 +705,19 @@ void migrateReceiptNumbering(const QSqlDatabase& db)
     // first sale, so every historical receipt gets an A-prefix and the sequence
     // stays contiguous.
     QString prefix;
-    {
+    if (settingColumns.contains(QStringLiteral("key"))
+        && settingColumns.contains(QStringLiteral("value"))) {
         QSqlQuery query(db);
         query.prepare(QStringLiteral("SELECT value FROM settings WHERE key = 'device_prefix'"));
-        if (query.exec() && query.next()) {
+        if (!query.exec()) {
+            fail(QStringLiteral("read settings.device_prefix"), query.lastError().text());
+        }
+        if (query.next()) {
             prefix = query.value(0).toString();
         }
-        if (prefix.isEmpty()) {
-            prefix = QStringLiteral("A");
-        }
+    }
+    if (prefix.isEmpty()) {
+        prefix = QStringLiteral("A");
     }
 
     struct ReceiptLedger {
@@ -755,9 +746,7 @@ void migrateReceiptNumbering(const QSqlDatabase& db)
                                       "ORDER BY created_at ASC, id ASC")
                            .arg(QLatin1StringView(ledger.table)));
         if (!select.exec()) {
-            qWarning() << "schema migration:" << ledger.what << "read failed:"
-                       << select.lastError().text();
-            continue;
+            fail(QString::fromLatin1(ledger.what), select.lastError().text());
         }
         struct Pending {
             int id;
@@ -785,8 +774,7 @@ void migrateReceiptNumbering(const QSqlDatabase& db)
             update.addBindValue(number);
             update.addBindValue(row.id);
             if (!update.exec()) {
-                qWarning() << "schema migration:" << ledger.what << "write failed:"
-                           << update.lastError().text();
+                fail(QString::fromLatin1(ledger.what), update.lastError().text());
             }
         }
     }
@@ -798,8 +786,7 @@ void migrateReceiptNumbering(const QSqlDatabase& db)
         replace.addBindValue(it.key());
         replace.addBindValue(it.value());
         if (!replace.exec()) {
-            qWarning() << "schema migration: receipt_sequences seed failed:"
-                       << replace.lastError().text();
+            fail(QStringLiteral("seed receipt_sequences"), replace.lastError().text());
         }
     }
 }
@@ -841,22 +828,105 @@ void migrateWeightProductsDropPackageFields(const QSqlDatabase& db)
         QStringLiteral("clear package fields on weight products"));
 }
 
+// 18 — quick items become an explicit flag
+//
+// The bar used to list every active product with no barcode, which also swept in
+// products that only happened to lack one. The flag says which products the owner
+// deliberately put there; existing rows stay at 0 until they are marked. The
+// restock window starts at one day, the default the bar will use.
+void migrateProductQuickItem(const QSqlDatabase& db)
+{
+    const QStringList columns = tableColumns(db, QStringLiteral("products"));
+    if (columns.isEmpty()) {
+        return;
+    }
+    if (!columns.contains(QStringLiteral("is_quick_item"))) {
+        run(db,
+            QStringLiteral("ALTER TABLE products ADD COLUMN is_quick_item INTEGER NOT NULL DEFAULT 0"),
+            QStringLiteral("add products.is_quick_item"));
+    }
+    if (!columns.contains(QStringLiteral("restock_days"))) {
+        run(db,
+            QStringLiteral("ALTER TABLE products ADD COLUMN restock_days INTEGER NOT NULL DEFAULT 1"),
+            QStringLiteral("add products.restock_days"));
+    }
+}
+
+// 19 — the date a quick item's restock cycle started
+//
+// Empty for existing rows: the repository fills it the next time the product is
+// saved, and the reminder treats an empty value as never restocked.
+void migrateProductLastRestockedAt(const QSqlDatabase& db)
+{
+    const QStringList columns = tableColumns(db, QStringLiteral("products"));
+    if (columns.isEmpty() || columns.contains(QStringLiteral("last_restocked_at"))) {
+        return;
+    }
+    run(db,
+        QStringLiteral("ALTER TABLE products ADD COLUMN last_restocked_at TEXT NOT NULL DEFAULT ''"),
+        QStringLiteral("add products.last_restocked_at"));
+}
+
+// 20 — utility service invoices
+//
+// Electricity, gas, and water bills have a due date and a paid/unpaid state but
+// no supplier purchase behind them. They get their own table rather than being
+// squeezed into purchases, where they would distort stock and supplier balances.
+void migrateServiceInvoices(const QSqlDatabase& db)
+{
+    run(db,
+        QStringLiteral("CREATE TABLE IF NOT EXISTS service_invoices ("
+                       "id INTEGER PRIMARY KEY,"
+                       "type TEXT NOT NULL,"
+                       "invoice_date TEXT NOT NULL,"
+                       "amount_cents INTEGER NOT NULL,"
+                       "due_date TEXT,"
+                       "status TEXT NOT NULL DEFAULT 'unpaid',"
+                       "notes TEXT)"),
+        QStringLiteral("create service_invoices table"));
+}
+
+void migrateOccasionOffers(const QSqlDatabase& db)
+{
+    const QStringList occasions = tableColumns(db, QStringLiteral("occasions"));
+    if (!occasions.isEmpty() && !occasions.contains(QStringLiteral("theme_key"))) {
+        run(db,
+            QStringLiteral("ALTER TABLE occasions ADD COLUMN theme_key TEXT"),
+            QStringLiteral("add occasions.theme_key"));
+    }
+    run(db,
+        QStringLiteral("CREATE TABLE IF NOT EXISTS occasion_offers ("
+                       "id INTEGER PRIMARY KEY,"
+                       "occasion_id INTEGER NOT NULL,"
+                       "product_id INTEGER NOT NULL,"
+                       "offer_price_cents INTEGER,"
+                       "discount_percent INTEGER,"
+                       "bonus_pieces INTEGER);"),
+        QStringLiteral("create occasion_offers table"));
+}
+
 // ---------------------------------------------------------------------------
 // The table below is keyed by schema version, and runSchemaMigrations() walks it
 // so a database that has already run it never runs it twice. Every entry is
 // idempotent anyway (each one looks before it creates), because a database
 // restored from a backup taken between two versions can arrive with some of the
 // work already done.
-const std::pair<int, std::function<void(const QSqlDatabase&)>> kMigrations[] = {
+struct Migration {
+    int version;
+    const char* name;
+    std::function<void(const QSqlDatabase&)> apply;
+};
+
+const Migration kMigrations[] = {
     // 1 is the version this table started at. Everything it would have held was
     // applied unconditionally by createSchema() before versioning existed, and
     // still is, so there is nothing to replay for it.
-    {2, migrateSupplierPaymentMethod},
+    {2, "supplier payment method", migrateSupplierPaymentMethod},
     // The reversal column was not in the original schema; it arrived with the
     // supplier payment reversal feature. Existing databases need it added so the
     // index migration can create the partial unique index on it.
-    {3, migrateSupplierPaymentReversal},
-    {4, migrateReversalUniqueness},
+    {3, "supplier payment reversal", migrateSupplierPaymentReversal},
+    {4, "reversal uniqueness indexes", migrateReversalUniqueness},
     // The paid part of a purchase used to have no way to say how it was settled,
     // so a cash payment left the drawer and nothing else, and the session
     // reconciled short by exactly that amount. Every report that adds up the till
@@ -865,48 +935,52 @@ const std::pair<int, std::function<void(const QSqlDatabase&)>> kMigrations[] = {
     // had no other choice. No cash movement is back-dated for them — that would put
     // a negative row on a session that was already closed against a figure that did
     // not include it.
-    {5, migratePurchaseMethod},
+    {5, "purchase method", migratePurchaseMethod},
     // The void purchase feature needs to link the void header to the original. The
     // column is added with 0 as the default ("not a void"). The partial unique
     // index in the next migration uses it.
-    {6, migratePurchaseReversedId},
+    {6, "purchase reversed id", migratePurchaseReversedId},
     // The void purchase feature needs to link void items to their originals. The
     // column is added with 0 as the default ("not a void item").
-    {7, migratePurchaseItemReversedId},
-    {8, migrateReportIndexes},
+    {7, "purchase item reversed id", migratePurchaseItemReversedId},
+    {8, "report indexes", migrateReportIndexes},
     // cash_movements.ref_type + ref_id for till reconciliation.
-    {9, migrateCashMovementReference},
-    {10, migrateCashMovementReferenceIndex},
-    {11, migratePurchaseInitialPaymentMarker},
+    {9, "cash movement reference", migrateCashMovementReference},
+    {10, "cash movement reference index", migrateCashMovementReferenceIndex},
+    {11, "purchase initial payment marker", migratePurchaseInitialPaymentMarker},
     // A cashier had no way to change the whole invoice: a discount had to be made
     // by rewriting a unit price, which changed the cost the goods left at and left
     // nothing on the invoice to say so. The column is added to both ledgers at 0,
     // which is what every existing row says about itself.
-    {12, migrateSaleAdjustment},
+    {12, "sale adjustment", migrateSaleAdjustment},
     // Cartons. products gains what a package is called, how many pieces are in it,
     // its own barcode and its exact cost; every ledger line that moves stock gains
     // the unit it was counted in and the piece count, because a quantity alone
     // cannot say whether it meant 3 pieces or 3 cartons. Existing rows are
     // backfilled from their quantity, which is a count of pieces by definition —
     // nothing could be sold or bought by the carton before now.
-    {13, migrateProductPackages},
+    {13, "product packages", migrateProductPackages},
     // The carton column arrived with its default of 1 and the old tray figure was
     // left where it was, so the two disagreed on every product a shop had already
     // described. The old one is copied across only where the new one still holds
     // its default, so a row a shop has since set by hand is not overwritten.
-    {14, migrateBackfillPiecesPerPackage},
+    {14, "pieces per package backfill", migrateBackfillPiecesPerPackage},
     // Receipt numbering. One counter per calendar year, shared by cash and credit
     // sales, and a nullable receipt_number on both ledgers. The backfill numbers
     // every historical row A-prefixed in the order it was written, so a shop that
     // upgrades gets a contiguous sequence rather than a gap before its first new
     // sale; the counter is seeded from the highest number issued so the next sale
     // continues rather than restarts.
-    {15, migrateReceiptNumbering},
+    {15, "receipt numbering", migrateReceiptNumbering},
     // The dialog used to write a carton barcode, name and size onto every product
     // whether or not it was sold by weight, so weight products carry a "5c" code
     // no reader ever wanted. Clear the four fields on those rows so nothing a
     // future reader might trust is left behind.
-    {16, migrateWeightProductsDropPackageFields},
+    {16, "weight product package cleanup", migrateWeightProductsDropPackageFields},
+    {17, "occasion offers", migrateOccasionOffers},
+    {18, "product quick items", migrateProductQuickItem},
+    {19, "product last restocked at", migrateProductLastRestockedAt},
+    {20, "service invoices", migrateServiceInvoices},
 };
 
 } // namespace
@@ -920,30 +994,79 @@ int readSchemaVersion(const QSqlDatabase& db)
     return query.value(0).toInt();
 }
 
+int readSupportedSchemaVersion(const QSqlDatabase& db)
+{
+    const int version = readSchemaVersion(db);
+    if (version > kSchemaVersion) {
+        throw std::runtime_error(
+            QStringLiteral("This database was created by a newer version of Mahali "
+                           "(schema %1; this build supports %2). "
+                           "قاعدة البيانات أنشأتها نسخة أحدث من البرنامج.")
+                .arg(version)
+                .arg(kSchemaVersion)
+                .toStdString());
+    }
+    return version;
+}
+
 void runSchemaMigrations(const QSqlDatabase& db)
 {
-    const int from = readSchemaVersion(db);
+    const int from = readSupportedSchemaVersion(db);
     if (from >= kSchemaVersion) {
         return;
     }
 
-    for (const auto& [version, migration] : kMigrations) {
-        if (version <= from || version > kSchemaVersion) {
+    // Each migration commits on its own, with its version stamp in the same
+    // transaction. A failure halfway through therefore leaves the database at the
+    // last version that completed instead of holding uncommitted ALTERs from a
+    // migration that never finished. Stamping every version is what makes the
+    // next start resume at the right entry rather than replay the whole table.
+    for (const Migration& migration : kMigrations) {
+        if (migration.version <= from || migration.version > kSchemaVersion) {
             continue;
         }
-        migration(db);
+        bool transactionOpen = false;
+        try {
+            QSqlQuery begin(db);
+            if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) {
+                fail(QStringLiteral("begin schema migration %1 (%2)")
+                         .arg(migration.version)
+                         .arg(QString::fromLatin1(migration.name)),
+                     begin.lastError().text());
+            }
+            transactionOpen = true;
+
+            migration.apply(db);
+            run(db,
+                QStringLiteral("PRAGMA user_version = %1").arg(migration.version),
+                QStringLiteral("stamp schema version %1").arg(migration.version));
+
+            QSqlQuery commit(db);
+            if (!commit.exec(QStringLiteral("COMMIT"))) {
+                fail(QStringLiteral("commit schema migration %1 (%2)")
+                         .arg(migration.version)
+                         .arg(QString::fromLatin1(migration.name)),
+                     commit.lastError().text());
+            }
+            transactionOpen = false;
+        } catch (const std::exception& error) {
+            if (transactionOpen) {
+                QSqlQuery rollback(db);
+                if (!rollback.exec(QStringLiteral("ROLLBACK"))) {
+                    qWarning() << "schema migration: rollback of" << migration.name
+                               << "failed:" << rollback.lastError().text();
+                }
+            }
+            throw std::runtime_error(
+                QStringLiteral("schema migration %1 (%2) failed: %3")
+                    .arg(migration.version)
+                    .arg(QString::fromLatin1(migration.name), QString::fromUtf8(error.what()))
+                    .toStdString());
+        }
     }
 
-    // Stamped unconditionally at the end, including when a migration above only
-    // warned: the version records that this build has visited the database, and
-    // the entry that warned about a skipped index has already named itself in
-    // the log. Re-running it on every open would repeat the same warning on
-    // every startup forever.
-    QSqlQuery stamp(db);
-    if (!stamp.exec(QStringLiteral("PRAGMA user_version = %1").arg(kSchemaVersion))) {
-        qWarning() << "schema migration: could not stamp the schema version:"
-                   << stamp.lastError().text();
-    }
+    // The duplicate-reversal index migration is allowed to warn and return
+    // normally; it stamps its own version like every other completed migration.
 }
 
 } // namespace app::data

@@ -6,6 +6,8 @@
 #include <QSqlQuery>
 #include <QVariant>
 
+#include "core/line_total.h"
+
 namespace app::data {
 
 ProductRepository::ProductRepository(Database& db)
@@ -38,14 +40,18 @@ core::Product productFromQuery(const QSqlQuery& query)
     product.piecesPerPackage = query.value(11).toInt();
     product.packageBarcode = query.value(12).toString();
     product.packageCostCents = query.value(13).toLongLong();
+    product.isQuickItem = query.value(14).toInt() != 0;
+    product.restockDays = query.value(15).toInt();
+    product.lastRestockedAt = query.value(16).toString();
     return product;
 }
 
 const char* kProductColumns =
     "id, barcode, name, cost_price_cents, sale_price_cents, quantity, unit, package_size, active, "
-    "sold_by_weight, package_name, pieces_per_package, package_barcode, package_cost_cents";
+    "sold_by_weight, package_name, pieces_per_package, package_barcode, package_cost_cents, "
+    "is_quick_item, restock_days, last_restocked_at";
 
-const char* kQuickItemsFilter = "active = 1 AND (barcode IS NULL OR TRIM(barcode) = '')";
+const char* kQuickItemsFilter = "active = 1 AND is_quick_item = 1";
 
 // Every table holding a product line, and so every one whose rows a deleted
 // product would take the meaning of with it. supplier_return_items is here for
@@ -80,6 +86,14 @@ QVariant barcodeVariant(const QString& barcode)
 // answer, and it is a fallback rather than a stored value because it is a default
 // for this product rather than a fact about it: a shop that packs in boxes should
 // not have to retype "كرتونة" on every product to keep it.
+QString lastRestockedOrDefault(const QString& lastRestockedAt)
+{
+    if (lastRestockedAt.trimmed().isEmpty()) {
+        return QDate::currentDate().toString(Qt::ISODate);
+    }
+    return lastRestockedAt;
+}
+
 QString packageNameOrDefault(const QString& packageName)
 {
     return packageName.trimmed().isEmpty() ? core::Product{}.packageName : packageName;
@@ -175,8 +189,9 @@ int ProductRepository::save(const core::Product& product)
         query.prepare(
             QStringLiteral("INSERT INTO products "
                            "(barcode, name, cost_price_cents, sale_price_cents, quantity, unit, package_size, active, sold_by_weight, "
-                           "package_name, pieces_per_package, package_barcode, package_cost_cents) "
-                           "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)"));
+                           "package_name, pieces_per_package, package_barcode, package_cost_cents, "
+                           "is_quick_item, restock_days, last_restocked_at) "
+                           "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
         query.addBindValue(barcodeVariant(product.barcode));
         query.addBindValue(product.name);
         query.addBindValue(product.costPriceCents);
@@ -194,6 +209,9 @@ int ProductRepository::save(const core::Product& product)
         query.addBindValue(piecesPerPackageOrOne(product.piecesPerPackage));
         query.addBindValue(barcodeVariant(product.packageBarcode));
         query.addBindValue(product.packageCostCents);
+        query.addBindValue(product.isQuickItem ? 1 : 0);
+        query.addBindValue(product.restockDays);
+        query.addBindValue(lastRestockedOrDefault(product.lastRestockedAt));
         if (!query.exec()) {
             m_db.recordError(query.lastError(), QStringLiteral("ProductRepository::save"));
             return 0;
@@ -206,7 +224,8 @@ int ProductRepository::save(const core::Product& product)
                        "barcode = ?, name = ?, cost_price_cents = ?, sale_price_cents = ?, "
                        "unit = ?, package_size = ?, active = ?, sold_by_weight = ?, "
                        "package_name = ?, pieces_per_package = ?, package_barcode = ?, "
-                       "package_cost_cents = ? "
+                       "package_cost_cents = ?, is_quick_item = ?, restock_days = ?, "
+                       "last_restocked_at = ? "
                        "WHERE id = ?"));
     query.addBindValue(barcodeVariant(product.barcode));
     query.addBindValue(product.name);
@@ -224,6 +243,9 @@ int ProductRepository::save(const core::Product& product)
     query.addBindValue(piecesPerPackageOrOne(product.piecesPerPackage));
     query.addBindValue(barcodeVariant(product.packageBarcode));
     query.addBindValue(product.packageCostCents);
+    query.addBindValue(product.isQuickItem ? 1 : 0);
+    query.addBindValue(product.restockDays);
+    query.addBindValue(lastRestockedOrDefault(product.lastRestockedAt));
     query.addBindValue(product.id);
     if (!query.exec()) {
         m_db.recordError(query.lastError(), QStringLiteral("ProductRepository::save"));
@@ -283,11 +305,41 @@ void ProductRepository::adjustStock(int productId, long long delta, const QStrin
 bool ProductRepository::updateAverageCost(int productId, long long oldQty, long long oldCostCents,
                                           long long addedQty, long long addedCostCents)
 {
+    // Every product below is checked before it is formed. Signed overflow is
+    // undefined behaviour, and a wrapped average cost is not a wrong number: it
+    // is a plausible number written into every future sale's frozen cost.
+    if (!core::detail::sumFits(oldQty, addedQty)) {
+        m_db.recordError(
+            QSqlError(QStringLiteral("average cost quantity overflow"),
+                      QStringLiteral("oldQty + addedQty does not fit in long long"),
+                      QSqlError::UnknownError),
+            QStringLiteral("ProductRepository::updateAverageCost"));
+        return false;
+    }
     const long long newQty = oldQty + addedQty;
     if (newQty <= 0) {
         return true;
     }
-    const long long newCost = (oldQty * oldCostCents + addedQty * addedCostCents) / newQty;
+    if (!core::detail::productFits(oldQty, oldCostCents)
+        || !core::detail::productFits(addedQty, addedCostCents)) {
+        m_db.recordError(
+            QSqlError(QStringLiteral("average cost value overflow"),
+                      QStringLiteral("quantity * cost does not fit in long long"),
+                      QSqlError::UnknownError),
+            QStringLiteral("ProductRepository::updateAverageCost"));
+        return false;
+    }
+    const long long oldValue = oldQty * oldCostCents;
+    const long long addedValue = addedQty * addedCostCents;
+    if (!core::detail::sumFits(oldValue, addedValue)) {
+        m_db.recordError(
+            QSqlError(QStringLiteral("average cost total overflow"),
+                      QStringLiteral("old value + added value does not fit in long long"),
+                      QSqlError::UnknownError),
+            QStringLiteral("ProductRepository::updateAverageCost"));
+        return false;
+    }
+    const long long newCost = (oldValue + addedValue) / newQty;
 
     QSqlQuery query(m_db.handle());
     query.prepare(QStringLiteral("UPDATE products SET cost_price_cents = ? WHERE id = ?"));
@@ -347,7 +399,7 @@ bool ProductRepository::canDeletePermanently(int productId) const
 
 bool ProductRepository::removePermanently(int productId) const
 {
-    if (!m_db.beginTransaction()) {
+    if (!m_db.beginWriteTransaction()) {
         return false;
     }
 

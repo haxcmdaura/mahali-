@@ -92,7 +92,7 @@ void AndroidBackend::syncProducts(const QString& serverUrl, const QString& key)
         }
 
         const QJsonArray arr = doc.array();
-        if (!m_db.beginTransaction()) {
+        if (!m_db.beginWriteTransaction()) {
             emit syncStatusChanged(QStringLiteral("Sync failed: could not start transaction"));
             return;
         }

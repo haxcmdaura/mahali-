@@ -5,8 +5,8 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMouseEvent>
+#include <QPushButton>
 #include <QScrollArea>
-#include <QVBoxLayout>
 
 #include "data/product_repository.h"
 #include "theme.h"
@@ -71,58 +71,6 @@ void QuickItemCard::mousePressEvent(QMouseEvent* event)
     QFrame::mousePressEvent(event);
 }
 
-QuickAddCard::QuickAddCard(QWidget* parent)
-    : QFrame(parent)
-{
-    // Not "quickCard": that name is the product tile, and sharing it made the add
-    // card inherit the tile's fill, hover and border, so the one control that is
-    // not a product looked like a product. Its own name lets the stylesheet draw
-    // it as the outlined "add" target it is.
-    setObjectName(QStringLiteral("quickAddCard"));
-    setFixedSize(kCardWidth, kCardHeight);
-    setCursor(Qt::PointingHandCursor);
-    setToolTip(tr("Ajouter un produit"));
-    setAccessibleName(tr("Ajouter un produit"));
-
-    auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
-    m_glyph = new QLabel(this);
-    m_glyph->setAlignment(Qt::AlignCenter);
-    layout->addWidget(m_glyph);
-    refreshGlyph();
-}
-
-void QuickAddCard::refreshGlyph()
-{
-    if (!m_glyph) {
-        return;
-    }
-    const bool dark = activeTheme() == QStringLiteral("dark");
-    const QColor accent(dark ? QStringLiteral("#d4a017") : QStringLiteral("#2563eb"));
-    m_glyph->setPixmap(appIcon(Icon::Plus, accent, 24).pixmap(24, 24));
-}
-
-void QuickAddCard::changeEvent(QEvent* event)
-{
-    QFrame::changeEvent(event);
-    // The application stylesheet is replaced on a theme switch, which is a style
-    // change to every widget in the tree. This is the only signal the card gets,
-    // and reading the live theme rather than the stored setting keeps the glyph
-    // in step with what is actually on screen.
-    if (event->type() == QEvent::StyleChange || event->type() == QEvent::ThemeChange
-        || event->type() == QEvent::PaletteChange) {
-        refreshGlyph();
-    }
-}
-
-void QuickAddCard::mousePressEvent(QMouseEvent* event)
-{
-    if (event->button() == Qt::LeftButton) {
-        emit clicked();
-    }
-    QFrame::mousePressEvent(event);
-}
-
 QuickItemsBar::QuickItemsBar(app::data::Database& db, QWidget* parent)
     : QWidget(parent)
     , m_db(db)
@@ -166,11 +114,21 @@ QuickItemsBar::QuickItemsBar(app::data::Database& db, QWidget* parent)
     // normal case for a shop that scans everything, and the strip reads as
     // empty on its own.
 
-    m_addCard = new QuickAddCard(this);
-    connect(m_addCard, &QuickAddCard::clicked, this, &QuickItemsBar::addNewRequested);
+    const bool dark = activeTheme() == QStringLiteral("dark");
+    const QColor accent(dark ? QStringLiteral("#d4a017") : QStringLiteral("#2563eb"));
+    m_addButton = new QPushButton(this);
+    m_addButton->setObjectName(QStringLiteral("quickAddButton"));
+    m_addButton->setFixedSize(kCardWidth, kCardHeight);
+    m_addButton->setCursor(Qt::PointingHandCursor);
+    m_addButton->setIcon(appIcon(Icon::Plus, accent, 24));
+    m_addButton->setIconSize(QSize(24, 24));
+    m_addButton->setToolTip(tr("Ajouter un produit"));
+    m_addButton->setAccessibleName(tr("Ajouter un produit"));
+    connect(m_addButton, &QPushButton::clicked, this,
+            &QuickItemsBar::addQuickItemRequested);
 
     root->addWidget(m_scroll, 1);
-    root->addWidget(m_addCard);
+    root->addWidget(m_addButton);
 
     connect(m_search, &QLineEdit::textChanged, this, [this](const QString& text) { refresh(text); });
 
