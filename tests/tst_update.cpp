@@ -1,7 +1,10 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QHostAddress>
 #include <QSignalSpy>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QUrl>
 #include <QtTest/QtTest>
 
@@ -25,7 +28,7 @@ private slots:
     void current_version_matches_macro();
     void release_url_is_the_one_the_installer_publishes_to();
     void downloader_urls_the_published_installer();
-    void downloader_start_with_bad_host_fails();
+    void downloader_start_with_http_error_fails();
     void update_script_contains_checks();
     void update_script_refuses_unsafe_paths();
 };
@@ -45,14 +48,38 @@ void UpdateTest::downloader_urls_the_published_installer()
     QVERIFY(app::core::UpdateDownloader::defaultDestination().startsWith(QDir::tempPath()));
 }
 
-void UpdateTest::downloader_start_with_bad_host_fails()
+void UpdateTest::downloader_start_with_http_error_fails()
 {
     app::core::UpdateDownloader downloader;
 
-    // Port 1 on loopback: nothing is listening, so the connection is refused
-    // immediately. No network and no real GitHub call, and still the same code
-    // path a shop with no internet would walk.
-    downloader.setUrl(QUrl(QStringLiteral("http://127.0.0.1:1/Mahali-Setup.zip")));
+    // A local server answers 404 and closes. This walks the HTTP error path
+    // without DNS, GitHub, or an operating-system-specific connection-refused
+    // delay: on a Windows runner, port 1 can sit in connect() long enough to
+    // trip the test watchdog.
+    QTcpServer server;
+    QVERIFY2(server.listen(QHostAddress::LocalHost, 0), qPrintable(server.errorString()));
+    QObject::connect(&server, &QTcpServer::newConnection, &server, [&server]() {
+        while (QTcpSocket* socket = server.nextPendingConnection()) {
+            QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket]() {
+                socket->readAll();
+                socket->write("HTTP/1.1 404 Not Found\r\n"
+                              "Content-Type: text/plain\r\n"
+                              "Content-Length: 0\r\n"
+                              "Connection: close\r\n\r\n");
+                socket->disconnectFromHost();
+            });
+            QObject::connect(socket, &QTcpSocket::disconnected, socket,
+                             &QObject::deleteLater);
+        }
+    });
+
+    QUrl url;
+    url.setScheme(QStringLiteral("http"));
+    url.setHost(QStringLiteral("127.0.0.1"));
+    url.setPort(server.serverPort());
+    url.setPath(QStringLiteral("/Mahali-Setup.zip"));
+    downloader.setUrl(url);
+
     const QString destination =
         QDir(QDir::tempPath()).filePath(QStringLiteral("tst-update-download.zip"));
     downloader.setDestination(destination);
@@ -65,16 +92,13 @@ void UpdateTest::downloader_start_with_bad_host_fails()
     timer.start();
     downloader.start();
 
-    QVERIFY2(failedSpy.wait(3000), "an unreachable host must fail, not hang");
-    QVERIFY2(timer.elapsed() < 3000, "the failure took too long to surface");
+    QVERIFY2(failedSpy.wait(10000), "an HTTP error must fail, not hang");
+    QVERIFY2(timer.elapsed() < 10000, "the failure took too long to surface");
 
-    // A refused connection is not a download: nothing may be reported as
-    // finished, and no half-written file may be left for the restart step to
-    // find and unpack.
+    // An HTTP error is not a download: nothing may be reported as finished,
+    // and no half-written file may be left for the restart step to find and
+    // unpack.
     QVERIFY(finishedSpy.isEmpty());
-    // QNetworkReply reports one progress(0) as the request opens, before the
-    // connection is refused. What must never appear is a real percentage: a
-    // refused connection transferred nothing.
     for (const QList<QVariant>& reported : progress) {
         QCOMPARE(reported.at(0).toInt(), 0);
     }

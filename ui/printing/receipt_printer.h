@@ -29,8 +29,11 @@ bool isPrinterAvailable(const QPrinterInfo& printer,
 // prints a paper copy when an available printer is configured. Returns the path
 // of the saved PDF, or an empty string on failure. Never opens a dialog:
 // the cashier pressed one button and expects a paper slip, not a
-// question.
+// question. printPaper=false writes the PDF only, which the headless CI test
+// uses because a Windows runner without a print spooler can block in Qt's
+// printer enumeration.
 QString printAndSaveReceipt(QTextDocument* doc, ReceiptPaper paper,
-                            app::data::Database& db, QString* error);
+                            app::data::Database& db, QString* error,
+                            bool printPaper = true);
 
 } // namespace app::ui

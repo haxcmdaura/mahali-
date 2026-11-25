@@ -78,7 +78,8 @@ void printReceiptToPrinter(QTextDocument* doc, QPrinter& printer)
 }
 
 QString printAndSaveReceipt(QTextDocument* doc, ReceiptPaper paper,
-                            app::data::Database& db, QString* error)
+                            app::data::Database& db, QString* error,
+                            bool printPaper)
 {
     if (error) {
         error->clear();
@@ -141,6 +142,10 @@ QString printAndSaveReceipt(QTextDocument* doc, ReceiptPaper paper,
     }
 
     printReceiptToPrinter(doc, printer);
+
+    if (!printPaper) {
+        return path;
+    }
 
     const QPrinterInfo selectedPrinter = QPrinterInfo::defaultPrinter();
     if (!selectedPrinter.isNull()) {

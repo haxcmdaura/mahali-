@@ -8,6 +8,7 @@
 #include <QSpinBox>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QStandardPaths>
 #include <QVariant>
 #include <QTemporaryDir>
 #include <QTime>
@@ -1770,6 +1771,11 @@ void UiTest::sales_page_prints_the_selected_sale_as_pdf()
 
 void UiTest::receipt_print_and_save_writes_pdf_regardless_of_printer_state()
 {
+    // A Windows CI runner has no print spooler, and Qt's printer enumeration can
+    // block there for minutes. The PDF half is still exercised; only the paper
+    // attempt is skipped.
+    const bool headlessCi = qEnvironmentVariableIsSet("CI");
+
     const QString folder = m_dir.filePath(QStringLiteral("receipts"));
     QVERIFY(!QDir(folder).exists());
 
@@ -1811,7 +1817,8 @@ void UiTest::receipt_print_and_save_writes_pdf_regardless_of_printer_state()
     doc->setMetaInformation(QTextDocument::DocumentTitle, data.receiptNumber);
 
     QString error;
-    const QString out = ui::printAndSaveReceipt(doc, ui::ReceiptPaper::Thermal80, db, &error);
+    const QString out = ui::printAndSaveReceipt(doc, ui::ReceiptPaper::Thermal80, db, &error,
+                                                !headlessCi);
     delete doc;
 
     const QString expected =
@@ -1835,6 +1842,10 @@ void UiTest::receipt_print_and_save_writes_pdf_regardless_of_printer_state()
 
 void UiTest::receipt_is_a_single_page_on_thermal_paper()
 {
+    if (QStandardPaths::findExecutable(QStringLiteral("pdfinfo")).isEmpty()) {
+        QSKIP("pdfinfo is not installed; skipping the page-count check");
+    }
+
     const QString path = m_dir.filePath(QStringLiteral("receipt-single-page.sqlite"));
     data::Database db(path);
 
@@ -1891,7 +1902,7 @@ void UiTest::receipt_is_a_single_page_on_thermal_paper()
 
     QProcess p;
     p.start(QStringLiteral("pdfinfo"), QStringList() << pdf);
-    QVERIFY(p.waitForFinished());
+    QVERIFY(p.waitForFinished(10000));
     const QString out = QString::fromUtf8(p.readAllStandardOutput());
     int pages = -1;
     QRegularExpression re(QStringLiteral("Pages:\\s*(\\d+)"));
